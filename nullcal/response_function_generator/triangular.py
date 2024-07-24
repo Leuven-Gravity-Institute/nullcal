@@ -14,12 +14,12 @@ class TriangularResponseFunctionGenerator(ResponseFunctionGenerator):
         
     def frequency_domain_response_function(self, parameters):
         splitted_parameters = {
-            'E1': {},
-            'E2': {},
-            'E3': {},
+            'ET1': {},
+            'ET2': {},
+            'ET3': {},
         }
         for key, value in parameters.items():
-            splitted_parameters[key[:2]][key[3:]] = value
-        return (self.frequency_domain_calibration_model(self.frequency_array, **splitted_parameters['E1']),
-                self.frequency_domain_calibration_model(self.frequency_array, **splitted_parameters['E2']),
-                self.frequency_domain_calibration_model(self.frequency_array, **splitted_parameters['E3']))
+            splitted_parameters[key[:3]][key[4:]] = value
+        return (self.frequency_domain_calibration_model(self.frequency_array, **splitted_parameters['ET1']),
+                self.frequency_domain_calibration_model(self.frequency_array, **splitted_parameters['ET2']),
+                self.frequency_domain_calibration_model(self.frequency_array, **splitted_parameters['ET3']))

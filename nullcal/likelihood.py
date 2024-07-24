@@ -6,10 +6,10 @@ from bilby.gw.detector import InterferometerList
 class SelfCalibrationLikelihood(Likelihood):
     def __init__(self,
                  interferometers,
-                 calibration_model):
+                 response_function_generator):
         super().__init__(dict())
         self.interferometers = InterferometerList(interferometers)
-        self.calibration_model = calibration_model
+        self.response_function_generator = response_function_generator
         # Find the frequency mask
         self._frequency_mask = self.interferometers[0].frequency_mask * \
                                self.interferometers[1].frequency_mask * \
@@ -17,7 +17,7 @@ class SelfCalibrationLikelihood(Likelihood):
 
     def log_likelihood(self):
         response_function_1, response_function_2, response_function_3 = \
-            self.calibration_model.frequency_domain_response_function(self.parameters)
+            self.response_function_generator.frequency_domain_response_function(self.parameters)
         calibrated_frequency_domain_strain_E1 = self.calculate_calibrated_frequency_domain_strain(self.interferometers[0], response_function_1)
         calibrated_frequency_domain_strain_E2 = self.calculate_calibrated_frequency_domain_strain(self.interferometers[1], response_function_2)
         calibrated_frequency_domain_strain_E3 = self.calculate_calibrated_frequency_domain_strain(self.interferometers[2], response_function_3)

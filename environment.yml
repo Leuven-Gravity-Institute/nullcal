@@ -1,0 +1,5 @@
+name: nullcal
+channels:
+    - conda-forge
+dependencies:
+    - multinest
