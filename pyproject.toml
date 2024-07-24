@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=40.6.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nullcal"
+version = "0.1.0"
+description = "A package to estimate the calibration parameters for gravitational-wave measurements using null stream."
+authors = [{name="Isaac C.F. Wong",email="chunfung.wong@kuleuven.be"}]
+license = {file="LICENSE"}
+readme = "README.md"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "bilby",
+]
+[tool.setuptools.packages]
+find = {}
+[project.scripts]
