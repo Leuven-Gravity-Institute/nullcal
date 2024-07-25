@@ -6,7 +6,7 @@ ET1 = Detector('E1')
 ET2 = Detector('E2')
 ET3 = Detector('E3')
 
-def  pycbc_antenna_response(det_name, pycbc_det, ra, dec, time, psi, mode):
+def pycbc_antenna_response(det_name, pycbc_det, ra, dec, time, psi, mode):
     if mode == 'plus' or mode == 'cross':
         Fp, Fc = pycbc_det.antenna_pattern(right_ascension=ra,
                                      declination=dec,
