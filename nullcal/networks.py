@@ -49,4 +49,7 @@ class ET(InterferometerList):
         instance[0].antenna_response = lambda ra, dec, time, psi, mode: pycbc_antenna_response('ET1', ET1, ra, dec, time, psi, mode)
         instance[1].antenna_response = lambda ra, dec, time, psi, mode: pycbc_antenna_response('ET2', ET2, ra, dec, time, psi, mode)
         instance[2].antenna_response = lambda ra, dec, time, psi, mode: pycbc_antenna_response('ET3', ET3, ra, dec, time, psi, mode)
+        instance[0].time_delay_from_geocenter = lambda ra, dec, time: ET1.time_delay_from_earth_center(right_ascension=ra,declination=dec,t_gps=time)
+        instance[1].time_delay_from_geocenter = lambda ra, dec, time: ET2.time_delay_from_earth_center(right_ascension=ra,declination=dec,t_gps=time)
+        instance[2].time_delay_from_geocenter = lambda ra, dec, time: ET3.time_delay_from_earth_center(right_ascension=ra,declination=dec,t_gps=time)
         return instance
