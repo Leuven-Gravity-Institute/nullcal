@@ -70,7 +70,8 @@ class SelfRecalibrationLikelihood(Likelihood):
         self._frequency_mask = self.interferometers[0].frequency_mask * \
                                self.interferometers[1].frequency_mask * \
                                self.interferometers[2].frequency_mask
-        self._masked_frequency_array = self.interferometers[0].frequency_array[self._frequency_mask]        
+        self._masked_frequency_array = self.interferometers[0].frequency_array[self._frequency_mask]
+        self._noise_log_likelihood = None
 
     def log_likelihood(self):
         """Log likelihood.
@@ -158,12 +159,12 @@ class SelfRecalibrationLikelihood(Likelihood):
                            power_spectral_density_array_2 + \
                            power_spectral_density_array_3) / 3
         normalization_constant = 4 / duration
-        logl = -0.5 * normalization_constant * np.sum(np.abs(null_stream)**2/null_stream_PSD)
-        logl -= 0.5 * np.sum(np.log(null_stream_PSD))
-        print(null_stream_PSD)
+        logresidual = -0.5 * normalization_constant * np.sum(np.abs(null_stream)**2/null_stream_PSD)
+        lognorm = -0.5 * np.sum(np.log(null_stream_PSD))
+        logl = logresidual + lognorm
         return logl
         
-    def noise_log_likelihood(self):
+    def _calculate_noise_log_likelihood(self):
         """Log likelihood of the noise model.
 
         Returns:
@@ -184,3 +185,8 @@ class SelfRecalibrationLikelihood(Likelihood):
                                                 uncalibrated_PSD_3,
                                                 self.interferometers[0].duration)
         return logl
+
+    def noise_log_likelihood(self):
+        if self._noise_log_likelihood is None:
+            self._noise_log_likelihood = self._calculate_noise_log_likelihood()
+        return self._noise_log_likelihood
