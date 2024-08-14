@@ -162,6 +162,7 @@ class SelfRecalibrationLikelihood(Likelihood):
         logresidual = -0.5 * normalization_constant * np.sum(np.abs(null_stream)**2/null_stream_PSD)
         lognorm = -0.5 * np.sum(np.log(null_stream_PSD))
         logl = logresidual + lognorm
+        #logl = logresidual
         return logl
         
     def _calculate_noise_log_likelihood(self):
@@ -184,6 +185,87 @@ class SelfRecalibrationLikelihood(Likelihood):
                                                 uncalibrated_PSD_2,
                                                 uncalibrated_PSD_3,
                                                 self.interferometers[0].duration)
+        return logl
+
+    def noise_log_likelihood(self):
+        if self._noise_log_likelihood is None:
+            self._noise_log_likelihood = self._calculate_noise_log_likelihood()
+        return self._noise_log_likelihood
+
+
+class SelfRecalibrationProjectorLikelihood(Likelihood):
+    def __init__(self,
+                 interferometers,
+                 recalibration_generator_1,
+                 recalibration_generator_2,
+                 recalibration_generator_3):
+        """Self-calibration likelihood.
+
+        Args:
+            interferometers (bilby InterferometerList): An InterferometerList instance.
+            recalibration_generator_1 (RecalibrationGenerator): A RecalibrationGenerator instance to generate calibration factor.
+            recalibration_generator_2 (RecalibrationGenerator): A RecalibrationGenerator instance to generate calibration factor.
+            recalibration_generator_3 (RecalibrationGenerator): A RecalibrationGenerator instance to generate calibration factor.
+        """
+        super().__init__(dict())
+        self.interferometers = InterferometerList(interferometers)
+        self.recalibration_generator_1 = recalibration_generator_1
+        self.recalibration_generator_2 = recalibration_generator_2
+        self.recalibration_generator_3 = recalibration_generator_3
+        # Find the frequency mask
+        self._frequency_mask = self.interferometers[0].frequency_mask * \
+                               self.interferometers[1].frequency_mask * \
+                               self.interferometers[2].frequency_mask
+        self._masked_frequency_array = self.interferometers[0].frequency_array[self._frequency_mask]
+        self._noise_log_likelihood = None
+        # Construct the noise weighed antenna pattern
+        F = np.array([[ifo.antenna_response(0., 0., 0., 0., 'plus'), ifo.antenna_response(0., 0., 0., 0., 'cross')] for ifo in self.interferometers])
+        psd_array = np.array([ifo.power_spectral_density_array[self._frequency_mask] for ifo in self.interferometers])
+        whitening_factor = 1. / np.sqrt(psd_array / (2 / self.interferometers[0].duration))
+        self._whitened_antenna_response = np.einsum('dm,df->fdm', F, whitening_factor)
+        # Constructed the noise weighed strain data
+        strain_array = np.array([ifo.frequency_domain_strain[self._frequency_mask] for ifo in self.interferometers])
+        self._whitened_strain_data_array = np.einsum('df,df->fd', strain_array, whitening_factor)
+
+    def log_likelihood(self):
+        """Log likelihood.
+
+        Returns:
+            float: Log likelihood.
+        """
+        calibration_factor = np.array([self.recalibration_generator_1.get_calibration_factor(self._masked_frequency_array, self.parameters),
+                                       self.recalibration_generator_2.get_calibration_factor(self._masked_frequency_array, self.parameters),
+                                       self.recalibration_generator_3.get_calibration_factor(self._masked_frequency_array, self.parameters)])
+
+        # Absorb the calibration factor into the whitened antenna response
+        calibrated_whitened_antenna_response = np.einsum('fdm,df->fdm', self._whitened_antenna_response, calibration_factor)
+        # Compute the loglikelihood
+        logl = self._null_stream_log_likelihood(calibrated_whitened_antenna_response)
+        return logl
+
+    def _null_stream_log_likelihood(self,
+                                   calibrated_whitened_antenna_response):
+        """Null stream log likelihood
+
+        Args:
+            calibrated_whitened_antenna_response (numpy array): Calibrated whitened antenna response matrix.
+
+        Returns:
+            float: Log likelihood.
+        """
+        projector = np.array([np.eye(3) for _ in range(len(self._masked_frequency_array))]) - calibrated_whitened_antenna_response @ np.linalg.inv(np.conj(calibrated_whitened_antenna_response).T @ calibrated_whitened_antenna_response) @ np.conj(calibrated_whitened_antenna_response).T
+        # Compute the projected strain
+        projected_strain_data = np.einsum('fdl,fl->fd', projector, self._whitened_strain_data_array)
+        logl = -np.sum(np.abs(projected_strain_data) ** 2)
+        return logl
+        
+    def _calculate_noise_log_likelihood(self):
+        """Log likelihood of the noise model.
+
+        Returns:
+            float: Log likelihood.
+        """
+        logl = self._null_stream_log_likelihood(self._whitened_antenna_response)
         return logl
 
     def noise_log_likelihood(self):
