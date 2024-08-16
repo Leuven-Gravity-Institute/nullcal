@@ -253,7 +253,8 @@ class SelfRecalibrationProjectorLikelihood(Likelihood):
         Returns:
             float: Log likelihood.
         """
-        projector = np.array([np.eye(3) for _ in range(len(self._masked_frequency_array))]) - calibrated_whitened_antenna_response @ np.linalg.inv(np.conj(calibrated_whitened_antenna_response).T @ calibrated_whitened_antenna_response) @ np.conj(calibrated_whitened_antenna_response).T
+        calibrated_whitened_antenna_response_T = np.transpose(calibrated_whitened_antenna_response, [0,2, 1])
+        projector = np.array([np.eye(3) for _ in range(len(self._masked_frequency_array))]) - calibrated_whitened_antenna_response @ np.linalg.inv(np.conj(calibrated_whitened_antenna_response_T) @ calibrated_whitened_antenna_response) @ np.conj(calibrated_whitened_antenna_response_T)
         # Compute the projected strain
         projected_strain_data = np.einsum('fdl,fl->fd', projector, self._whitened_strain_data_array)
         logl = -np.sum(np.abs(projected_strain_data) ** 2)
@@ -272,3 +273,149 @@ class SelfRecalibrationProjectorLikelihood(Likelihood):
         if self._noise_log_likelihood is None:
             self._noise_log_likelihood = self._calculate_noise_log_likelihood()
         return self._noise_log_likelihood
+
+
+class SelfRecalibrationScaleInsensitiveLikelihood(Likelihood):
+    def __init__(self,
+                 interferometers,
+                 recalibration_generator_1,
+                 recalibration_generator_2,
+                 recalibration_generator_3):
+        """Self-calibration likelihood.
+
+        Args:
+            interferometers (bilby InterferometerList): An InterferometerList instance.
+            recalibration_generator_1 (RecalibrationGenerator): A RecalibrationGenerator instance to generate calibration factor.
+            recalibration_generator_2 (RecalibrationGenerator): A RecalibrationGenerator instance to generate calibration factor.
+            recalibration_generator_3 (RecalibrationGenerator): A RecalibrationGenerator instance to generate calibration factor.
+        """
+        super().__init__(dict())
+        self.interferometers = InterferometerList(interferometers)
+        self.recalibration_generator_1 = recalibration_generator_1
+        self.recalibration_generator_2 = recalibration_generator_2
+        self.recalibration_generator_3 = recalibration_generator_3
+        # Find the frequency mask
+        self._frequency_mask = self.interferometers[0].frequency_mask * \
+                               self.interferometers[1].frequency_mask * \
+                               self.interferometers[2].frequency_mask
+        self._masked_frequency_array = self.interferometers[0].frequency_array[self._frequency_mask]
+        self._noise_log_likelihood = None
+
+    def log_likelihood(self):
+        """Log likelihood.
+
+        Returns:
+            float: Log likelihood.
+        """
+        calibration_factor_1 = self.recalibration_generator_1.get_calibration_factor(self._masked_frequency_array, self.parameters)
+        calibration_factor_2 = self.recalibration_generator_2.get_calibration_factor(self._masked_frequency_array, self.parameters)
+        calibration_factor_3 = self.recalibration_generator_3.get_calibration_factor(self._masked_frequency_array, self.parameters)
+
+        # Recalibrate the strain
+        recalibrated_frequency_domain_strain_1 = self.recalibrate_strain(calibration_factor_1,
+                                                                         self.interferometers[0].frequency_domain_strain[self._frequency_mask])
+        recalibrated_frequency_domain_strain_2 = self.recalibrate_strain(calibration_factor_2,
+                                                                         self.interferometers[1].frequency_domain_strain[self._frequency_mask])
+        recalibrated_frequency_domain_strain_3 = self.recalibrate_strain(calibration_factor_3,
+                                                                         self.interferometers[2].frequency_domain_strain[self._frequency_mask])
+        # Recalibrate the power spectral density
+        recalibrated_power_spectral_density_1 = self.recalibrate_power_spectral_density(calibration_factor_1,
+                                                                                        self.interferometers[0].power_spectral_density_array[self._frequency_mask])
+        recalibrated_power_spectral_density_2 = self.recalibrate_power_spectral_density(calibration_factor_2,
+                                                                                        self.interferometers[1].power_spectral_density_array[self._frequency_mask])
+        recalibrated_power_spectral_density_3 = self.recalibrate_power_spectral_density(calibration_factor_3,
+                                                                                        self.interferometers[2].power_spectral_density_array[self._frequency_mask])        
+        logl = self._null_stream_log_likelihood(recalibrated_frequency_domain_strain_1,
+                                                recalibrated_frequency_domain_strain_2,
+                                                recalibrated_frequency_domain_strain_3,
+                                                recalibrated_power_spectral_density_1,
+                                                recalibrated_power_spectral_density_2,
+                                                recalibrated_power_spectral_density_3,
+                                                self.interferometers[0].duration)
+        return logl
+
+    def recalibrate_strain(self, calibration_factor, frequency_domain_strain):
+        """Recalibrate strain.
+
+        Args:
+            calibration_factor (numpy array): Calibration factor.
+            frequency_domain_strain (numpy array): Frequency domain strain.
+
+        Returns:
+            numpy array: Recalibrated frequency domain strain.
+        """
+        return frequency_domain_strain / calibration_factor
+
+    def recalibrate_power_spectral_density(self, calibration_factor, power_spectral_density_array):
+        """Recalibrate power spectral density.
+
+        Args:
+            calibration_factor (numpy array): Calibration factor.
+            power_spectral_density_array (numpy array): Power spectral density.
+
+        Returns:
+            numpy array: Recalibrated power spectral density.
+        """
+        return power_spectral_density_array / np.abs(calibration_factor) ** 2
+
+    def _null_stream_log_likelihood(self,
+                                    frequency_domain_strain_1,
+                                    frequency_domain_strain_2,
+                                    frequency_domain_strain_3,
+                                    power_spectral_density_array_1,
+                                    power_spectral_density_array_2,
+                                    power_spectral_density_array_3,
+                                    duration):
+        """Null stream log likelihood
+
+        Args:
+            frequency_domain_strain_1 (numpy array): Frequency domain strain of detector 1.
+            frequency_domain_strain_2 (numpy array): Frequency domain strain of detector 2.
+            frequency_domain_strain_3 (numpy array): Frequency domain strain of detector 3.
+            power_spectral_density_array_1 (numpy array): Power spectral density of detector 1.
+            power_spectral_density_array_2 (numpy array): Power spectral density of detector 2.
+            power_spectral_density_array_3 (numpy array): Power spectral density of detector 3.
+            duration (float): Duration of data segment in second.
+
+        Returns:
+            float: Log likelihood.
+        """
+        null_stream = (frequency_domain_strain_1 + \
+                       frequency_domain_strain_2 + \
+                       frequency_domain_strain_3) / np.sqrt(3)
+        null_stream_PSD = (power_spectral_density_array_1 + \
+                           power_spectral_density_array_2 + \
+                           power_spectral_density_array_3) / 3
+        normalization_constant = 4 / duration
+        logl = -0.5 * normalization_constant * np.sum(np.abs(null_stream)**2/null_stream_PSD)
+        #lognorm = -0.5 * np.sum(np.log(null_stream_PSD))
+        #logl = logresidual + lognorm
+        #logl = logresidual
+        return logl
+        
+    def _calculate_noise_log_likelihood(self):
+        """Log likelihood of the noise model.
+
+        Returns:
+            float: Log likelihood.
+        """
+        uncalibrated_frequency_domain_strain_1 = self.interferometers[0].frequency_domain_strain[self._frequency_mask]
+        uncalibrated_frequency_domain_strain_2 = self.interferometers[1].frequency_domain_strain[self._frequency_mask]
+        uncalibrated_frequency_domain_strain_3 = self.interferometers[2].frequency_domain_strain[self._frequency_mask]
+        uncalibrated_PSD_1 = self.interferometers[0].power_spectral_density_array[self._frequency_mask]
+        uncalibrated_PSD_2 = self.interferometers[1].power_spectral_density_array[self._frequency_mask]
+        uncalibrated_PSD_3 = self.interferometers[2].power_spectral_density_array[self._frequency_mask]
+        # Compute the log likelihood.
+        logl = self._null_stream_log_likelihood(uncalibrated_frequency_domain_strain_1,
+                                                uncalibrated_frequency_domain_strain_2,
+                                                uncalibrated_frequency_domain_strain_3,
+                                                uncalibrated_PSD_1,
+                                                uncalibrated_PSD_2,
+                                                uncalibrated_PSD_3,
+                                                self.interferometers[0].duration)
+        return logl
+
+    def noise_log_likelihood(self):
+        if self._noise_log_likelihood is None:
+            self._noise_log_likelihood = self._calculate_noise_log_likelihood()
+        return self._noise_log_likelihood        
