@@ -68,4 +68,4 @@ For any questions or further assistance, please open an issue on Git.
 
 ## Thank You!
 
-We appreciate your contributions to [Your Project Name] and look forward to your pull requests!
+We appreciate your contributions to nullcal and look forward to your pull requests!
