@@ -1,6 +1,6 @@
 # Contributing to nullcal
 
-Thank you for considering contributing to [Your Project Name]! We welcome contributions from the community and are excited to work with you. To ensure a smooth contribution process, please follow the guidelines below.
+Thank you for considering contributing to nullcal! We welcome contributions from the community and are excited to work with you. To ensure a smooth contribution process, please follow the guidelines below.
 
 ## How to Contribute
 ### 1. Getting Started
