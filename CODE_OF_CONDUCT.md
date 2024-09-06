@@ -18,7 +18,7 @@ At nullcal, we are committed to fostering a welcoming and inclusive environment 
 
 ## Reporting and Enforcement
 
-If you experience or witness any behavior that violates this Code of Conduct, please report it to the main developers (the email channel specifically for issues of code of conduct has not been set up yet). All reports will be handled confidentially.
+If you experience or witness any behavior that violates this Code of Conduct, please report it to the maintainers (the email channel specifically for issues of code of conduct has not been set up yet). All reports will be handled confidentially.
 
 The project maintainers will investigate reported issues and take appropriate action to address violations.
 
