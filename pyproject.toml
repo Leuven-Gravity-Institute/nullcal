@@ -16,6 +16,7 @@ classifiers = [
 ]
 dependencies = [
     "bilby>=2.3.0",
+    "pytest",
 ]
 [tool.setuptools.packages]
 find = {}

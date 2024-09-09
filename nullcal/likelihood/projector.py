@@ -6,7 +6,7 @@ from numba import njit
 
 @njit
 def compute_calibrated_whitened_antenna_response(whitened_antenna_response, calibration_factor):
-    output = np.zeros_like(whitened_antenna_response)
+    output = np.zeros(whitened_antenna_response.shape, dtype=calibration_factor.dtype)
     nfreq, ndet, nmode = whitened_antenna_response.shape
     for i in range(nfreq):
         for j in range(ndet):
