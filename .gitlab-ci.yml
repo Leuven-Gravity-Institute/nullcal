@@ -1,6 +1,18 @@
 stages:
   - test
 
+# ------------- Initial Stage -------------
+
+.list-env: &list-env
+  - PREFIX="$(dirname $(which python))/.."
+  - if [ -d "${PREFIX}/conda-meta" ]; then
+      conda list --prefix "${PREFIX}" --show-channel-urls;
+    else
+      python -m pip list installed;
+    fi
+
+
+
 # ------------- Test Stage -------------
 .unit-tests: &unit-test
   stage: test
