@@ -1,10 +1,21 @@
 import unittest
 import numpy as np
+from nullcal.likelihood.projector import compute_calibrated_whitened_antenna_response
 from nullcal.likelihood.projector import compute_projector
 from nullcal.likelihood.projector import compute_projected_strain_data
 
 
 class TestSelfRecalibrationProjectorLikelihood(unittest.TestCase):
+    def test(self):
+        nfreq = 4096
+        ndet = 3
+        nmode = 2
+        whitened_antenna_response = np.random.randn(nfreq,ndet,nmode)+np.random.randn(nfreq,ndet,nmode)*1.j
+        calibration_factor = np.random.randn(ndet,nfreq)+np.random.randn(ndet,nfreq)*1.j
+        Fwc = compute_calibrated_whitened_antenna_response(whitened_antenna_response, calibration_factor)
+        Fwc_np = np.einsum('fdm,df->fdm', whitened_antenna_response, calibration_factor)
+        self.assertTrue(np.allclose(Fwc, Fwc_np))
+
     def test_compute_projector(self):
         nfreq = 4096
         ndet = 3

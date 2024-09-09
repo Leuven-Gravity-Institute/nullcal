@@ -35,8 +35,7 @@ basic-3.10:
   script:
     - python -m pip install .
     - *list-env
-
-    - pytest --cov=bilby --durations 10
+    - python -m unittest discover -s test
 
 python-3.10:
   <<: *unit-test

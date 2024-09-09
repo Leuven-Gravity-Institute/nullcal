@@ -6,7 +6,13 @@ from numba import njit
 
 @njit
 def compute_calibrated_whitened_antenna_response(whitened_antenna_response, calibration_factor):
-    pass
+    output = np.zeros_like(whitened_antenna_response)
+    nfreq, ndet, nmode = whitened_antenna_response.shape
+    for i in range(nfreq):
+        for j in range(ndet):
+            for k in range(nmode):
+                output[i,j,k] = whitened_antenna_response[i,j,k] * calibration_factor[j,i]
+    return output
 
 @njit
 def compute_projector(calibrated_whitened_antenna_response_function):
@@ -108,7 +114,7 @@ class SelfRecalibrationProjectorLikelihood(Likelihood):
         calibration_factor = self._construct_calibration_factor()
 
         # Absorb the calibration factor into the whitened antenna response
-        calibrated_whitened_antenna_response = np.einsum('fdm,df->fdm', self._whitened_antenna_response, calibration_factor)
+        calibrated_whitened_antenna_response = compute_calibrated_whitened_antenna_response(self._whitened_antenna_response, calibration_factor)
         # Compute the loglikelihood
         logl = self._null_stream_log_likelihood(calibrated_whitened_antenna_response)
         return logl
