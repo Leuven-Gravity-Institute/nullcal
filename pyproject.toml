@@ -4,11 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nullcal"
-version = "0.2.0"
+version = "0.3.0"
 description = "A package to estimate the calibration parameters for gravitational-wave measurements using null stream."
 authors = [{name="Isaac C.F. Wong",email="chunfung.wong@kuleuven.be"}]
 license = {file="LICENSE"}
-readme = "README.md"
+readme = "README.rst"
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
@@ -16,6 +16,8 @@ classifiers = [
 ]
 dependencies = [
     "bilby>=2.3.0",
+    "pytest",
+    "pytest-cov"
 ]
 [tool.setuptools.packages]
 find = {}
