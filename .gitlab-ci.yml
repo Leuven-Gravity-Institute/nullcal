@@ -1,4 +1,5 @@
 stages:
+  - initial
   - test
 
 # ------------- Initial Stage -------------
@@ -11,6 +12,21 @@ stages:
       python -m pip list installed;
     fi
 
+.test-python: &test-python
+  stage: initial
+  image: python
+  script:
+    - python -m pip install .
+    - *list-env
+    - python -c "import nullcal"
+    - python -c "import nullcal.likelihood"
+    - for script in $(pip show -f nullcal | grep "bin\/" | xargs -I {} basename {}); do
+          ${script} --help;
+      done
+
+basic-3.10:
+  <<: *test-python
+  image: python:3.10
 
 
 # ------------- Test Stage -------------
