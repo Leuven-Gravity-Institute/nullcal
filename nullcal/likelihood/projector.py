@@ -4,10 +4,66 @@ from bilby.gw.detector import InterferometerList
 from numba import njit
 
 
+@njit
 def compute_calibrated_whitened_antenna_response(whitened_antenna_response, calibration_factor):
-    
-    calibrated_whitened_antenna_response = np.einsum('fdm,df->fdm', self._whitened_antenna_response, calibration_factor)
+    pass
 
+@njit
+def compute_projector(calibrated_whitened_antenna_response_function):
+    """Compute the projector given the calibrated whitened antenna response function.
+
+    Args:
+        calibrated_whitened_antenna_response_function (numpy array): Calibrated whitened antenna response function.
+
+    Returns:
+        numpy array: Projector.
+    """
+    # The dimensions of the input is (frequency, detector, mode)
+    nfreq, ndet, nmode = calibrated_whitened_antenna_response_function.shape
+    FtF = np.zeros((nfreq, nmode, nmode), dtype=calibrated_whitened_antenna_response_function.dtype)
+    for i in range(nfreq):
+        for j in range(nmode):
+            for k in range(j, nmode):
+                sum = 0.
+                for l in range(ndet):
+                    sum += np.conj(calibrated_whitened_antenna_response_function[i,l,j])*calibrated_whitened_antenna_response_function[i,l,k]
+                FtF[i,j,k] = sum
+                FtF[i,k,j] = np.conj(sum)
+    # Compute F @ FtF_inv first
+    F_FtF_inv = np.zeros((nfreq, ndet, nmode), dtype=calibrated_whitened_antenna_response_function.dtype)
+    for i in range(nfreq):
+        FtF_inv_i = np.linalg.inv(FtF[i])
+        for j in range(ndet):
+            for k in range(nmode):
+                sum = 0.
+                for l in range(nmode):
+                    sum += calibrated_whitened_antenna_response_function[i,j,l]*FtF_inv_i[l,k]
+                F_FtF_inv[i,j,k] = sum                
+    output = np.zeros((nfreq, ndet, ndet), dtype=calibrated_whitened_antenna_response_function.dtype)
+    for i in range(nfreq):
+        for j in range(ndet):
+            for k in range(j, ndet):
+                sum = 0.
+                for l in range(nmode):
+                    sum += F_FtF_inv[i,j,l]*np.conj(calibrated_whitened_antenna_response_function[i,k,l])
+                if j != k:
+                    output[i,j,k] = -sum
+                    output[i,k,j] = -np.conj(sum)
+                else:
+                    output[i,j,k] = 1. - sum
+    return output
+
+@njit
+def compute_projected_strain_data(projector, strain_data):
+    nfreq, ndet, _ = projector.shape
+    output = np.zeros_like(strain_data)
+    for i in range(nfreq):
+        for j in range(ndet):
+            sum = 0.
+            for k in range(ndet):
+                sum += projector[i,j,k]*strain_data[i,k]
+            output[i,j] = sum
+    return output
 
 class SelfRecalibrationProjectorLikelihood(Likelihood):
     def __init__(self,
@@ -49,15 +105,19 @@ class SelfRecalibrationProjectorLikelihood(Likelihood):
         Returns:
             float: Log likelihood.
         """
-        calibration_factor = np.array([self.recalibration_generator_1.get_calibration_factor(self._masked_frequency_array, self.parameters),
-                                       self.recalibration_generator_2.get_calibration_factor(self._masked_frequency_array, self.parameters),
-                                       self.recalibration_generator_3.get_calibration_factor(self._masked_frequency_array, self.parameters)])
+        calibration_factor = self._construct_calibration_factor()
 
         # Absorb the calibration factor into the whitened antenna response
         calibrated_whitened_antenna_response = np.einsum('fdm,df->fdm', self._whitened_antenna_response, calibration_factor)
         # Compute the loglikelihood
         logl = self._null_stream_log_likelihood(calibrated_whitened_antenna_response)
         return logl
+
+    def _construct_calibration_factor(self):
+        calibration_factor = np.array([self.recalibration_generator_1.get_calibration_factor(self._masked_frequency_array, self.parameters),
+                                       self.recalibration_generator_2.get_calibration_factor(self._masked_frequency_array, self.parameters),
+                                       self.recalibration_generator_3.get_calibration_factor(self._masked_frequency_array, self.parameters)])
+        return calibration_factor
 
     def _null_stream_log_likelihood(self,
                                    calibrated_whitened_antenna_response):
@@ -69,10 +129,9 @@ class SelfRecalibrationProjectorLikelihood(Likelihood):
         Returns:
             float: Log likelihood.
         """
-        calibrated_whitened_antenna_response_T = np.transpose(calibrated_whitened_antenna_response, [0,2, 1])
-        projector = np.array([np.eye(3) for _ in range(len(self._masked_frequency_array))]) - calibrated_whitened_antenna_response @ np.linalg.inv(np.conj(calibrated_whitened_antenna_response_T) @ calibrated_whitened_antenna_response) @ np.conj(calibrated_whitened_antenna_response_T)
+        projector = compute_projector(calibrated_whitened_antenna_response)
         # Compute the projected strain
-        projected_strain_data = np.einsum('fdl,fl->fd', projector, self._whitened_strain_data_array)
+        projected_strain_data = compute_projected_strain_data(projector, self._whitened_strain_data_array)        
         logl = -np.sum(np.abs(projected_strain_data) ** 2)
         return logl
         
