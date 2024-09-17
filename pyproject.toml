@@ -16,6 +16,8 @@ classifiers = [
 ]
 dependencies = [
     "bilby>=2.3.0",
+    "numba",
+    "scipy",
     "pytest",
     "pytest-cov"
 ]
