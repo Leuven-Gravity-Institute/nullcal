@@ -8,6 +8,9 @@ import sys
 import os
 import numpy as np
 
+# Enable Cython coverage
+CYTHON_COVERAGE = os.getenv("CYTHON_COVERAGE", "1") == "1"
+
 python_version = sys.version_info
 
 if python_version < (3, 8):
@@ -51,6 +54,7 @@ extensions  = [
                             np.get_include()],
               libraries=cython_gsl.get_libraries(),
               library_dirs=[cython_gsl.get_library_dir()],
+              define_macros=[("CYTHON_TRACE", "1")] if CYTHON_COVERAGE else [],
     ),
     Extension("nullcal.time_frequency_transform.inverse_wavelet_time_funcs",
               ["nullcal/time_frequency_transform/inverse_wavelet_time_funcs.pyx"],
@@ -58,6 +62,7 @@ extensions  = [
                             np.get_include()],
               libraries=cython_gsl.get_libraries(),
               library_dirs=[cython_gsl.get_library_dir()],
+              define_macros=[("CYTHON_TRACE", "1")] if CYTHON_COVERAGE else [],
     ),
     Extension("nullcal.time_frequency_transform.transform_freq_funcs",
               ["nullcal/time_frequency_transform/transform_freq_funcs.pyx"],
@@ -65,6 +70,7 @@ extensions  = [
                             np.get_include()],
               libraries=cython_gsl.get_libraries(),
               library_dirs=[cython_gsl.get_library_dir()],
+              define_macros=[("CYTHON_TRACE", "1")] if CYTHON_COVERAGE else [],
     ),
     Extension("nullcal.time_frequency_transform.transform_time_funcs",
               ["nullcal/time_frequency_transform/transform_time_funcs.pyx"],
@@ -72,6 +78,7 @@ extensions  = [
                             np.get_include()],
               libraries=cython_gsl.get_libraries(),
               library_dirs=[cython_gsl.get_library_dir()],
+              define_macros=[("CYTHON_TRACE", "1")] if CYTHON_COVERAGE else [],
     ),
     Extension("nullcal.time_frequency_transform.wavelet_transform",
               ["nullcal/time_frequency_transform/wavelet_transform.pyx"],
@@ -79,6 +86,7 @@ extensions  = [
                             np.get_include()],
               libraries=cython_gsl.get_libraries(),
               library_dirs=[cython_gsl.get_library_dir()],
+              define_macros=[("CYTHON_TRACE", "1")] if CYTHON_COVERAGE else [],
     )
 ]
 
@@ -93,5 +101,5 @@ setup(
         "nullcal.time_frequency_transform"
     ],
     package_dir={"nullcal": "nullcal"},
-    ext_modules=cythonize(extensions, language_level="3"),
+    ext_modules=cythonize(extensions, language_level="3", compiler_directives={"linetrace": CYTHON_COVERAGE}),
 )

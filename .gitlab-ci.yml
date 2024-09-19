@@ -40,7 +40,7 @@ basic-3.10:
   stage: test
   script:
     - python -m pip install .
-    - python setup.py build_ext --inplace
+    - CYTHON_COVERAGE=1 python setup.py build_ext --inplace
     - *list-env
     - pytest --cov=nullcal --durations 10
 
