@@ -1,1 +1,1 @@
-The numba implementation of https://github.com/XGI-MSU/WDMWaveletTransforms
+Cython implementation of https://github.com/XGI-MSU/WDMWaveletTransforms

@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=40.6.0", "wheel"]
+requires = ["setuptools>=40.6.0", "wheel", "Cython", "CythonGSL", "numpy"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -15,11 +15,13 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
+    "numpy>=1.18.1",
+    "CythonGSL",
+    "pytest",
+    "pytest-cov",
     "bilby>=2.3.0",
     "numba",
     "scipy",
-    "pytest",
-    "pytest-cov"
 ]
 [tool.setuptools.packages]
 find = {}
