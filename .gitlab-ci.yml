@@ -39,7 +39,7 @@ basic-3.10:
 .unit-tests: &unit-test
   stage: test
   script:
-    - python -m pip install .
+    - python setup.py build_ext --inplace
     - *list-env
     - pytest --cov=nullcal --durations 10
 
