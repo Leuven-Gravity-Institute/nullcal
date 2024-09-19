@@ -42,7 +42,7 @@ basic-3.10:
     - python -m pip install .
     - CYTHON_COVERAGE=1 python setup.py build_ext --inplace
     - *list-env
-    - pytest --cov=nullcal --durations 10
+    - pytest --doctest-cython --cov=nullcal --durations 10
 
 python-3.10:
   <<: *unit-test
