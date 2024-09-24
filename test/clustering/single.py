@@ -7,6 +7,7 @@ from nullcal.clustering.time_frequency_map import construct_time_frequency_map
 if __name__ == '__main__':
     duration = 4.0
     sampling_frequency = 1024.0
+    minimum_frequency = 20
 
     injection_parameters = dict(
         mass_1=60.0,
@@ -27,7 +28,7 @@ if __name__ == '__main__':
     waveform_arguments = dict(
         waveform_approximant="IMRPhenomD",
         reference_frequency=50.0,
-        minimum_frequency=20.0,
+        minimum_frequency=minimum_frequency,
     )
 
 
@@ -67,7 +68,7 @@ if __name__ == '__main__':
     plt.close()
 
 
-    filter = single_clustering_by_quantile(ifos, frequency_resolution=16, quantile=0.95, padding_freq=0, padding_time=0)
+    filter = single_clustering_by_quantile(ifos, frequency_resolution=16, quantile=0.99, padding_freq=0, padding_time=0, minimum_frequency=minimum_frequency)
 
     plt.imshow(filter.T, aspect='auto', origin='lower', extent=[0, ifos[0].duration, 0, ifos[0].frequency_array[-1]], cmap='viridis')
     plt.xlabel('Time [s]')
