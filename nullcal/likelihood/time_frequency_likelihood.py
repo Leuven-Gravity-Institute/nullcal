@@ -33,7 +33,7 @@ class SelfRecalibrationProjectorTimeFrequencyLikelihood(Likelihood):
         self.time_frequency_filter = time_frequency_filter
         self._wavelet_transform_frequency_resolution = wavelet_transform_frequency_resolution
         self._wavelet_transform_Nf = int(self.interferometers[0].sampling_frequency / 2 / wavelet_transform_frequency_resolution)
-        self._wavelet_transform_Nt = int(len(self.interferometer[0].time_array) / self._wavelet_transform_Nf)
+        self._wavelet_transform_Nt = int(len(self.interferometers[0].time_array) / self._wavelet_transform_Nf)
         self._wavelet_transform_nx = wavelet_transform_nx
         # Find the frequency mask
         self._frequency_mask = self.interferometers[0].frequency_mask * \
@@ -91,9 +91,9 @@ class SelfRecalibrationProjectorTimeFrequencyLikelihood(Likelihood):
         # Compute the projected strain
         projected_strain_data = compute_projected_strain_data(projector, self._whitened_strain_data_array, self._frequency_mask)
         # Transform the projected strain data to time frequency domain
-        projected_time_frequency_strain_data = transform_wavelet_freq(projected_strain_data, self._wavelet_transform_Nf, self._wavelet_transform_Nt, self._wavelet_transform_nx)
+        projected_time_frequency_strain_data = np.array([transform_wavelet_freq(data, self._wavelet_transform_Nf, self._wavelet_transform_Nt, self._wavelet_transform_nx) for data in projected_strain_data])
         # Apply the time-frequency filter
-        filtered_projected_time_frequency_strain_data = projected_time_frequency_strain_data[self.time_frequency_filter]
+        filtered_projected_time_frequency_strain_data = projected_time_frequency_strain_data[:,self.time_frequency_filter]
         logl = -np.sum(np.abs(filtered_projected_time_frequency_strain_data) ** 2) * 0.5
         return logl
         

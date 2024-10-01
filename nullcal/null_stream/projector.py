@@ -15,7 +15,7 @@ def compute_projector(calibrated_whitened_antenna_response_function, frequency_m
     nfreq, ndet, nmode = calibrated_whitened_antenna_response_function.shape
     FtF = np.zeros((nfreq, nmode, nmode), dtype=calibrated_whitened_antenna_response_function.dtype)
     for i in range(nfreq):
-        if frequency_mask[i] is True:
+        if frequency_mask[i]:
             for j in range(nmode):
                 for k in range(j, nmode):
                     sum = 0.
@@ -26,7 +26,7 @@ def compute_projector(calibrated_whitened_antenna_response_function, frequency_m
     # Compute F @ FtF_inv first
     F_FtF_inv = np.zeros((nfreq, ndet, nmode), dtype=calibrated_whitened_antenna_response_function.dtype)
     for i in range(nfreq):
-        if frequency_mask[i] is True:
+        if frequency_mask[i]:
             FtF_inv_i = np.linalg.inv(FtF[i])
             for j in range(ndet):
                 for k in range(nmode):
@@ -36,7 +36,7 @@ def compute_projector(calibrated_whitened_antenna_response_function, frequency_m
                     F_FtF_inv[i,j,k] = sum                
     output = np.zeros((nfreq, ndet, ndet), dtype=calibrated_whitened_antenna_response_function.dtype)
     for i in range(nfreq):
-        if frequency_mask[i] is True:
+        if frequency_mask[i]:
             for j in range(ndet):
                 for k in range(j, ndet):
                     sum = 0.
