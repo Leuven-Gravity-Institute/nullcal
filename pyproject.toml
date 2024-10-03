@@ -17,9 +17,6 @@ classifiers = [
 dependencies = [
     "numpy>=1.18.1",
     "CythonGSL",
-    "pytest",
-    "pytest-cov",
-    "pytest-cython",
     "bilby>=2.3.0",
     "numba",
     "scipy",
