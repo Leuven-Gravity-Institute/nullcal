@@ -36,7 +36,7 @@ def main():
     parser.add('--minimum-frequency', type=float, help='Minimum frequency in Hz.')
     parser.add('--signal-files', type=json_loads_with_none, help='A dictionary of files that contains the signal.')
     parser.add('--signal-file-channels', type=json_loads_with_none, help='A dictionary of channel names for the signal files.')
-    parser.add('--signal-parameters', type=str, help='Path to a JSON file with a list of signal parameters.', default=example_signal_parameters_path)
+    parser.add('--signal-parameters', type=str, help='Path to a JSON file with a list of signal parameters.')
     parser.add('--waveform-arguments', type=str, help='A dictionary of additional arguments for the waveform model.')
     parser.add('--frequency-domain-source-model', type=str, help='Path to the frequency domain source function.')
     parser.add('--parameter-conversion', type=str, help="Parameter conversion function.")
