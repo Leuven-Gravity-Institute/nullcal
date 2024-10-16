@@ -20,7 +20,8 @@ dependencies = [
     "bilby>=2.3.0",
     "numba",
     "scipy",
-    "ConfigArgParse"
+    "ConfigArgParse",
+    "pycbc"
 ]
 [tool.setuptools.packages]
 find = {}
