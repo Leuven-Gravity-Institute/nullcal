@@ -20,7 +20,10 @@ dependencies = [
     "bilby>=2.3.0",
     "numba",
     "scipy",
+    "ConfigArgParse"
 ]
 [tool.setuptools.packages]
 find = {}
+
 [project.scripts]
+nullcal-create-injection = "nullcal.tools.create_injection:main"

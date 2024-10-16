@@ -1,0 +1,2 @@
+include nullcal/tools/*.ini
+include nullcal/tools/*.json
