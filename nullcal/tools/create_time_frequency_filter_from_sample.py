@@ -130,9 +130,32 @@ def main():
     wavelet_Nt = int(args.sampling_frequency * args.duration / wavelet_Nf)
     time_frequency_map = np.zeros((wavelet_Nt, wavelet_Nf))
     npix = hp.nside2npix(args.nside)
+    middle_time = args.start_time + args.duration / 2
+    maximized_time_frequency_map = np.zeros((wavelet_Nt, wavelet_Nf))
     for ipix in range(npix):
         theta, phi = hp.pix2ang(args.nside, ipix)
         ra = phi
         dec = np.pi / 2 - theta
-        # Copy the frequency domain strain data.
-        frequency_domain_strain = interferometers[0].frequency_domain_strain.copy()
+        time_frequency_map = np.zeros((wavelet_Nt, wavelet_Nf))
+        for i in range(ndetector):
+            # Copy the frequency domain strain data.
+            whitened_frequency_domain_strain_copy = whitened_frequency_domain_strains[i].copy()
+            time_shift = interferometers[i].time_delay_from_geocenter(ra, dec, middle_time)
+            dt_geocent = middle_time - args.start_time
+            dt = dt_geocent + time_shift
+            frequency_mask = interferometers[i].frequency_mask
+            frequencies = interferometers[i].frequency_array[frequency_mask]
+            whitened_frequency_domain_strain_copy[frequency_mask] *= np.exp(1j * 2 * np.pi * dt * frequencies)
+            # Transform to time-frequency domain
+            whitened_wavelet_domain_strain = transform_wavelet_freq(whitened_frequency_domain_strain_copy,
+                                                                    wavelet_Nf,
+                                                                    wavelet_Nt,
+                                                                    args.nx)
+            whitened_wavelet_domain_strain_quadrature = transform_wavelet_freq_quadrature(whitened_frequency_domain_strain_copy,
+                                                                                        wavelet_Nf,
+                                                                                        wavelet_Nt,
+                                                                                        args.nx)
+            whitened_wavelet_domain_power = whitened_wavelet_domain_strain ** 2 + whitened_wavelet_domain_strain_quadrature ** 2
+            time_frequency_map += whitened_wavelet_domain_power
+        maximized_time_frequency_map = np.maximum(maximized_time_frequency_map, time_frequency_map)
+        logger.info(f'Maximizing signal power over the sky sphere - {ipix+1}/{npix}.')
