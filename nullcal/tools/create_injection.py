@@ -27,7 +27,6 @@ def json_loads_with_none(value):
 
 def main():
     default_config_file_path = pkg_resources.resource_filename('nullcal.tools', 'default_config_create_injection.ini')
-    example_signal_parameters_path = pkg_resources.resource_filename('nullcal.tools', 'example_signal_parameters_create_injection.json')
     parser = ArgParser(default_config_files=[default_config_file_path])
     parser.add('-c', '--config', is_config_file=True, help='Path to custom config file.')
     parser.add('-o', '--outdir', type=str, help='Path of output.')
