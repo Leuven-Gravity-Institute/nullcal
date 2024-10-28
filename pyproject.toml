@@ -29,3 +29,4 @@ find = {}
 
 [project.scripts]
 nullcal-create-injection = "nullcal.tools.create_injection:main"
+nullcal-create-time-frequency-filter-from-sample = "nullcal.tools.create_time_frequency_filter_from_sample:main"

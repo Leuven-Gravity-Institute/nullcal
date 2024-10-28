@@ -7,6 +7,7 @@ import numpy as np
 import healpy as hp
 from bilby.gw.waveform_generator import WaveformGenerator
 from bilby.gw.detector import InterferometerList
+from bilby.gw.detector import PowerSpectralDensity
 from ..utility import logger
 from ..time_frequency_transform import (transform_wavelet_freq,
                                         transform_wavelet_freq_quadrature)
@@ -33,6 +34,7 @@ def main():
     parser.add('--detectors', type=str, nargs="+", help='Detector prefix.')
     parser.add('--psds', type=json_loads_with_none, help='A dictionary of PSD files.')
     parser.add('--minimum-frequency', type=float, help='Minimum frequency in Hz.')
+    parser.add('--signal-parameters', type=str, help='Path to a JSON file with a list of signal parameters.')
     parser.add('--waveform-arguments', type=str, help='A dictionary of additional arguments for the waveform model.')
     parser.add('--frequency-domain-source-model', type=str, help='Path to the frequency domain source function.')
     parser.add('--parameter-conversion', type=str, help="Parameter conversion function.")
@@ -42,6 +44,7 @@ def main():
     parser.add('--nside', type=int, help='nside should be a power of 2. 12 * nside * nside sky pixels are generated.')
     parser.add('--nx', type=float, help='Sharpness of wavelet.', default=4.)
     parser.add('--wavelet-df', type=float, help='Frequency resolution of wavelet transform in Hz.', default=16)
+    parser.add('--threshold', type=float, help='Threshild to apply the filter.', default=0.1)
     parser.add('--generate-config', help='Generate default config file and exit.', is_write_out_config_file_arg=True)
 
     args = parser.parse_args()
@@ -141,11 +144,9 @@ def main():
             # Copy the frequency domain strain data.
             whitened_frequency_domain_strain_copy = whitened_frequency_domain_strains[i].copy()
             time_shift = interferometers[i].time_delay_from_geocenter(ra, dec, middle_time)
-            dt_geocent = middle_time - args.start_time
-            dt = dt_geocent + time_shift
             frequency_mask = interferometers[i].frequency_mask
             frequencies = interferometers[i].frequency_array[frequency_mask]
-            whitened_frequency_domain_strain_copy[frequency_mask] *= np.exp(1j * 2 * np.pi * dt * frequencies)
+            whitened_frequency_domain_strain_copy[frequency_mask] *= np.exp(1j * 2 * np.pi * time_shift * frequencies)
             # Transform to time-frequency domain
             whitened_wavelet_domain_strain = transform_wavelet_freq(whitened_frequency_domain_strain_copy,
                                                                     wavelet_Nf,
@@ -159,3 +160,16 @@ def main():
             time_frequency_map += whitened_wavelet_domain_power
         maximized_time_frequency_map = np.maximum(maximized_time_frequency_map, time_frequency_map)
         logger.info(f'Maximizing signal power over the sky sphere - {ipix+1}/{npix}.')
+
+    # Perform the clustering on the sky-maximized time-frequency map.
+    ## Apply a threshold
+    time_frequency_filter = maximized_time_frequency_map >= args.threshold
+    ## Remove the frequency content beyond the range
+    ### Always remove the Nyquist frequency
+    time_frequency_filter[:, -1] = 0.
+    ### Remove the components below the minimum frequency.
+    freq_low_idx = int(np.ceil(args.minimum_frequency / args.wavelet_df))
+    time_frequency_filter[:, :freq_low_idx] = 0.
+    ### Save the file to disk.
+    np.save(args.output, time_frequency_filter)
+    logger.info(f'Time-frequency filter is written to {args.output}.')

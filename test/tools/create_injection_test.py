@@ -107,7 +107,6 @@ class TestCreateInjection(unittest.TestCase):
         with tempfile.NamedTemporaryFile(suffix='.ini', delete=False) as temp_config_file:
             config_file_path = temp_config_file.name
         example_signal_parameters_create_injection_path = pkg_resources.resource_filename('nullcal.tools', 'example_signal_parameters_create_injection.json')
-        print('testing', self.ET1_TEST_frame_path)
         with mock.patch('sys.argv', ['nullcal-create-injection',
                                      '--generate-config', config_file_path,
                                      '--signal-parameters', example_signal_parameters_create_injection_path,
