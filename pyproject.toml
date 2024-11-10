@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=40.6.0", "wheel", "Cython", "CythonGSL", "numpy"]
+requires = ["setuptools>=40.6.0", "wheel", "setuptools_scm"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -16,16 +16,21 @@ classifiers = [
 ]
 dependencies = [
     "numpy>=1.18.1",
-    "CythonGSL",
     "bilby>=2.3.0",
     "numba",
     "scipy",
     "ConfigArgParse",
     "pycbc",
     "healpy",
+    "rocket-fft",
 ]
 [tool.setuptools.packages]
 find = {}
+
+[tool.setuptools_scm]
+write_to = "nullcal/_version.py"
+version_scheme = "post-release"  # Use 'post-release' or 'guess-next-dev'
+local_scheme = "node-and-date"   # This includes the full commit hash in the version
 
 [project.scripts]
 nullcal-create-injection = "nullcal.tools.create_injection:main"

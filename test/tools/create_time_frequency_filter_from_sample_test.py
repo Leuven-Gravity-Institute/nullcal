@@ -39,7 +39,7 @@ class TestCreateTimeFrequencyFilterFromSample(unittest.TestCase):
         # Create a temporary config file path
         with tempfile.NamedTemporaryFile(suffix='.ini', delete=True) as temp_config_file:
             config_file_path = temp_config_file.name
-            with tempfile.NamedTemporaryFile(suffix='.npy', delete=False) as temp_time_frequency_filter_file:
+            with tempfile.NamedTemporaryFile(suffix='.npy', delete=True) as temp_time_frequency_filter_file:
                 time_frequency_filter_file_path = temp_time_frequency_filter_file.name
                 example_signal_parameters_create_injection_path = pkg_resources.resource_filename('nullcal.tools', 'example_signal_parameters_create_injection.json')
                 current_dir = os.path.dirname(__file__)

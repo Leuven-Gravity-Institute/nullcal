@@ -6,10 +6,13 @@ from pathlib import Path
 import numpy as np
 from scipy.interpolate import interp1d
 from pycbc.frame import write_frame
+import bilby
 from bilby.gw.waveform_generator import WaveformGenerator
 from bilby.gw.detector import InterferometerList
 from bilby.gw.detector import PowerSpectralDensity
 from ..utility import logger
+from ..metadata import write_to_yaml
+from .._version import __version__
 
 def import_function(path):
     module_path, func_name = path.rsplit('.', 1)
@@ -47,6 +50,26 @@ def main():
     parser.add('--generate-config', help='Generate default config file and exit.', is_write_out_config_file_arg=True)
 
     args = parser.parse_args()
+
+    metadata = {
+        'config': args.config,
+        'outdir': args.outdir,
+        'label': args.label,
+        'detectors': args.detectors,
+        'psds': args.psds,
+        'minimum-frequency': args.minimum_frequency,
+        'signal-files': args.signal_files,
+        'signal-file-channels': args.signal_file_channels,
+        'signal-parameters': args.signal_parameters,
+        'waveform-arguments': args.waveform_arguments,
+        'frequency-domain-source-model': args.frequency_domain_source_model,
+        'parameter-conversion': args.parameter_conversion,
+        'duration': args.duration,
+        'start-time': args.start_time,
+        'sampling-frequency': args.sampling_frequency,
+        'calibration-errors': args.calibration_errors,
+        'version': __version__
+    }
 
     # Create the interferometer
     interferometers = InterferometerList(args.detectors)
@@ -116,6 +139,9 @@ def main():
                 parameters=signal_parameters[i],
                 waveform_generator=waveform_generator
             )
+            optimal_snrs = np.array([float(ifo.meta_data['optimal_SNR']) for ifo in interferometers])
+            metadata[f'signal-{i}-optimal-snrs'] = {ifo.name: float(ifo.meta_data['optimal_SNR']) for ifo in interferometers}
+            metadata[f'signal-{i}-optimal-snrs']['network'] = float(np.sqrt(np.sum(optimal_snrs**2)))
             logger.info(f'Signal {i+1}/{len(signal_parameters)} - Injected a signal with parameters: {signal_parameters[i]}')
 
     # Load the signal files if they are not empty
@@ -137,32 +163,36 @@ def main():
                 interferometer.strain_data.frequency_domain_strain += signal_interferometer.strain_data.frequency_domain_strain
                 logger.info(f'{interferometer.name} - Injected signal file {signal_file}.')
 
-    outdir = Path(args.outdir)
+    outdir = Path(args.outdir).resolve()
 
     if args.calibration_errors is not None:
         # Apply the calibration errors to the frequency domain strain data.
         for interferometer in interferometers:
             # Load the calibration error
-            calibration_error_data = np.loadtxt(args.calibration_errors[interferometer.name])
+            calibration_error_data = np.loadtxt(args.calibration_errors[interferometer.name], dtype=np.complex_)
 
             # Interpolate the calibration errors
-            calibration_error_interp = interp1d(calibration_error_data[:,0], calibration_error_data[:,1], kind='cubic', bounds_error=False, fill_value=1.)
+            calibration_error_interp = interp1d(np.real(calibration_error_data[:,0]), calibration_error_data[:,1], kind='cubic', bounds_error=False, fill_value=1.)
 
             # Compute the calibration errors using the strain frequency array
             calibration_error = calibration_error_interp(interferometer.frequency_array)
 
             # Multiply the error to the frequency domain strain.
-            interferometer.strain_data.freqency_domain_strain /= calibration_error
+            interferometer.strain_data.frequency_domain_strain /= calibration_error
 
             # Update the noise PSD
             new_psd = interferometer.power_spectral_density.get_power_spectral_density_array(interferometer.frequency_array) / np.abs(calibration_error)**2
 
-            # Save the PSD to disk.
-            np.savetxt(outdir/f'{interferometer.name}-{args.label}-{args.start_time}-{args.duration}-psd.dat',
-                       np.array(
-                           [interferometer.frequency_array,
-                            new_psd]
-                       ).T)
+            interferometer.power_spectral_density = bilby.gw.detector.psd.PowerSpectralDensity(frequency_array=interferometer.frequency_array,
+                                                                                               psd_array=new_psd)
+
+    # Save the PSD to disk.
+    for interferometer in interferometers:
+        np.savetxt(outdir/f'{interferometer.name}-{args.label}-{args.start_time}-{args.duration}-psd.dat',
+                    np.array(
+                        [interferometer.frequency_array,
+                        interferometer.power_spectral_density_array]
+                    ).T)
 
     # Write the strain data
     for interferometer in interferometers:
@@ -171,3 +201,7 @@ def main():
         channel_name = f'{interferometer.name}:STRAIN'
         write_frame(output_path, channel_name, ts)
         logger.info(f'{interferometer.name} strain data is written to the channel: {channel_name} in the file located at {output_path}.')
+
+    # Write the metadata
+    yaml_fname = str(outdir/f'{args.label}-{args.start_time}-{args.duration}.yaml')
+    write_to_yaml(yaml_fname, metadata)

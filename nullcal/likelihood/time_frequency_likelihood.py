@@ -42,8 +42,10 @@ class SelfRecalibrationProjectorTimeFrequencyLikelihood(Likelihood):
         self._frequency_array = self.interferometers[0].frequency_array
         self._masked_frequency_array = self.interferometers[0].frequency_array[self._frequency_mask]
         self._noise_log_likelihood = None
-        # Construct the noise weighed antenna pattern
-        F = np.array([[ifo.antenna_response(0., 0., 0., 0., 'plus'), ifo.antenna_response(0., 0., 0., 0., 'cross')] for ifo in self.interferometers])
+        # Construct the noise weighed antenna pattern        
+        F = np.array([[-1./np.sqrt(6), -1/np.sqrt(2)],
+                      [np.sqrt(6)/3, 0],
+                      [-1/np.sqrt(6), 1/np.sqrt(2)]])
         psd_array = np.array([ifo.power_spectral_density_array for ifo in self.interferometers])
         delta_f = 1. / self.interferometers[0].duration
         self._whitened_antenna_response = compute_whitened_antenna_response(F,
