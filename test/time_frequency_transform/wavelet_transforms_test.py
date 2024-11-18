@@ -3,8 +3,10 @@ from pycbc.noise import noise_from_psd
 import numpy as np
 import scipy.stats
 from nullcal.time_frequency_transform import (transform_wavelet_freq_time,
+                                              transform_wavelet_freq_time_partial,
                                               transform_wavelet_freq_time_quadrature,
                                               transform_wavelet_freq,
+                                              transform_wavelet_freq_partial,
                                               transform_wavelet_freq_quadrature,
                                               transform_wavelet_time,
                                               transform_wavelet_time_pixel,
@@ -19,6 +21,8 @@ import os
 
 class TestWaveletTransform(unittest.TestCase):
     def setUp(self):
+        seed = 12
+        np.random.seed(seed)
         srate = 128
         self.sine_wave_inj_freq = 32
         seglen = 4
@@ -157,6 +161,31 @@ class TestWaveletTransform(unittest.TestCase):
         data_1 = transform_wavelet_time(time_domain_strain, self.Nf, self.Nt, self.nx, self.mult)
         data_2 = transform_wavelet_time_pixel(time_domain_strain, self.Nf, self.Nt, self.nx, self.mult, time_frequency_filter)
         self.assertTrue(np.allclose(data_1[time_frequency_filter.astype(bool)], data_2[time_frequency_filter.astype(bool)]))
-        
+
+    def test_transform_wavelet_freq_partial(self):
+        seglen = 128
+        srate = 4096
+        tlen = seglen * srate
+        delta_f = 1 / seglen
+        flen = tlen // 2 + 1
+        freq_low = 50
+        tf_df = 16
+        Nf = int(srate / 2 / tf_df)
+        Nt = int(tlen / Nf)
+        time_domain_strain = np.random.randn(tlen)
+        frequency_filter = np.ones(Nf)
+        frequency_filter[:8192] = 0
+        data_1 = transform_wavelet_freq_time(time_domain_strain, Nf, Nt, self.nx)
+        data_2 = transform_wavelet_freq_time_partial(time_domain_strain, Nf, Nt, self.nx, frequency_filter)
+        self.assertTrue(np.allclose(data_1[:,frequency_filter.astype(bool)], data_2[:,frequency_filter.astype(bool)]))        
+        # import time
+        # start = time.time()
+        # data_1 = transform_wavelet_freq_time(time_domain_strain, Nf, Nt, self.nx)
+        # print(time.time() - start)
+        # start = time.time()
+        # data_2 = transform_wavelet_freq_time_partial(time_domain_strain, Nf, Nt, self.nx, frequency_filter)
+        # print(time.time() - start)
+
+
 if __name__ == '__main__':
     unittest.main()

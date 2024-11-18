@@ -3,7 +3,8 @@ import numpy as np
 from numba import njit
 from .transform_freq_funcs import (phitilde_vec_norm,
                                    transform_wavelet_freq_helper,
-                                   transform_wavelet_freq_quadrature_helper)
+                                   transform_wavelet_freq_quadrature_helper,
+                                   transform_wavelet_freq_partial_helper,)
 from .transform_time_funcs import (phi_vec,
                                    transform_wavelet_time_helper,
                                    transform_wavelet_time_pixel_helper)
@@ -102,6 +103,24 @@ def transform_wavelet_freq_time(data,Nf,Nt,nx=4.):
     return transform_wavelet_freq(data_fft,Nf,Nt,nx)
 
 @njit
+def transform_wavelet_freq_time_partial(data,Nf,Nt,nx,frequency_filter):
+    """Transform time domain data into wavelet domain via FFT and then frequency transform.
+
+    Args:
+        data (1D numpy array): Data in time domain.
+        Nf (int): Number of frequency bins.
+        Nt (int): Number of time bins.
+        nx (float, optional): Steepness of filter.
+        frequency_filter (1D numpy array): An array to indicate which frequency bins to evaluate.
+
+    Returns:
+        2D numpy array: Data in wavelet domain.
+    """
+    data_fft = np.fft.rfft(data)
+
+    return transform_wavelet_freq_partial(data_fft,Nf,Nt,nx,frequency_filter)
+
+@njit
 def transform_wavelet_freq_time_quadrature(data,Nf,Nt,nx=4.):
     """Transform time domain data into wavelet quadrature domain via FFT and then frequency transform.
 
@@ -149,6 +168,23 @@ def transform_wavelet_freq(data,Nf,Nt,nx=4.):
     """
     phif = 2/Nf*phitilde_vec_norm(Nf,Nt,nx)
     return transform_wavelet_freq_helper(data,Nf,Nt,phif) * np.sqrt((data.shape[0] - 1) * 2)
+
+@njit
+def transform_wavelet_freq_partial(data,Nf,Nt,nx,frequency_filter):
+    """Do the wavelet transform using the fast wavelet domain transform.
+
+    Args:
+        data (1D complex numpy array): Data in frequency domain.
+        Nf (int): Number of frequency bins.
+        Nt (int): Number of time bins.
+        nx (float): Steepness of filter.
+        frequency_filter (1D numpy array): An array to indicate which frequency bins to evaluate.
+
+    Returns:
+        2D numpy array: Data in wavelet domain.
+    """
+    phif = 2/Nf*phitilde_vec_norm(Nf,Nt,nx)
+    return transform_wavelet_freq_partial_helper(data,Nf,Nt,phif,frequency_filter) * np.sqrt((data.shape[0] - 1) * 2)
 
 @njit
 def transform_wavelet_time_pixel(data,Nf,Nt,nx=4.,mult=32,time_frequency_filter=None):

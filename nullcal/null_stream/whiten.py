@@ -30,3 +30,18 @@ def compute_whitened_antenna_response(antenna_response_matrix,
                 for k in range(nmode):
                     output[i,j,k] = antenna_response_matrix[j,k] / np.sqrt(power_spectral_density_array[j,i] / scaling)
     return output
+
+@njit
+def compute_whitened_time_frequency_domain_strain(time_frequency_domain_strain_array,
+                                                  power_spectral_density_array,
+                                                  delta_f,
+                                                  time_frequency_mask):
+    ndet, tlen, flen = time_frequency_domain_strain_array.shape
+    output = np.zeros_like(time_frequency_domain_strain_array)
+    scaling = delta_f * 2
+    for n in range(ndet):
+        for i in range(tlen):
+            for j in range(flen):
+                if time_frequency_mask[i,j]:
+                    output[n,i,j] = time_frequency_domain_strain_array[n,i,j] / np.sqrt(power_spectral_density_array[n,j] / scaling)
+    return output    

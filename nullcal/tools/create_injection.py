@@ -53,7 +53,7 @@ def main():
 
     metadata = {
         'config': args.config,
-        'outdir': args.outdir,
+        'outdir': str(Path(args.outdir).resolve()),
         'label': args.label,
         'detectors': args.detectors,
         'psds': args.psds,
@@ -163,7 +163,7 @@ def main():
                 interferometer.strain_data.frequency_domain_strain += signal_interferometer.strain_data.frequency_domain_strain
                 logger.info(f'{interferometer.name} - Injected signal file {signal_file}.')
 
-    outdir = Path(args.outdir).resolve()
+    outdir = Path(args.outdir)
 
     if args.calibration_errors is not None:
         # Apply the calibration errors to the frequency domain strain data.
@@ -181,7 +181,7 @@ def main():
             interferometer.strain_data.frequency_domain_strain /= calibration_error
 
             # Update the noise PSD
-            new_psd = interferometer.power_spectral_density.get_power_spectral_density_array(interferometer.frequency_array) / np.abs(calibration_error)**2
+            new_psd = interferometer.power_spectral_density_array / np.abs(calibration_error)**2
 
             interferometer.power_spectral_density = bilby.gw.detector.psd.PowerSpectralDensity(frequency_array=interferometer.frequency_array,
                                                                                                psd_array=new_psd)

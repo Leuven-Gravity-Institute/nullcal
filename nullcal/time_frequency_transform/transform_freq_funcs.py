@@ -99,6 +99,30 @@ def transform_wavelet_freq_helper(data,Nf,Nt,phif):
         DX_unpack_loop(m,Nt,Nf,DX_trans,wave)
     return wave
 
+@njit(parallel=True)
+def transform_wavelet_freq_partial_helper(data,Nf,Nt,phif,frequency_filter):
+    """Helper to do the wavelet transform using the fast wavelet domain transform.
+
+    Args:
+        data (1D numpy array): Data.
+        Nf (int): Number of frequency bins.
+        Nt (int): Number of time bins.
+        phif (1D numpy array): Wavelet.
+        frequency_filter (1D numpy numpy): An array to indicate which frequency bins to evaluate.
+
+    Returns:
+        2D numpy array: Data in wavelet domain.
+    """
+    wave = np.zeros((Nt,Nf)) # wavelet wavepacket transform of the signal
+    
+    for m in prange(0,Nf+1):
+        if frequency_filter[m]:
+            DX = np.zeros(Nt,dtype=np.complex128)
+            DX_assign_loop(m,Nt,Nf,DX,data,phif)
+            DX_trans = np.fft.ifft(DX,Nt)
+            DX_unpack_loop(m,Nt,Nf,DX_trans,wave)
+    return wave
+
 @njit
 def transform_wavelet_freq_quadrature_helper(data,Nf,Nt,phif):
     """Helper to do the wavelet transform using the fast wavelet domain quadrature transform.
