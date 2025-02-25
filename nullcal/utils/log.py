@@ -3,6 +3,7 @@ import logging
 
 logger = logging.getLogger('nullcal')
 
+
 def setup_logger(outdir='.', label=None, log_level='INFO', print_version=False):
     """ Setup logging output: call at the start of the script to use
 

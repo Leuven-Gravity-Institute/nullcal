@@ -3,6 +3,8 @@ from bilby.core.likelihood import Likelihood
 from bilby.gw.detector import InterferometerList
 
 
+
+class BaseLikelihood(Likelihood)
 class SelfCalibrationLikelihood(Likelihood):
     def __init__(self,
                  interferometers,

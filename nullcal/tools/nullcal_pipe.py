@@ -7,7 +7,7 @@ import subprocess
 from pathlib import Path
 from .utility import (load_config_file,
                       resolve_config_conflicts)
-from ..utility import logger
+from ..utils import logger
 from ..prior import CalibrationPriorDict
 from ..likelihood import SelfRecalibrationProjectorTimeFrequencyLikelihood
 
@@ -51,14 +51,14 @@ def main():
             args.nullcal_create_injection = "nullcal-create-injection"
         # Resolve any conflict
         ## Read the config file for nullcall-create-injection
-        nullcall_create_injection_config = load_config_file(args.nullcal_create_injection_config)
+        nullcal_create_injection_config = load_config_file(args.nullcal_create_injection_config)
         resolve_config_conflicts(args,
                                  {key:val for key,val in nullcall_create_injection_config.items() if key in ['minimum-frequency',
                                                                                                              'duration',
                                                                                                              'start-time',
                                                                                                              'sampling-frequency']})
-        if float(nullcall_create_injection_config['minimum-frequency']) != args.minimum_frequency:
-            args.minimum_frequency = float(nullcall_create_injection_config['minimum-frequency'])
+        if float(nullcal_create_injection_config['minimum-frequency']) != args.minimum_frequency:
+            args.minimum_frequency = float(nullcal_create_injection_config['minimum-frequency'])
 
         subprocess.run([f"{args.nullcal_create_injection}",
                         "--label", args.label],
