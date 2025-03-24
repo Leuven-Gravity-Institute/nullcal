@@ -6,6 +6,7 @@ build-backend = "flit_core.buildapi"
 name =  "nullcal"
 authors = [
     {name = "Isaac C. F. Wong", email = "chunfung.wong@kuleuven.be"},
+    {name = "Milan Wils", email = "milan.wils@kuleuven.be"}
 ]
 description = "Sample Python Project for creating a new Python Module"
 readme = "README.md"
@@ -31,6 +32,8 @@ dependencies = [
     "healpy",
     "rocket-fft",
 ]
+
+[project.scripts]
 
 [project.optional-dependencies]
 spark = [
@@ -62,7 +65,7 @@ Source = "https://gitlab.kuleuven.be/gwc/nullcal"
 Tracker = "https://gitlab.kuleuven.be/gwc/nullcal/-/issues"
 
 [tool.flit.module]
-name = "python_package"
+name = "nullcal"
 
 [tool.bandit]
 exclude_dirs = ["build","dist","tests","scripts"]
@@ -323,59 +326,3 @@ overgeneral-exceptions= [
     "BaseException",
     "Exception"
 ]
-
-
-
-
-
-
-
-
-
-
-[build-system]
-requires = ["setuptools>=40.6.0", "wheel", "setuptools_scm"]
-build-backend = "setuptools.build_meta"
-
-[project]
-name = "nullcal"
-version = "0.4.0"
-description = "A package to estimate the calibration parameters for gravitational-wave measurements using null stream."
-authors = [{name="Isaac C.F. Wong",email="chunfung.wong@kuleuven.be"}]
-license = {file="LICENSE"}
-readme = "README.rst"
-classifiers = [
-    "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
-    "Operating System :: OS Independent",
-]
-dependencies = [
-    "numpy>=1.18.1",
-    "bilby>=2.3.0",
-    "numba",
-    "scipy",
-    "ConfigArgParse",
-    "pycbc",
-    "healpy",
-    "rocket-fft",
-]
-
-[project.optional-dependencies]
-# test suite
-test = [
-    "coverage[toml] >=5.0",
-    "pytest >=3.9.1",
-    "pytest-cov >=2.4.0",
-]
-
-[tool.setuptools.packages]
-find = {}
-
-[tool.setuptools_scm]
-write_to = "nullcal/_version.py"
-version_scheme = "post-release"  # Use 'post-release' or 'guess-next-dev'
-local_scheme = "node-and-date"   # This includes the full commit hash in the version
-
-[project.scripts]
-nullcal-create-injection = "nullcal.tools.create_injection:main"
-nullcal-create-time-frequency-filter-from-sample = "nullcal.tools.create_time_frequency_filter_from_sample:main"
