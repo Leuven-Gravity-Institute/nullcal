@@ -55,10 +55,6 @@ basic-3.12:
       - coverage.xml
     reports:
       junit: test-results.xml
-    only:
-      - merge_requests
-      - main
-      - branches
 
 python-3.10:
   <<: *unit-test
