@@ -6,7 +6,13 @@ from bilby.gw.detector import InterferometerList
 
 
 class SelfCalibrationLikelihood(Likelihood):
-    def __init__(self, interferometers):
+    def __init__(self, interferometers: InterferometerList):
+        """The likelihood class for self-calibration.
+
+        Args:
+            interferometers (InterferometerList): A list of interferometers.
+        """
+        super().__init__(dict())
         self.interferometers = interferometers
         self._constant_log_normalization = np.log(2 * self.delta_f / np.pi) * np.sum(self.frequency_mask)
 
@@ -54,7 +60,6 @@ class SelfCalibrationLikelihood(Likelihood):
         self._masked_power_spectral_density_array = np.array([
                 ifo.power_spectral_density_array[self._frequency_mask] for ifo in self._interferometers
             ])
-
 
     @property
     def frequency_array(self) -> np.ndarray:
@@ -131,8 +136,6 @@ class SelfCalibrationLikelihood(Likelihood):
         calibration_factor =  np.array([ifo.calibration_model.get_calibration_factor(frequency_array=self.masked_frequency_array,
                                                                                      prefix=f'recalib_{ifo.name}_',
                                                                                      **self.parameters) for ifo in self.interferometers])
-        if not np.all(np.isfinite(calibration_factor)):
-            raise ValueError("Calibration factor contains invalid values.")
         return calibration_factor
 
     def log_likelihood(self) -> float:
@@ -143,6 +146,8 @@ class SelfCalibrationLikelihood(Likelihood):
         """
         # Compute the calibration factor.
         calibration_factor = self._get_calibration_factor_from_parameters()
+        if not np.all(np.isfinite(calibration_factor)):
+            raise ValueError("Calibration factor contains invalid values.")
         # Compute the unnormalized calibrated null stream.
         calibrated_null_stream = np.sum(self.masked_frequency_domain_strain_array / calibration_factor, axis=0)
         # Compute the calibrated power spectral density.
