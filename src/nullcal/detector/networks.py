@@ -1,15 +1,18 @@
+from __future__ import annotations
+
 from collections.abc import Iterable
 
-import numpy as np
-from scipy.spatial.transform import Rotation
-from bilby.gw.detector.psd import PowerSpectralDensity
-from bilby.gw.detector.interferometer import Interferometer
-from bilby.gw.detector.networks import InterferometerList as BilbyInterferometerList
-from bilby.gw.detector.networks import get_empty_interferometer
 import bilby.gw.detector.networks
+import numpy as np
+from bilby.gw.detector.interferometer import Interferometer
+from bilby.gw.detector.networks import \
+    InterferometerList as BilbyInterferometerList
+from bilby.gw.detector.networks import get_empty_interferometer
+from bilby.gw.detector.psd import PowerSpectralDensity
 from bilby.gw.utils import get_vertex_position_geocentric
-from ..utils import (get_vertex_position_ellipsoid,
-                     logger,
+from scipy.spatial.transform import Rotation
+
+from ..utils import (get_vertex_position_ellipsoid, logger,
                      optimal_uncorrelated_null_stream_snr_squared)
 
 
@@ -28,7 +31,7 @@ class InterferometerList(BilbyInterferometerList):
         Raises:
             TypeError: Input must not be a string.
             TypeError: Input list of interferometers are not all Interferometer objects.
-        """        
+        """
         if isinstance(interferometers, str):
             raise TypeError("Input must not be a string")
         for ifo in interferometers:
@@ -61,7 +64,7 @@ class TriangularInterferometer(InterferometerList):
             yarm_tilt=0.0,
             clockwise=True,
     ):
-        super(TriangularInterferometer, self).__init__([])
+        super().__init__([])
         self.name = name
         # for attr in ['power_spectral_density', 'minimum_frequency', 'maximum_frequency']:
         if isinstance(power_spectral_density, PowerSpectralDensity):

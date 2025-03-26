@@ -34,4 +34,3 @@ Violations of this Code of Conduct may result in actions such as:
 By participating in this project, you agree to abide by this Code of Conduct. We are dedicated to creating a positive and respectful environment for everyone involved.
 
 Thank you for contributing to nullcal!
-
