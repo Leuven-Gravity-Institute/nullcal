@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 
 
-def get_vertex_position_ellipsoid(x_comp, y_comp, z_comp):
+def get_vertex_position_ellipsoid(x_comp: float, y_comp: float, z_comp: float):
     """
     Calculate the position of the IFO vertex in ellipsoidal coordinates.
 
@@ -12,18 +12,13 @@ def get_vertex_position_ellipsoid(x_comp, y_comp, z_comp):
     For the correct version of formula 11a, see: http://www.astro.uni.torun.pl/~kb/Papers/geod/Geod-GK.htm#GEOD
     See https://ieeexplore.ieee.org/document/303772 for an overview of inversion algorithms.
 
-    Parameters
-    ==========
-    x_comp: float
-        Geocentric x-coordinate in meters
-    y_comp: float
-        Geocentric y-coordinate in meters
-    z_comp: float
-        Geocentric z-coordinate in meters
+    Args:
+        x_comp (float): Geocentric x-coordinate in meters
+        y_comp (float): Geocentric y-coordinate in meters
+        z_comp (float): Geocentric z-coordinate in meters
 
-    Returns
-    =======
-    array_like: A 3D representation of the ellipsoidal vertex position (latitude [rad], longitude [rad], elevation [m])
+    Returns:
+        array_like: A 3D representation of the ellipsoidal vertex position (latitude [rad], longitude [rad], elevation [m])
     """
     semi_major_axis = 6378137  # for ellipsoid model of Earth, in m
     semi_minor_axis = 6356752.314  # in m
