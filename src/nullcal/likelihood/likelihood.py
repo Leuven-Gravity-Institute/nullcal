@@ -15,6 +15,7 @@ class SelfCalibrationLikelihood(Likelihood):
         super().__init__(dict())
         self.interferometers = interferometers
         self._constant_log_normalization = np.log(2 * self.delta_f / np.pi) * np.sum(self.frequency_mask)
+        self._noise_log_likelihood = None
 
     @property
     def interferometers(self) -> InterferometerList:
@@ -158,3 +159,24 @@ class SelfCalibrationLikelihood(Likelihood):
         # Compute the normalization term of the likelihood function.
         logl +=  self.constant_log_normalization - np.sum(np.log(calibrated_null_stream_psd)) - np.sum(np.log(calibration_factor_squared))
         return logl
+
+    def noise_log_likelihood(self) -> float:
+        """The noise log likelihood is defined as the case when there is no calibration error,
+        so that the calibration factor is 1.
+
+        Returns:
+            float: Noise log likelihood.
+        """
+        if self._noise_log_likelihood is None:
+            calibration_factor = np.ones_like(self.masked_frequency_domain_strain_array)
+            # Compute the unnormalized calibrated null stream.
+            calibrated_null_stream = np.sum(self.masked_frequency_domain_strain_array / calibration_factor, axis=0)
+            # Compute the calibrated power spectral density.
+            calibration_factor_squared = np.abs(calibration_factor) ** 2
+            calibrated_null_stream_psd = np.sum(self.masked_power_spectral_density_array / calibration_factor_squared, axis=0)
+            # Compute the residual component of the likelihood function.
+            logl = -2 * self.delta_f * np.sum(np.abs(calibrated_null_stream) ** 2 / calibrated_null_stream_psd)
+            # Compute the normalization term of the likelihood function.
+            logl +=  self.constant_log_normalization - np.sum(np.log(calibrated_null_stream_psd)) - np.sum(np.log(calibration_factor_squared))
+            self._noise_log_likelihood = logl
+        return self._noise_log_likelihood
