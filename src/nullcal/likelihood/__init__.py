@@ -1,4 +1,9 @@
 from __future__ import annotations
 
-from .base import *
 from .likelihood import SelfCalibrationLikelihood
+from .projection import ProjectionLikelihood
+
+__all__ = [
+    "SelfCalibrationLikelihood",
+    "ProjectionLikelihood",
+]

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-from bilby.gw.detector import Interferometer, InterferometerList
+from bilby.gw.detector import InterferometerList
 
 from nullcal.likelihood import SelfCalibrationLikelihood
 
