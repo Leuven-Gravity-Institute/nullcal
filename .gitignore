@@ -1,7 +1,13 @@
+# pytest results
+test-results.xml
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
+
+# Version file
+_version.py
 
 # C extensions
 *.so
@@ -114,5 +120,5 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-# Mac metadata file
+## Mac metadata file
 .DS_Store
