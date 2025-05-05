@@ -26,14 +26,23 @@ stages:
 basic-3.10:
   <<: *test-python
   image: python:3.10
+  only:
+    - merge_requests
+    - main
 
 basic-3.11:
   <<: *test-python
   image: python:3.11
+  only:
+    - merge_requests
+    - main
 
 basic-3.12:
   <<: *test-python
   image: python:3.12
+  only:
+    - merge_requests
+    - main
 
 # ------------- Test Stage -------------
 .unit-tests: &unit-test
