@@ -1,8 +1,3 @@
-before_script:
-  # Install system dependencies
-  - apt-get update
-  - apt-get install -y libgsl-dev # Install GSL and its development headers
-
 stages:
   - initial
   - test
@@ -46,10 +41,12 @@ basic-3.12:
   script:
     - python -m pip install .[test]
     - *list-env
-    - pytest --junitxml=test-results.xml --cov=nullcal --cov-report=xml --cov-report=html
+    - export COVERAGE_FILE=.coverage.$CI_JOB_NAME
+    - pytest --cov-config=.coveragerc --junitxml=test-results.xml --cov=nullcal --cov-report=xml --cov-report=html
   artifacts:
     when: always
     paths:
+      - .coverage.*
       - test-results.xml
       - htmlcov/
       - coverage.xml
