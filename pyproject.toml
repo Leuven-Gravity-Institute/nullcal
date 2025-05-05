@@ -25,12 +25,14 @@ dynamic = ["version"]
 dependencies = [
     "numpy>=1.18.1",
     "bilby>=2.3.0",
+    "bilby_pipe",
     "numba",
     "scipy",
     "ConfigArgParse",
     "pycbc",
     "healpy",
     "rocket-fft",
+    "tables",
 ]
 
 [project.scripts]
