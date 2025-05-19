@@ -5,10 +5,7 @@ import numpy as np
 import scipy.special
 from numba import njit, prange
 
-from .gsl_wrapper import gsl_sf_beta_inc
 
-
-@njit
 def phitilde_vec(om,Nf,nx=4.):
     """Compute phitilde, om i array, nx is filter steepness, defaults to 4.
 
@@ -20,8 +17,8 @@ def phitilde_vec(om,Nf,nx=4.):
     Returns:
         1D numpy array: z.
     """
-    OM = np.pi  #Nyquist angular frequency
-    DOM = OM/Nf #2 pi times DF
+    OM = np.pi
+    DOM = OM/Nf
     insDOM = 1./np.sqrt(DOM)
     B = OM/(2*Nf)
     A = (DOM-B)/2
@@ -30,14 +27,12 @@ def phitilde_vec(om,Nf,nx=4.):
     mask = (np.abs(om)>= A)&(np.abs(om)<A+B)
 
     x = (np.abs(om[mask])-A)/B
-    y = np.zeros_like(x)
-    beta_inc_norm = gsl_sf_beta_inc(nx,nx,1.)
-    for i in range(y.shape[0]):
-        y[i] = gsl_sf_beta_inc(nx,nx,x[i]) / beta_inc_norm
+    y = scipy.special.betainc(nx, nx, x)
     z[mask] = insDOM*np.cos(np.pi/2.*y)
 
     z[np.abs(om)<A] = insDOM
     return z
+
 
 @njit
 def phitilde_vec_norm(Nf,Nt,nx):
@@ -60,6 +55,7 @@ def phitilde_vec_norm(Nf,Nt,nx):
     phif /= nrm
     return phif
 
+
 @njit
 def tukey(data,alpha,N):
     """Apply Tukey window function to data.
@@ -80,6 +76,7 @@ def tukey(data,alpha,N):
         if i>imax:
             f_mult = 0.5*(1.+np.cos(np.pi/Nwin*(i-imax)))
         data[i] *= f_mult
+
 
 @njit(parallel=True)
 def transform_wavelet_freq_helper(data,Nf,Nt,phif):

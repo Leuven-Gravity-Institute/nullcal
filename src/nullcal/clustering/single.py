@@ -97,6 +97,31 @@ def single_clustering_by_quantile(interferometers, frequency_resolution, nx, qua
     output = clustering(filter, dt, frequency_resolution, padding_time=padding_time, padding_freq=padding_freq)
     return output
 
+def single_clustering_by_threshold(interferometers,
+                                   frequency_resolution,
+                                   nx,
+                                   threshold,
+                                   padding_time=0.05,
+                                   padding_freq=0.,
+                                   minimum_frequency=None,
+                                   maximum_frequency=None):
+    time_frequency_map = construct_time_frequency_map(interferometers=interferometers,
+                                                      frequency_resolution=frequency_resolution,
+                                                      nx=nx)
+    # Zero the components beyond the frequency range
+    if minimum_frequency is not None:
+        freq_low_idx = int(np.ceil(minimum_frequency / frequency_resolution))
+        time_frequency_map[:,:freq_low_idx] = 0.
+    if maximum_frequency is not None:
+        freq_high_idx = int(np.floor(maximum_frequency / frequency_resolution))
+        time_frequency_map[:,freq_high_idx:] = 0.
+    filter = time_frequency_map > threshold
+    Nf = int(interferometers[0].sampling_frequency / 2 / frequency_resolution)
+    Nt = int(len(interferometers[0].time_array) / Nf)
+    dt = interferometers[0].duration / Nt
+    output = clustering(filter, dt, frequency_resolution, padding_time=padding_time, padding_freq=padding_freq)
+    return output
+
 def single_clustering_from_time_frequency_map(time_frequency_map,
                                               frequency_resolution,
                                               sampling_frequency,

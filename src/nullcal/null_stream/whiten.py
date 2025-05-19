@@ -6,9 +6,9 @@ from numba import njit
 
 @njit
 def compute_whitened_frequency_domain_strain(frequency_domain_strain_array,
-                                   power_spectral_density_array,
-                                   delta_f,
-                                   frequency_mask):
+                                             power_spectral_density_array,
+                                             delta_f,
+                                             frequency_mask):
     ndet, flen = frequency_domain_strain_array.shape
     output = np.zeros_like(frequency_domain_strain_array)
     scaling = delta_f * 2
@@ -20,9 +20,9 @@ def compute_whitened_frequency_domain_strain(frequency_domain_strain_array,
 
 @njit
 def compute_whitened_antenna_response(antenna_response_matrix,
-                            power_spectral_density_array,
-                            delta_f,
-                            frequency_mask):
+                                      power_spectral_density_array,
+                                      delta_f,
+                                      frequency_mask):
     ndet, nfreq = power_spectral_density_array.shape
     nmode = antenna_response_matrix.shape[1]
     output = np.zeros((nfreq, ndet, nmode), dtype=antenna_response_matrix.dtype)

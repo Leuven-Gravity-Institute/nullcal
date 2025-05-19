@@ -1,12 +1,21 @@
 from __future__ import annotations
 
+import json
+
 import numpy as np
 from bilby.core.likelihood import Likelihood
 from bilby.gw.detector import InterferometerList
+from bilby.gw.waveform_generator import WaveformGenerator
 
 
 class SelfCalibrationLikelihood(Likelihood):
-    def __init__(self, interferometers: InterferometerList):
+    """Self calibration.
+    """
+    def __init__(self,
+                 interferometers: InterferometerList,
+                 waveform_generator: WaveformGenerator,
+                 injection_parameters_file: str,
+                 *args, **kwargs):
         """The likelihood class for self-calibration.
 
         Args:
@@ -14,6 +23,9 @@ class SelfCalibrationLikelihood(Likelihood):
         """
         super().__init__(dict())
         self.interferometers = interferometers
+        self.waveform_generator = waveform_generator
+        with open(injection_parameters_file) as f:
+            self.injection_parameters = json.load(f)
         self._constant_log_normalization = np.log(2 * self.delta_f / np.pi) * np.sum(self.frequency_mask)
         self._noise_log_likelihood = None
 
