@@ -77,14 +77,14 @@ class TimeFrequencyLikelihood(Likelihood):
                 parameters=clustering_parameters,
             )
             logger.info('Start perform clustering.')
-            single_clustering_by_threshold(interferometers=ifos,
-                                           frequency_resolution=self._wavelet_transform_frequency_resolution,
-                                           nx=self._wavelet_transform_nx,
-                                           threshold=self.clustering_threshold,
-                                           padding_time=0.0,
-                                           padding_freq=0.0,
-                                           minimum_frequency=self.interferometers[0].minimum_frequency,
-                                           maximum_frequency=self.interferometers[0].maximum_frequency)
+            self._time_frequency_filter = single_clustering_by_threshold(interferometers=ifos,
+                                                                         frequency_resolution=self._wavelet_transform_frequency_resolution,
+                                                                         nx=self._wavelet_transform_nx,
+                                                                         threshold=self.clustering_threshold,
+                                                                         padding_time=0.0,
+                                                                         padding_freq=0.0,
+                                                                         minimum_frequency=self.interferometers[0].minimum_frequency,
+                                                                         maximum_frequency=self.interferometers[0].maximum_frequency)
 
     def compute_uncalibrated_frequency_domain_null_stream(self):
         # Dimensions: (frequency, detector, detector)
