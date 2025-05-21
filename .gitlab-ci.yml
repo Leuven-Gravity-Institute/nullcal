@@ -1,6 +1,7 @@
 stages:
   - initial
   - test
+  - release
 
 # ------------- Initial Stage -------------
 
