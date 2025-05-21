@@ -1,32 +1,49 @@
 from __future__ import annotations
 
 import numpy as np
-from numba import njit
 
 
-@njit
-def compute_projected_strain_data(projector, strain_data, frequency_mask):
-    nfreq, ndet, _ = projector.shape
+def compute_projected_strain_data(
+    projector: np.ndarray, strain_data: np.ndarray, frequency_mask: np.ndarray
+) -> np.ndarray:
+    """Compute the projected strain data.
+
+    Args:
+        projector (np.ndarray): Projector. Dimensions: (frequency, detector, detector).
+        strain_data (np.ndarray): Strain data. Dimensions: (detector, frequency).
+        frequency_mask (np.ndarray): Frequency mask. Dimensions: (frequency,).
+
+    Raises:
+        ValueError: Projector shape mismatch. project must have the same dimensions in the two last axes.
+        ValueError: Shape mismatch. projector and strain_data must have the same detector and frequency dimensions.
+        ValueError: Shape mismatch. strain_data and frequency_mask must have the same frequency dimension.
+
+    Returns:
+        np.ndarray: Projected strain data. Dimensions: (detector, frequency).
+    """
+    n_freq_1, n_det_1, n_det_2 = projector.shape
+    if n_det_1 != n_det_2:
+        raise ValueError(
+            "Shape mismatch."
+            f"projector: (frequency={n_freq_1},detector={n_det_1}, detector={n_det_2})."
+            "project must have the same dimensions in the two last axes."
+        )
+    n_det_3, n_freq_2 = strain_data.shape
+    if n_det_1 != n_det_3 or n_freq_1 != n_freq_2:
+        raise ValueError(
+            "Shape mismatch."
+            f"projector: (frequency={n_freq_1},detector={n_det_1}, detector={n_det_2})."
+            f"strain_data: (detector={n_det_3},frequency={n_freq_2})."
+            "projector and strain_data must have the same detector and frequency dimensions."
+        )
+    n_freq_3 = frequency_mask.shape[0]
+    if n_freq_2 != n_freq_3:
+        raise ValueError(
+            "Shape mismatch."
+            f"strain_data: (detector={n_det_3},frequency={n_freq_2})."
+            f"frequency_mask: (frequency={n_freq_3})."
+            "strain_data and frequency_mask must have the same frequency dimension."
+        )
     output = np.zeros_like(strain_data)
-    for i in range(nfreq):
-        if frequency_mask[i]:
-            for j in range(ndet):
-                sum = 0.
-                for k in range(ndet):
-                    sum += projector[i,j,k]*strain_data[k,i]
-                output[j,i] = sum
-    return output
-
-@njit
-def compute_projected_time_frequency_strain_data(projector, whitened_time_frequency_strain_data, time_frequency_mask):
-    ndet, ntime, nfreq = whitened_time_frequency_strain_data.shape
-    output = np.zeros_like(whitened_time_frequency_strain_data)
-    for j in range(nfreq):
-        for i in range(ntime):
-            if time_frequency_mask[i,j]:
-                for k in range(ndet):
-                    sum = 0.
-                    for l in range(ndet):
-                        sum += projector[j,k,l]*whitened_time_frequency_strain_data[l,i,j]
-                    output[k,i,j] = sum
+    output[:, frequency_mask] = np.einsum("fij,jf->if", projector[frequency_mask, :, :], strain_data[:, frequency_mask])
     return output

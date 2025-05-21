@@ -15,6 +15,7 @@ def _get_neighbours(i, j, mask):
                 neighbours.append((i + x, j + y))
     return neighbours
 
+
 # Depth-first search
 def _dfs(i, j, mask, visited):
     stack = [(i, j)]
@@ -29,6 +30,7 @@ def _dfs(i, j, mask, visited):
             if mask[neighbour[0], neighbour[1]]:
                 stack.append(neighbour)
     return cluster
+
 
 def clustering(filter, dt, df, padding_time=0.1, padding_freq=10, **kwargs):
     """
@@ -78,47 +80,88 @@ def clustering(filter, dt, df, padding_time=0.1, padding_freq=10, **kwargs):
 
     return mask
 
-def single_clustering_by_quantile(interferometers, frequency_resolution, nx, quantile, padding_time=0.05, padding_freq=0., minimum_frequency=None, maximum_frequency=None):
-    time_frequency_map = construct_time_frequency_map(interferometers=interferometers,
-                                                      frequency_resolution=frequency_resolution,
-                                                      nx=nx)
+
+def single_clustering_by_quantile(
+    interferometers,
+    frequency_resolution,
+    nx,
+    quantile,
+    padding_time=0.05,
+    padding_freq=0.0,
+    minimum_frequency=None,
+    maximum_frequency=None,
+):
+    time_frequency_map = construct_time_frequency_map(
+        interferometers=interferometers, frequency_resolution=frequency_resolution, nx=nx
+    )
     # Zero the components beyond the frequency range
     if minimum_frequency is not None:
         freq_low_idx = int(np.ceil(minimum_frequency / frequency_resolution))
-        time_frequency_map[:,:freq_low_idx] = 0.
+        time_frequency_map[:, :freq_low_idx] = 0.0
     if maximum_frequency is not None:
         freq_high_idx = int(np.floor(maximum_frequency / frequency_resolution))
-        time_frequency_map[:,freq_high_idx:] = 0.
-    threshold = np.quantile(time_frequency_map[time_frequency_map>0.], quantile)
+        time_frequency_map[:, freq_high_idx:] = 0.0
+    threshold = np.quantile(time_frequency_map[time_frequency_map > 0.0], quantile)
     filter = time_frequency_map > threshold
     Nf = int(interferometers[0].sampling_frequency / 2 / frequency_resolution)
     Nt = int(len(interferometers[0].time_array) / Nf)
     dt = interferometers[0].duration / Nt
     output = clustering(filter, dt, frequency_resolution, padding_time=padding_time, padding_freq=padding_freq)
-    return output
+    return output.astype(bool)
 
-def single_clustering_from_time_frequency_map(time_frequency_map,
-                                              frequency_resolution,
-                                              sampling_frequency,
-                                              duration,
-                                              quantile=None,
-                                              padding_time=0.05,
-                                              padding_freq=0.,
-                                              minimum_frequency=None,
-                                              maximum_frequency=None,
-                                              *args,
-                                              **kwargs):
+
+def single_clustering_by_threshold(
+    interferometers,
+    frequency_resolution,
+    nx,
+    threshold,
+    padding_time=0.05,
+    padding_freq=0.0,
+    minimum_frequency=None,
+    maximum_frequency=None,
+):
+    time_frequency_map = construct_time_frequency_map(
+        interferometers=interferometers, frequency_resolution=frequency_resolution, nx=nx
+    )
     # Zero the components beyond the frequency range
     if minimum_frequency is not None:
         freq_low_idx = int(np.ceil(minimum_frequency / frequency_resolution))
-        time_frequency_map[:,:freq_low_idx] = 0.
+        time_frequency_map[:, :freq_low_idx] = 0.0
     if maximum_frequency is not None:
         freq_high_idx = int(np.floor(maximum_frequency / frequency_resolution))
-        time_frequency_map[:,freq_high_idx:] = 0.
-    threshold = np.quantile(time_frequency_map[time_frequency_map>0.], quantile)
+        time_frequency_map[:, freq_high_idx:] = 0.0
+    filter = time_frequency_map > threshold
+    Nf = int(interferometers[0].sampling_frequency / 2 / frequency_resolution)
+    Nt = int(len(interferometers[0].time_array) / Nf)
+    dt = interferometers[0].duration / Nt
+    output = clustering(filter, dt, frequency_resolution, padding_time=padding_time, padding_freq=padding_freq)
+    return output.astype(bool)
+
+
+def single_clustering_from_time_frequency_map(
+    time_frequency_map,
+    frequency_resolution,
+    sampling_frequency,
+    duration,
+    quantile=None,
+    padding_time=0.05,
+    padding_freq=0.0,
+    minimum_frequency=None,
+    maximum_frequency=None,
+    *args,
+    **kwargs,
+):
+    # Zero the components beyond the frequency range
+    if minimum_frequency is not None:
+        freq_low_idx = int(np.ceil(minimum_frequency / frequency_resolution))
+        time_frequency_map[:, :freq_low_idx] = 0.0
+    if maximum_frequency is not None:
+        freq_high_idx = int(np.floor(maximum_frequency / frequency_resolution))
+        time_frequency_map[:, freq_high_idx:] = 0.0
+    threshold = np.quantile(time_frequency_map[time_frequency_map > 0.0], quantile)
     filter = time_frequency_map > threshold
     Nf = int(sampling_frequency / 2 / frequency_resolution)
-    Nt = int(duration*sampling_frequency/ Nf)
+    Nt = int(duration * sampling_frequency / Nf)
     dt = duration / Nt
     output = clustering(filter, dt, frequency_resolution, padding_time=padding_time, padding_freq=padding_freq)
-    return output
+    return output.astype(bool)
