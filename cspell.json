@@ -15,5 +15,13 @@
         "stft",
         "nullcal",
         "bilby",
+        "gaussianity",
+        "kstest",
+        "rtol",
+        "kstest",
+        "pvalue",
+        "geocent",
+        "recalib",
+        "XPHM",
     ]
 }

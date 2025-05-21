@@ -23,6 +23,7 @@ requires-python = ">=3.10"
 dynamic = ["version"]
 dependencies = [
     "numpy>=1.18.1",
+    "nptyping",
     "bilby>=2.3.0",
     "bilby_pipe",
     "numba",
