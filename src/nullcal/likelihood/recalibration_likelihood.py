@@ -29,6 +29,7 @@ class RecalibrationLikelihood(Likelihood):
         time_frequency_filter: np.ndarray | None = None,
         clustering_parameter_file: str | None = None,
         clustering_threshold: float = 0.1,
+        enforce_signal_duration: bool = False,
     ):
         """Time-frequency likelihood.
 
@@ -40,6 +41,7 @@ class RecalibrationLikelihood(Likelihood):
             time_frequency_filter (np.ndarray | None, optional): A time-frequency filter. Defaults to None.
             clustering_parameter_file (str | None, optional): A file to the parameters for clustering. Defaults to None.
             clustering_threshold (float, optional): The clustering threshold. Defaults to 0.1.
+            enforce_signal_duration (bool, optional): Enforce signal duration to be smaller than that of data. Defaults to False.
         """
         super().__init__(dict())
         self.interferometers = InterferometerList(interferometers)
@@ -72,6 +74,7 @@ class RecalibrationLikelihood(Likelihood):
             delta_f=1.0 / interferometers[0].duration,
             frequency_mask=self.frequency_mask,
         )
+        self.enforce_signal_duration = enforce_signal_duration
         self._noise_log_likelihood = None
 
     @property
@@ -81,6 +84,7 @@ class RecalibrationLikelihood(Likelihood):
         Returns:
             InterferometerList: A list of interferometers.
         """
+
         return self._interferometers
 
     @interferometers.setter
@@ -97,16 +101,19 @@ class RecalibrationLikelihood(Likelihood):
         """
         # Check whether the sampling frequencies are the same.
         sampling_frequency_array = [ifo.sampling_frequency for ifo in value]
+
         if not np.allclose(sampling_frequency_array, sampling_frequency_array[0]):
             raise ValueError(
                 f"The interferometers do not have the same sampling frequency: {sampling_frequency_array}."
             )
         # Check whether the durations are the same.
         duration_array = [ifo.duration for ifo in value]
+
         if not np.allclose(duration_array, duration_array[0]):
             raise ValueError(f"The interferometers do not have the same duration: {duration_array}.")
         # Check whether the start times are the same.
         start_time_array = [ifo.start_time for ifo in value]
+
         if not np.allclose(start_time_array, start_time_array[0]):
             raise ValueError(f"The interferometers do not have the same start time: {start_time_array}.")
         self._interferometers = value
@@ -121,10 +128,12 @@ class RecalibrationLikelihood(Likelihood):
         Returns:
             np.ndarray: Time-frequency filter.
         """
+
         if self._time_frequency_filter is None and self.clustering_parameter_file is not None:
             logger.info("clustering_parameter_file = %s is provided.", self.clustering_parameter_file)
             clustering_parameters = pd.read_csv(self.clustering_parameter_file).iloc[0].to_dict()
             logger.info("Generating zero-noise injection data.")
+
             if (
                 len(self.interferometers) == 3
                 and self.interferometers[0].name == "ET1"
@@ -135,6 +144,7 @@ class RecalibrationLikelihood(Likelihood):
             else:
                 interferometers = InterferometerList([ifo.name for ifo in self.interferometers])
             # Copy the power spectral density
+
             for i in range(len(interferometers)):
                 interferometers[i].power_spectral_density = self.interferometers[i].power_spectral_density
                 interferometers[i].calibration_model = self.interferometers[i].calibration_model
@@ -146,6 +156,7 @@ class RecalibrationLikelihood(Likelihood):
             interferometers.inject_signal(
                 waveform_generator=self.waveform_generator,
                 parameters=clustering_parameters,
+                raise_error=self.enforce_signal_duration,
             )
             logger.info("Clustering started.")
             self._time_frequency_filter = single_clustering_by_threshold(
@@ -159,6 +170,7 @@ class RecalibrationLikelihood(Likelihood):
                 maximum_frequency=self.interferometers[0].maximum_frequency,
             )
             logger.info("Clustering done.")
+
         return self._time_frequency_filter
 
     @time_frequency_filter.setter
@@ -179,6 +191,7 @@ class RecalibrationLikelihood(Likelihood):
         # Dimensions: (frequency, detector, detector)
         projector = compute_projector(self._whitened_antenna_response, frequency_mask=self.frequency_mask)
         # Dimensions: (frequency, detector)
+
         return np.einsum("ijk,ki->ji", projector, self._whitened_frequency_domain_strain_array)
 
     def compute_calibrated_frequency_domain_null_stream(self, calibration_factor: np.ndarray) -> np.ndarray:
@@ -195,6 +208,7 @@ class RecalibrationLikelihood(Likelihood):
         )
         projector = compute_projector(calibrated_whitened_antenna_response, frequency_mask=self.frequency_mask)
         # Dimensions: (frequency, detector)
+
         return np.einsum("ijk,ki->ji", projector, self._whitened_frequency_domain_strain_array)
 
     def construct_calibration_factor_from_parameters(self, parameters: dict) -> np.ndarray:
@@ -211,11 +225,13 @@ class RecalibrationLikelihood(Likelihood):
                 ifo.calibration_model.get_calibration_factor(
                     frequency_array=self.masked_frequency_array, prefix=f"recalib_{ifo.name}_", **parameters
                 )
+
                 for ifo in self.interferometers
             ]
         )
         output = np.zeros_like(self._whitened_frequency_domain_strain_array)
         output[:, self.frequency_mask] = calibration_factor
+
         return output
 
     def log_likelihood(self) -> float:
@@ -237,6 +253,7 @@ class RecalibrationLikelihood(Likelihood):
                     Nt=self._wavelet_transform_Nt,
                     nx=self._wavelet_transform_nx,
                 )
+
                 for data in calibrated_frequency_domain_null_stream
             ]
         )
@@ -245,6 +262,7 @@ class RecalibrationLikelihood(Likelihood):
             np.sum(np.abs(calibrated_time_frequency_domain_null_stream[:, self.time_frequency_filter]) ** 2)
         )
         # Return the log likelihood
+
         return -0.5 * residual_energy
 
     def _calculate_noise_log_likelihood(self) -> float:
@@ -263,6 +281,7 @@ class RecalibrationLikelihood(Likelihood):
                     Nt=self._wavelet_transform_Nt,
                     nx=self._wavelet_transform_nx,
                 )
+
                 for data in uncalibrated_frequency_domain_null_stream
             ]
         )
@@ -271,6 +290,7 @@ class RecalibrationLikelihood(Likelihood):
             np.sum(np.abs(uncalibrated_time_frequency_domain_null_stream[:, self.time_frequency_filter]) ** 2)
         )
         # Return the log likelihood
+
         return -0.5 * residual_energy
 
     def noise_log_likelihood(self) -> float:
@@ -279,6 +299,8 @@ class RecalibrationLikelihood(Likelihood):
         Returns:
             float: Noise log-likelihood.
         """
+
         if self._noise_log_likelihood is None:
             self._noise_log_likelihood = self._calculate_noise_log_likelihood()
+
         return self._noise_log_likelihood
