@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from . import result
 from .utils import logger
 
 __version__ = '0.5.0'
