@@ -1,46 +1,45 @@
+from __future__ import annotations
+
+from typing import Callable, Optional, Tuple
+
+import matplotlib.pyplot as plt
 import numpy as np
+from bilby.core.utils import SamplesSummary, logger
 from scipy.interpolate import interp1d
 
-from bilby.core.utils import SamplesSummary, logger
 
-
-def plot_spline_pos(log_freqs, samples, minimum_frequency, maximum_frequency, nfreqs=100, level=0.9, injected_values=None, priors_samples=None, errorbar=False, color='k', label=None, xform=None):
+def plot_spline_pos(log_freqs: np.ndarray,
+                    samples: np.ndarray,
+                    minimum_frequency: float,
+                    maximum_frequency: float,
+                    nfreqs: int=100,
+                    level: float=0.9,
+                    injected_values: np.ndarray | None=None,
+                    priors_samples: np.ndarray | None=None,
+                    errorbar: bool | None=False,
+                    color: str | None='k',
+                    label: str | None=None,
+                    xform: Callable | None=None,
+                    font_size: float | None=32):
     """
     Plot calibration posterior estimates for a spline model in log space.
     Adapted from the same function in bilby.gw.utils
 
-    Parameters
-    ==========
-    log_freqs: array-like
-        The (log) location of spline control points.
-    samples: array-like
-        List of posterior draws of function at control points ``log_freqs``
-    minimum_frequency: float
-        Minimum frequency for plotting.
-    maximum_frequency: float
-        Maximum frequency for plotting.
-    nfreqs: int
-        Number of points to evaluate spline at for plotting.
-    level: float
-        Credible level to fill in.
-    injected_values: array-like
-        List of injected values at control points ``log_freqs``
-    priors_samples: array-like
-        List of prior draws of function at control points ``log_freqs``
-    errorbar: bool
-        If True, plot the posterior draws errorbars of function at control points ``log_freqs``
-    color: str
-        Color to plot with.
-    label: str
-        Label for plot.
-    xform: callable
-        Function to transform the spline into plotted values.
+    Args:
+        log_freqs (array-like): The (log) location of spline control points.
+        samples (array-like): List of posterior draws of function at control points ``log_freqs``
+        minimum_frequency (float): Minimum frequency for plotting.
+        maximum_frequency (float): Maximum frequency for plotting.
+        nfreqs (int): Number of points to evaluate spline at for plotting.
+        level (float): Credible level to fill in.
+        injected_values (array-like): List of injected values at control points ``log_freqs``
+        priors_samples (array-like): List of prior draws of function at control points ``log_freqs``
+        errorbar (bool): If True, plot the posterior draws errorbars of function at control points ``log_freqs``
+        color (str): Color to plot with.
+        label (str): Label for plot.
+        xform (Callable): Function to transform the spline into plotted values.
+        font_size (float): Font size. Defaults to 32.
     """
-
-    import matplotlib.pyplot as plt
-
-    font_size = 32
-
     freq_points = np.exp(log_freqs)
     if minimum_frequency is None:
         minimum_frequency = min(log_freqs)
@@ -53,7 +52,7 @@ def plot_spline_pos(log_freqs, samples, minimum_frequency, maximum_frequency, nf
         scaled_samples = samples
     else:
         scaled_samples = xform(samples)
-    scaled_samples_summary = SamplesSummary(scaled_samples, average='mean', confidence_level=level)
+    scaled_samples_summary = SamplesSummary(scaled_samples, average='median', confidence_level=level)
 
     # Plot errorbar
     if errorbar:
@@ -71,7 +70,7 @@ def plot_spline_pos(log_freqs, samples, minimum_frequency, maximum_frequency, nf
             data[i] = temp
         else:
             data[i] = xform(temp)
-    data_summary = SamplesSummary(data, average='mean', confidence_level=level)
+    data_summary = SamplesSummary(data, average='median', confidence_level=level)
     plt.fill_between(freqs, data_summary.lower_absolute_credible_interval,
                      data_summary.upper_absolute_credible_interval, color=color, alpha=.2, linewidth=0.1, label=label)
 
@@ -99,9 +98,8 @@ def plot_spline_pos(log_freqs, samples, minimum_frequency, maximum_frequency, nf
                 priors_data[i] = temp
             else:
                 priors_data[i] = xform(temp)
-        level_3sigma = 0.9973
         priors_data_summary = SamplesSummary(
-            priors_data, average='mean', confidence_level=level_3sigma)
+            priors_data, average='median', confidence_level=level)
         plt.plot(freqs, priors_data_summary.lower_absolute_credible_interval, color=color, lw=2.5)
         plt.plot(freqs, priors_data_summary.upper_absolute_credible_interval, color=color, lw=2.5)
 
@@ -109,43 +107,39 @@ def plot_spline_pos(log_freqs, samples, minimum_frequency, maximum_frequency, nf
     plt.legend(loc='upper right', prop={'size': .75 * font_size})
 
 
-def plot_spline_pos_relative_amplitude(log_freqs, samples_1, samples_2, minimum_frequency, maximum_frequency, nfreqs=100, level=0.9, injected_values=None, priors_samples=None, errorbar=False, color='k', label=None):
+def plot_spline_pos_relative_amplitude(log_freqs: np.ndarray,
+                                       samples_1: np.ndarray,
+                                       samples_2: np.ndarray,
+                                       minimum_frequency: float,
+                                       maximum_frequency: float,
+                                       nfreqs: int=100,
+                                       level: float=0.9,
+                                       injected_values: tuple | None=None,
+                                       priors_samples: np.ndarray | None=None,
+                                       errorbar: bool | None=False,
+                                       color: str | None='k',
+                                       label: str | None=None,
+                                       font_size: float | None=32):
     """
     Plot calibration posterior estimates relative amplitude for a spline model in log space.
     Adapted from the function plot_spline_pos in bilby.gw.utils
 
-    Parameters
-    ==========
-    log_freqs: array-like
-        The (log) location of spline control points.
-    samples_1: array-like
-        List of amplitude posterior draws of function at control points ``log_freqs`` for detector 1
-    samples_2: array-like
-        List of amplitude posterior draws of function at control points ``log_freqs`` for detector 2
-    minimum_frequency: float
-        Minimum frequency for plotting.
-    maximum_frequency: float
-        Maximum frequency for plotting.
-    nfreqs: int
-        Number of points to evaluate spline at for plotting.
-    level: float
-        Credible level to fill in.
-    injected_values: tuple of array-like
-        Tuple of the list of injected values at control points ``log_freqs`` for detectors 1 and detectors 2
-    priors_samples: array-like
-        List of prior draws of function at control points ``log_freqs``
-    errorbar: bool
-        If True, plot the posterior draws errorbars of function at control points ``log_freqs``
-    color: str
-        Color to plot with.
-    label: str
-        Label for plot.
+    Args:
+        log_freqs (array-like): The (log) location of spline control points.
+        samples_1 (array-like): List of amplitude posterior draws of function at control points ``log_freqs`` for detector 1
+        samples_2 (array-like): List of amplitude posterior draws of function at control points ``log_freqs`` for detector 2
+        minimum_frequency (float): Minimum frequency for plotting.
+        maximum_frequency (float): Maximum frequency for plotting.
+        nfreqs (int): Number of points to evaluate spline at for plotting.
+        level (float): Credible level to fill in.
+            injected_values: tuple of array-like
+            Tuple of the list of injected values at control points ``log_freqs`` for detectors 1 and detectors 2
+        priors_samples (array-like): List of prior draws of function at control points ``log_freqs``
+        errorbar (bool): If True, plot the posterior draws errorbars of function at control points ``log_freqs``
+        color (str): Color to plot with.
+        label (str): Label for plot.
+        font_size (float): Font size.
     """
-
-    import matplotlib.pyplot as plt
-
-    font_size = 32
-
     freq_points = np.exp(log_freqs)
     if minimum_frequency is None:
         minimum_frequency = min(log_freqs)
@@ -159,7 +153,7 @@ def plot_spline_pos_relative_amplitude(log_freqs, samples_1, samples_2, minimum_
     errorbar_samples_relative = errorbar_samples_1 / errorbar_samples_2
 
     errorbar_samples_relative_summary = SamplesSummary(
-        errorbar_samples_relative, average='mean', confidence_level=level)
+        errorbar_samples_relative, average='median', confidence_level=level)
 
     # Plot errorbar
     if errorbar:
@@ -175,8 +169,8 @@ def plot_spline_pos_relative_amplitude(log_freqs, samples_1, samples_2, minimum_
                           bounds_error=False)(np.log(freqs))
         data_2 = interp1d(log_freqs, sample_2, kind="cubic", fill_value=np.inf,
                           bounds_error=False)(np.log(freqs))
-        data_relative[i] = data_1 / data_2
-    data_relative_summary = SamplesSummary(data_relative, average='mean', confidence_level=level)
+        data_relative[i] = (1 + data_1) / (1 + data_2)
+    data_relative_summary = SamplesSummary(data_relative, average='median', confidence_level=level)
     plt.fill_between(freqs, data_relative_summary.lower_absolute_credible_interval,
                      data_relative_summary.upper_absolute_credible_interval, color=color, alpha=.2, linewidth=0.1, label=label)
 
@@ -189,7 +183,7 @@ def plot_spline_pos_relative_amplitude(log_freqs, samples_1, samples_2, minimum_
                                           fill_value='extrapolate', bounds_error=False)(np.log(freqs))
         injected_values_data_2 = interp1d(log_freqs, injected_values_2, kind="cubic",
                                           fill_value=np.inf, bounds_error=False)(np.log(freqs))
-        injected_values_data_relative = injected_values_data_1 / injected_values_data_2
+        injected_values_data_relative = (1+injected_values_data_1) / (1+injected_values_data_2)
         plt.plot(freqs, injected_values_data_relative, color='k', ls='-.', lw=1.5)
 
     # Plot priors
@@ -203,11 +197,9 @@ def plot_spline_pos_relative_amplitude(log_freqs, samples_1, samples_2, minimum_
                               bounds_error=False)(np.log(freqs))
             data_2 = interp1d(log_freqs, sample_2, kind="cubic", fill_value='extrapolate',
                               bounds_error=False)(np.log(freqs))
-            priors_data_relative[i] = data_1 / data_2
-        level_3sigma = 0.9973
-        level_3sigma = 0.9
+            priors_data_relative[i] = (1 + data_1) / (1 + data_2)
         priors_data_relative_summary = SamplesSummary(
-            priors_data_relative, average='mean', confidence_level=level_3sigma)
+            priors_data_relative, average='median', confidence_level=level)
         plt.plot(freqs, priors_data_relative_summary.lower_absolute_credible_interval, color=color)
         plt.plot(freqs, priors_data_relative_summary.upper_absolute_credible_interval, color=color)
 
@@ -215,39 +207,37 @@ def plot_spline_pos_relative_amplitude(log_freqs, samples_1, samples_2, minimum_
     plt.legend(loc='upper right', prop={'size': .75 * font_size})
 
 
-def plot_spline_pos_relative_phase(log_freqs, samples_1, samples_2, minimum_frequency, maximum_frequency, nfreqs=100, level=0.9, injected_values=None, priors_samples=None, errorbar=False, color='k', label=None, xform=None):
+def plot_spline_pos_relative_phase(log_freqs: np.ndarray,
+                                   samples_1: np.ndarray,
+                                   samples_2: np.ndarray,
+                                   minimum_frequency: float,
+                                   maximum_frequency: float,
+                                   nfreqs: int | None=100,
+                                   level: float | None=0.9,
+                                   injected_values: tuple | None=None,
+                                   priors_samples: np.ndarray | None=None,
+                                   errorbar: np.ndarray | None=False,
+                                   color: str | None='k',
+                                   label: str | None=None,
+                                   xform: Callable | None=None):
     """
     Plot calibration posterior estimates relative phase for a spline model in log space.
     Adapted from the function plot_spline_pos in bilby.gw.utils
 
-    Parameters
-    ==========
-    log_freqs: array-like
-        The (log) location of spline control points.
-    samples_1: array-like
-        List of phase posterior draws of function at control points ``log_freqs`` for detector 1
-    samples_2: array-like
-        List of phase posterior draws of function at control points ``log_freqs`` for detector 2
-    minimum_frequency: float
-        Minimum frequency for plotting.
-    maximum_frequency: float
-        Maximum frequency for plotting.
-    nfreqs: int
-        Number of points to evaluate spline at for plotting.
-    level: float
-        Credible level to fill in.
-    injected_values: array-like
-        List of injected values at control points ``log_freqs``
-    priors_samples: array-like
-        List of prior draws of function at control points ``log_freqs``
-    errorbar: bool
-        If True, plot the posterior draws errorbars of function at control points ``log_freqs``
-    color: str
-        Color to plot with.
-    label: str
-        Label for plot.
-    xform: callable
-        Function to transform the spline into plotted values.
+    Args:
+        log_freqs (array-like): The (log) location of spline control points.
+        samples_1 (array-like): List of phase posterior draws of function at control points ``log_freqs`` for detector 1
+        samples_2 (array-like): List of phase posterior draws of function at control points ``log_freqs`` for detector 2
+        minimum_frequency (float): Minimum frequency for plotting.
+        maximum_frequency (float): Maximum frequency for plotting.
+        nfreqs (int): Number of points to evaluate spline at for plotting.
+        level (float): Credible level to fill in.
+        injected_values (array-like): List of injected values at control points ``log_freqs``
+        priors_samples (array-like): List of prior draws of function at control points ``log_freqs``
+        errorbar (bool): If True, plot the posterior draws errorbars of function at control points ``log_freqs``
+        color (str): Color to plot with.
+        label (str): Label for plot.
+        xform (Callable):Function to transform the spline into plotted values.
     """
 
     import matplotlib.pyplot as plt
@@ -272,7 +262,7 @@ def plot_spline_pos_relative_phase(log_freqs, samples_1, samples_2, minimum_freq
     errorbar_samples_relative = errorbar_samples_1 - errorbar_samples_2
 
     errorbar_samples_relative_summary = SamplesSummary(
-        errorbar_samples_relative, average='mean', confidence_level=level)
+        errorbar_samples_relative, average='median', confidence_level=level)
 
     # Plot errorbar
     if errorbar:
@@ -291,7 +281,7 @@ def plot_spline_pos_relative_phase(log_freqs, samples_1, samples_2, minimum_freq
         data_1 = xform(temp_1)
         data_2 = xform(temp_2)
         data_relative[i] = data_1 - data_2
-    data_relative_summary = SamplesSummary(data_relative, average='mean', confidence_level=level)
+    data_relative_summary = SamplesSummary(data_relative, average='median', confidence_level=level)
     plt.fill_between(freqs, data_relative_summary.lower_absolute_credible_interval,
                      data_relative_summary.upper_absolute_credible_interval, color=color, alpha=.2, linewidth=0.1, label=label)
 
@@ -325,7 +315,7 @@ def plot_spline_pos_relative_phase(log_freqs, samples_1, samples_2, minimum_freq
             data_2 = xform(temp_2)
             priors_data_relative[i] = data_1 - data_2
         priors_data_relative_summary = SamplesSummary(
-            priors_data_relative, average='mean', confidence_level=level)
+            priors_data_relative, average='median', confidence_level=level)
         plt.plot(freqs, priors_data_relative_summary.lower_absolute_credible_interval, color=color)
         plt.plot(freqs, priors_data_relative_summary.upper_absolute_credible_interval, color=color)
 
