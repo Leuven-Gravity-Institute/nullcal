@@ -1,11 +1,15 @@
 from __future__ import annotations
 
-import os
+from typing import Optional, Tuple
+
+import matplotlib.pyplot as plt
 import numpy as np
 from bilby.core.result import Result as CoreResult
 from bilby.core.utils import logger, safe_save_figure
 from bilby.gw.utils import spline_angle_xform
-from .utils import plot_spline_pos, plot_spline_pos_relative_amplitude, plot_spline_pos_relative_phase
+
+from .utils import (plot_spline_pos, plot_spline_pos_relative_amplitude,
+                    plot_spline_pos_relative_phase)
 
 
 class Result(CoreResult):
@@ -16,32 +20,32 @@ class Result(CoreResult):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-    def plot_calibration_posterior(self, filename=None, minimum_frequency=None, maximum_frequency=None, show_injected_value=False, show_priors=False, show_errorbar=False, quantile=.9):
+    def plot_calibration_posterior(self,
+                                   filename: str | None=None,
+                                   minimum_frequency: float | None=None,
+                                   maximum_frequency: float | None=None,
+                                   show_injected_value: bool | None=False,
+                                   show_priors: bool | None=False,
+                                   show_errorbar: bool | None=False,
+                                   quantile: float | None=.9,
+                                   font_size: float | None=32):
         """
         Plots the calibration amplitude and phase uncertainty.
         Adapted from the same function in bilby.gw.result
 
-        Parameters
-        ==========
-        filename: str
-            If provided, save the plot to disk, and otherwise show the plot.
-        minimum_frequency: float
-            Minimum frequency to display.
-        maximum_frequency: float
-            Maximum frequency to display
-        show_injected_value: bool
-            If true, display the injected value.
-        show_priors: bool
-            If true, display the uncertainty band from the prior.
-        show_errorbar: bool
-            If true, display the posterior errorbars at the spline control points
-        quantile: float
-            Quantile for confidence levels, default=0.9, i.e., 90% interval.
+        Args:
+            filename (str): If provided, save the plot to disk, and otherwise show the plot.
+            minimum_frequency (float): Minimum frequency to display.
+            maximum_frequency (float): Maximum frequency to display
+            show_injected_value (bool): If true, display the injected value.
+            show_priors (bool): If true, display the uncertainty band from the prior.
+            show_errorbar (bool): If true, display the posterior errorbars at the spline control points
+            quantile (float): Quantile for confidence levels, default=0.9, i.e., 90% interval.
+            font_size (float): Font size.
         """
-
-        import matplotlib.pyplot as plt
-
         # Retrieve posterior
+        if self._posterior is None:
+            self.samples_to_posterior(priors=self.priors)
         posterior = self.posterior
         parameters = posterior.keys()
 
@@ -52,10 +56,6 @@ class Result(CoreResult):
             return
 
         fig, axes = plt.subplots(2 * len(ifos), 1, figsize=(15, 10 * len(ifos)))
-        if filename is not None:
-            font_size = 32
-        else:
-            font_size = 10
 
         for i, ifo in enumerate(ifos):
 
@@ -71,7 +71,7 @@ class Result(CoreResult):
 
             # Assume spline control frequencies are constant
             freq_params = np.sort(
-                [param for param in parameters if 'recalib_{0}_frequency_'.format(ifo) in param])
+                [param for param in parameters if f'recalib_{ifo}_frequency_' in param])
             logfreqs = np.log([posterior[param].iloc[0] for param in freq_params])
 
             # Retrieve injected values if requested
@@ -82,12 +82,12 @@ class Result(CoreResult):
                 if isinstance(injected_values, dict):
                     # Amplitude injected parameters
                     inj_amp_params = np.sort(
-                        [param for param in injected_values_parameters if 'recalib_{0}_amplitude_'.format(ifo) in param])
-                    injected_amplitude = [100 * injected_values[param] for param in inj_amp_params]
+                        [param for param in injected_values_parameters if f'recalib_{ifo}_amplitude_' in param])
+                    injected_amplitude = np.array([injected_values[param] for param in inj_amp_params])
                     # Phase injected parameters
                     inj_phase_params = np.sort(
-                        [param for param in injected_values_parameters if 'recalib_{0}_phase_'.format(ifo) in param])
-                    injected_phase = [injected_values[param] for param in inj_phase_params]
+                        [param for param in injected_values_parameters if f'recalib_{ifo}_phase_' in param])
+                    injected_phase = np.array([injected_values[param] for param in inj_phase_params])
                 elif len(injected_values) == 0:
                     injected_amplitude = None
                     injected_phase = None
@@ -103,45 +103,45 @@ class Result(CoreResult):
                     # Amplitude priors
                     n_samples = int(1e4)
                     amp_priors_params = np.sort(
-                        [param for param in priors_parameters if 'recalib_{0}_amplitude_'.format(ifo) in param])
-                    amplitude_priors = 100 * np.transpose([priors[param].sample(n_samples)
+                        [param for param in priors_parameters if f'recalib_{ifo}_amplitude_' in param])
+                    amplitude_priors = np.transpose([priors[param].sample(n_samples)
                                                            for param in amp_priors_params])
                     # Phase priors
                     phase_priors_params = np.sort(
-                        [param for param in priors_parameters if 'recalib_{0}_phase_'.format(ifo) in param])
+                        [param for param in priors_parameters if f'recalib_{ifo}_phase_' in param])
                     phase_priors = np.transpose([priors[param].sample(n_samples)
                                                  for param in phase_priors_params])
                 elif priors is False:
                     amplitude_priors = None
                     phase_priors = None
                 else:
-                    raise ValueError('Input priors={} not understood'.format(priors))
+                    raise ValueError(f'Input priors={priors} not understood')
 
             # Amplitude calibration model
             ax1 = axes[2*i]
             plt.sca(ax1)
             amp_params = np.sort(
-                [param for param in parameters if 'recalib_{0}_amplitude_'.format(ifo) in param])
+                [param for param in parameters if f'recalib_{ifo}_amplitude_' in param])
             if len(amp_params) > 0:
-                amplitude = 100 * np.column_stack([posterior[param] for param in amp_params])
+                amplitude = np.column_stack([posterior[param] for param in amp_params])
                 plot_spline_pos(log_freqs=logfreqs,
-                                samples=amplitude,
+                                samples=amplitude*100,  # Convert to percentage
                                 minimum_frequency=minimum_frequency,
                                 maximum_frequency=maximum_frequency,
                                 level=quantile,
-                                injected_values=injected_amplitude,
-                                priors_samples=amplitude_priors,
+                                injected_values=injected_amplitude*100,  # Convert to percentage
+                                priors_samples=amplitude_priors*100,  # Convert to percentage
                                 errorbar=show_errorbar,
                                 color=color,
-                                label=r"{0} {1}$\%$C.L.".format(ifo.upper(), int(quantile * 100)))
+                                label=fr"{ifo.upper()} {int(quantile * 100)}$\%$C.L.")
 
             # Phase calibration model
             ax2 = axes[2*i+1]
             plt.sca(ax2)
             phase_params = np.sort([param for param in parameters if
-                                    'recalib_{0}_phase_'.format(ifo) in param])
+                                    f'recalib_{ifo}_phase_' in param])
             inj_phase_params = np.sort(
-                [param for param in injected_values_parameters if 'recalib_{0}_phase_'.format(ifo) in param])
+                [param for param in injected_values_parameters if f'recalib_{ifo}_phase_' in param])
             if len(phase_params) > 0:
                 phase = np.column_stack([posterior[param] for param in phase_params])
                 plot_spline_pos(log_freqs=logfreqs,
@@ -153,7 +153,7 @@ class Result(CoreResult):
                                 priors_samples=phase_priors,
                                 errorbar=show_errorbar,
                                 color=color,
-                                label=r"{0} {1}$\%$C.L.".format(ifo.upper(), int(quantile * 100)),
+                                label=fr"{ifo.upper()} {int(quantile * 100)}$\%$C.L.",
                                 xform=spline_angle_xform)
 
             ax1.tick_params(labelsize=.75 * font_size)
@@ -169,7 +169,7 @@ class Result(CoreResult):
         if filename is not None:
             fig.tight_layout()
             safe_save_figure(fig=fig, filename=filename, dpi=500, bbox_inches='tight')
-            logger.debug("Calibration figure saved to {}".format(filename))
+            logger.debug(f"Calibration figure saved to {filename}")
             plt.close()
         else:
             for ax in axes:
@@ -177,33 +177,34 @@ class Result(CoreResult):
             plt.tight_layout()
             plt.show()
 
-    def plot_relative_calibration_posterior(self, detectors, filename=None, minimum_frequency=None, maximum_frequency=None, show_injected_value=False, show_priors=False, show_errorbar=False, quantile=.9):
+    def plot_relative_calibration_posterior(self,
+                                            detectors: tuple,
+                                            filename: str | None=None,
+                                            minimum_frequency: float | None=None,
+                                            maximum_frequency: float | None=None,
+                                            show_injected_value: bool | None=False,
+                                            show_priors: bool | None=False,
+                                            show_errorbar: bool | None=False,
+                                            quantile: float | None=.9,
+                                            font_size: float | None=32):
         """
-        Plots the realtive calibration amplitude and phase uncertainty
+        Plots the relative calibration amplitude and phase uncertainty
 
-        Parameters
-        ==========
-        detectors: tuple of str
-            Tuple of detector names.
-        filename: str
-            If provided, save the plot to disk, and otherwise show the plot.
-        minimum_frequency: float
-            Minimum frequency to display.
-        maximum_frequency: float
-            Maximum frequency to display
-        show_injected_value: bool
-            If true, display the injected value.
-        show_priors: bool
-            If true, display the uncertainty band from the prior.
-        show_errorbar: bool
-            If true, display the posterior errorbars at the spline control points
-        quantile: float
-            Quantile for confidence levels, default=0.9, i.e., 90% interval.
+        Args:
+            detectors (tuple of str): Tuple of detector names.
+            filename (str): If provided, save the plot to disk, and otherwise show the plot.
+            minimum_frequency (float): Minimum frequency to display.
+            maximum_frequency (float): Maximum frequency to display
+            show_injected_value (bool): If true, display the injected value.
+            show_priors (bool): If true, display the uncertainty band from the prior.
+            show_errorbar (bool): If true, display the posterior errorbars at the spline control points
+            quantile (float): Quantile for confidence levels, default=0.9, i.e., 90% interval.
+            font_size (float): Font size. Defaults to 32.
         """
-
-        import matplotlib.pyplot as plt
-
         # Retrieve posterior
+        # Retrieve posterior
+        if self._posterior is None:
+            self.samples_to_posterior(priors=self.priors)
         posterior = self.posterior
         parameters = posterior.keys()
 
@@ -211,10 +212,6 @@ class Result(CoreResult):
         ifo_1, ifo_2 = detectors
 
         fig, [ax1, ax2] = plt.subplots(2, 1, figsize=(15, 10))
-        if filename is not None:
-            font_size = 32
-        else:
-            font_size = 10
 
         # Colors
         if ifo_1 == 'ET1':
@@ -228,7 +225,7 @@ class Result(CoreResult):
 
         # Assume spline control frequencies are constant
         freq_params = np.sort(
-            [param for param in parameters if 'recalib_{0}_frequency_'.format(ifo_1) in param])
+            [param for param in parameters if f'recalib_{ifo_1}_frequency_' in param])
         logfreqs = np.log([posterior[param].iloc[0] for param in freq_params])
 
         # Retrieve injected values if requested
@@ -239,16 +236,16 @@ class Result(CoreResult):
             if isinstance(injected_values, dict):
                 # Amplitude injected parameters
                 inj_amp_params_1 = np.sort(
-                    [param for param in injected_values_parameters if 'recalib_{0}_amplitude_'.format(ifo_1) in param])
+                    [param for param in injected_values_parameters if f'recalib_{ifo_1}_amplitude_' in param])
                 inj_amp_params_2 = np.sort(
-                    [param for param in injected_values_parameters if 'recalib_{0}_amplitude_'.format(ifo_2) in param])
+                    [param for param in injected_values_parameters if f'recalib_{ifo_2}_amplitude_' in param])
                 injected_amplitude_1 = [injected_values[param] for param in inj_amp_params_1]
                 injected_amplitude_2 = [injected_values[param] for param in inj_amp_params_2]
                 # Phase injected parameters
                 inj_phase_params_1 = np.sort(
-                    [param for param in injected_values_parameters if 'recalib_{0}_phase_'.format(ifo_1) in param])
+                    [param for param in injected_values_parameters if f'recalib_{ifo_1}_phase_' in param])
                 inj_phase_params_2 = np.sort(
-                    [param for param in injected_values_parameters if 'recalib_{0}_phase_'.format(ifo_2) in param])
+                    [param for param in injected_values_parameters if f'recalib_{ifo_2}_phase_' in param])
                 injected_phase_1 = [injected_values[param] for param in inj_phase_params_1]
                 injected_phase_2 = [injected_values[param] for param in inj_phase_params_2]
             elif len(injected_values) == 0:
@@ -268,18 +265,18 @@ class Result(CoreResult):
                 # Amplitude priors
                 n_samples = int(1e4)
                 amp_priors_params_1 = np.sort(
-                    [param for param in priors_parameters if 'recalib_{0}_amplitude_'.format(ifo_1) in param])
+                    [param for param in priors_parameters if f'recalib_{ifo_1}_amplitude_' in param])
                 amp_priors_params_2 = np.sort(
-                    [param for param in priors_parameters if 'recalib_{0}_amplitude_'.format(ifo_2) in param])
+                    [param for param in priors_parameters if f'recalib_{ifo_2}_amplitude_' in param])
                 amplitude_priors_1 = np.transpose([priors[param].sample(n_samples)
                                                    for param in amp_priors_params_1])
                 amplitude_priors_2 = np.transpose([priors[param].sample(n_samples)
                                                    for param in amp_priors_params_2])
                 # Phase priors
                 phase_priors_params_1 = np.sort(
-                    [param for param in priors_parameters if 'recalib_{0}_phase_'.format(ifo_1) in param])
+                    [param for param in priors_parameters if f'recalib_{ifo_1}_phase_' in param])
                 phase_priors_params_2 = np.sort(
-                    [param for param in priors_parameters if 'recalib_{0}_phase_'.format(ifo_2) in param])
+                    [param for param in priors_parameters if f'recalib_{ifo_2}_phase_' in param])
                 phase_priors_1 = np.transpose([priors[param].sample(n_samples)
                                                for param in phase_priors_params_1])
                 phase_priors_2 = np.transpose([priors[param].sample(n_samples)
@@ -290,14 +287,14 @@ class Result(CoreResult):
                 phase_priors_1 = None
                 phase_priors_2 = None
             else:
-                raise ValueError('Input priors={} not understood'.format(priors))
+                raise ValueError(f'Input priors={priors} not understood')
 
         # Amplitude calibration model
         plt.sca(ax1)
         amp_params_1 = np.sort(
-            [param for param in parameters if 'recalib_{0}_amplitude_'.format(ifo_1) in param])
+            [param for param in parameters if f'recalib_{ifo_1}_amplitude_' in param])
         amp_params_2 = np.sort(
-            [param for param in parameters if 'recalib_{0}_amplitude_'.format(ifo_2) in param])
+            [param for param in parameters if f'recalib_{ifo_2}_amplitude_' in param])
         if len(amp_params_1) > 0:
             amplitude_1 = np.column_stack([posterior[param] for param in amp_params_1])
             amplitude_2 = np.column_stack([posterior[param] for param in amp_params_2])
@@ -313,16 +310,16 @@ class Result(CoreResult):
                                                                amplitude_priors_2),
                                                errorbar=show_errorbar,
                                                color=color,
-                                               label=r"{0}-{1} {2}$\%$C.L.".format(ifo_1.upper(),
+                                               label=r"{}-{} {}$\%$C.L.".format(ifo_1.upper(),
                                                                                    ifo_2.upper(), int(quantile * 100))
                                                )
 
         # Phase calibration model
         plt.sca(ax2)
         phase_params_1 = np.sort([param for param in parameters if
-                                  'recalib_{0}_phase_'.format(ifo_1) in param])
+                                  f'recalib_{ifo_1}_phase_' in param])
         phase_params_2 = np.sort([param for param in parameters if
-                                  'recalib_{0}_phase_'.format(ifo_2) in param])
+                                  f'recalib_{ifo_2}_phase_' in param])
         if len(phase_params_1) > 0:
             phase_1 = np.column_stack([posterior[param] for param in phase_params_1])
             phase_2 = np.column_stack([posterior[param] for param in phase_params_2])
@@ -336,7 +333,7 @@ class Result(CoreResult):
                                            priors_samples=(phase_priors_1, phase_priors_2),
                                            errorbar=False,
                                            color=color,
-                                           label=r"{0}-{1} {2}$\%$C.L.".format(ifo_1.upper(),
+                                           label=r"{}-{} {}$\%$C.L.".format(ifo_1.upper(),
                                                                                ifo_2.upper(), int(quantile * 100)),
                                            xform=spline_angle_xform)
 
@@ -347,13 +344,12 @@ class Result(CoreResult):
         ax1.set_ylabel(r'Amplitude ratio', fontsize=font_size)
         ax2.set_ylabel('Phase difference [deg]', fontsize=font_size)
         ax2.set_xlabel('Frequency [Hz]', fontsize=font_size)
-        ax1.set_ylim(top=20, bottom=-20)
 
         # Save or show figure
         if filename is not None:
             fig.tight_layout()
             safe_save_figure(fig=fig, filename=filename, dpi=500, bbox_inches='tight')
-            logger.debug("Calibration figure saved to {}".format(filename))
+            logger.debug(f"Calibration figure saved to {filename}")
             plt.close()
         else:
             ax2.legend(fontsize=font_size)
