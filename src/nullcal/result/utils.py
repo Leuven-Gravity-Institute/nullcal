@@ -1,11 +1,24 @@
 from __future__ import annotations
 
-from typing import Callable, Optional, Tuple
+from typing import Callable, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
 from bilby.core.utils import SamplesSummary, logger
 from scipy.interpolate import interp1d
+
+
+def spline_percentage_xform(delta_A: float | np.ndarray) -> float | np.ndarray:
+    """Returns the error in percentage corresponding to the spline
+    calibration parameters delta_A.
+
+    Args:
+        delta_A (float | np.ndarray): Calibration amplitude uncertainty.
+
+    Returns:
+        float | np.ndarray: delta_A in percentage.
+    """
+    return delta_A * 100
 
 
 def plot_spline_pos(log_freqs: np.ndarray,
@@ -16,6 +29,7 @@ def plot_spline_pos(log_freqs: np.ndarray,
                     level: float=0.9,
                     injected_values: np.ndarray | None=None,
                     priors_samples: np.ndarray | None=None,
+                    show_knots: bool=True,
                     errorbar: bool | None=False,
                     color: str | None='k',
                     label: str | None=None,
@@ -102,6 +116,10 @@ def plot_spline_pos(log_freqs: np.ndarray,
             priors_data, average='median', confidence_level=level)
         plt.plot(freqs, priors_data_summary.lower_absolute_credible_interval, color=color, lw=2.5)
         plt.plot(freqs, priors_data_summary.upper_absolute_credible_interval, color=color, lw=2.5)
+
+    if show_knots:
+        for freq in freq_points:
+            plt.axvline(x=freq)
 
     plt.xlim(freq_points.min() - .5, freq_points.max() + 50)
     plt.legend(loc='upper right', prop={'size': .75 * font_size})
