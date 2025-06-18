@@ -25,16 +25,16 @@ def plot_spline_pos(log_freqs: np.ndarray,
                     samples: np.ndarray,
                     minimum_frequency: float,
                     maximum_frequency: float,
-                    nfreqs: int=100,
-                    level: float=0.9,
-                    injected_values: np.ndarray | None=None,
-                    priors_samples: np.ndarray | None=None,
-                    show_knots: bool=True,
-                    errorbar: bool | None=False,
-                    color: str | None='k',
-                    label: str | None=None,
-                    xform: Callable | None=None,
-                    font_size: float | None=32):
+                    nfreqs: int = 100,
+                    level: float = 0.9,
+                    injected_values: np.ndarray | None = None,
+                    priors_samples: np.ndarray | None = None,
+                    show_knots: bool = True,
+                    errorbar: bool | None = False,
+                    color: str | None = 'k',
+                    label: str | None = None,
+                    xform: Callable | None = None,
+                    font_size: float | None = 32):
     """
     Plot calibration posterior estimates for a spline model in log space.
     Adapted from the same function in bilby.gw.utils
@@ -66,7 +66,8 @@ def plot_spline_pos(log_freqs: np.ndarray,
         scaled_samples = samples
     else:
         scaled_samples = xform(samples)
-    scaled_samples_summary = SamplesSummary(scaled_samples, average='median', confidence_level=level)
+    scaled_samples_summary = SamplesSummary(
+        scaled_samples, average='median', confidence_level=level)
 
     # Plot errorbar
     if errorbar:
@@ -130,14 +131,14 @@ def plot_spline_pos_relative_amplitude(log_freqs: np.ndarray,
                                        samples_2: np.ndarray,
                                        minimum_frequency: float,
                                        maximum_frequency: float,
-                                       nfreqs: int=100,
-                                       level: float=0.9,
-                                       injected_values: tuple | None=None,
-                                       priors_samples: np.ndarray | None=None,
-                                       errorbar: bool | None=False,
-                                       color: str | None='k',
-                                       label: str | None=None,
-                                       font_size: float | None=32):
+                                       nfreqs: int = 100,
+                                       level: float = 0.9,
+                                       injected_values: tuple | None = None,
+                                       priors_samples: np.ndarray | None = None,
+                                       errorbar: bool | None = False,
+                                       color: str | None = 'k',
+                                       label: str | None = None,
+                                       font_size: float | None = 32):
     """
     Plot calibration posterior estimates relative amplitude for a spline model in log space.
     Adapted from the function plot_spline_pos in bilby.gw.utils
@@ -168,7 +169,7 @@ def plot_spline_pos_relative_amplitude(log_freqs: np.ndarray,
     # Retrieve posterior samples
     errorbar_samples_1 = samples_1
     errorbar_samples_2 = samples_2
-    errorbar_samples_relative = errorbar_samples_1 / errorbar_samples_2
+    errorbar_samples_relative = (1 + errorbar_samples_1) / (1 + errorbar_samples_2)
 
     errorbar_samples_relative_summary = SamplesSummary(
         errorbar_samples_relative, average='median', confidence_level=level)
@@ -230,14 +231,14 @@ def plot_spline_pos_relative_phase(log_freqs: np.ndarray,
                                    samples_2: np.ndarray,
                                    minimum_frequency: float,
                                    maximum_frequency: float,
-                                   nfreqs: int | None=100,
-                                   level: float | None=0.9,
-                                   injected_values: tuple | None=None,
-                                   priors_samples: np.ndarray | None=None,
-                                   errorbar: np.ndarray | None=False,
-                                   color: str | None='k',
-                                   label: str | None=None,
-                                   xform: Callable | None=None):
+                                   nfreqs: int | None = 100,
+                                   level: float | None = 0.9,
+                                   injected_values: tuple | None = None,
+                                   priors_samples: np.ndarray | None = None,
+                                   errorbar: np.ndarray | None = False,
+                                   color: str | None = 'k',
+                                   label: str | None = None,
+                                   xform: Callable | None = None):
     """
     Plot calibration posterior estimates relative phase for a spline model in log space.
     Adapted from the function plot_spline_pos in bilby.gw.utils
