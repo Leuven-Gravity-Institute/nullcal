@@ -49,8 +49,36 @@ class Result(CoreResult):
             np.ndarray: An array of detector labels.
         """
         if not hasattr(self, '_detectors'):
-            self._detectors = np.unique([param.split('_')[1] for param in self.search_parameter_keys if 'recalib_' in param])
+            self._detectors = np.unique([param.split('_')[1]
+                                        for param in self.search_parameter_keys if 'recalib_' in param])
         return self._detectors
+
+    def gaussian_prior_volume(self, priors: np.ndarray) -> float:
+        """Compute the priors volume, given a set of gaussian priors
+
+        Args:
+            priors (array-like):  List of bilby.core.prior.Gaussian priors
+
+        Returns:
+            float: The computed priors volume
+        """
+        return np.prod([p.sigma for p in priors])
+
+    def posterior_volume_from_samples(self, samples: np.ndarray) -> float:
+        """
+        The posterior volume for a set of posterior samples
+
+        Args:
+            samples (array-like):  List of posterior samples
+
+        Returns:
+            float: The computed posterior volume
+        """
+        covariance_matrix = np.cov(samples)
+        if covariance_matrix.ndim == 0:
+            return np.sqrt(covariance_matrix)
+        else:
+            return np.sqrt(np.linalg.det(covariance_matrix))
 
     def get_calibration_frequency_parameters(self, detector: str) -> np.ndarray:
         """Get the calibration frequency parameter keys.
@@ -143,7 +171,51 @@ class Result(CoreResult):
         else:
             raise ValueError(f'Injected values={injected_values} not understood')
 
-    def get_calibration_amplitude_error_prior_samples(self, detector: str, n_samples: int=10000) -> np.ndarray:
+    def get_calibration_amplitude_error_priors(self, detector: str) -> np.ndarray:
+        """Get the priors of the calibration amplitude error.
+
+        Args:
+            detector (str): Label of the detector.
+
+        Raises:
+            ValueError: priors are not found.
+            ValueError: Input priors are not understood.
+
+        Returns:
+            np.ndarray: Prior of the calibration amplitude error.
+        """
+        priors = getattr(self, 'priors', False)
+        if isinstance(priors, dict):
+            amp_priors_params = self.get_calibration_amplitude_parameters(detector=detector)
+            return np.array([priors[param] for param in amp_priors_params])
+        elif priors is False:
+            raise ValueError(f'priors are not found.')
+        else:
+            raise ValueError(f'Input priors={priors} not understood')
+
+    def get_calibration_phase_error_priors(self, detector: str) -> np.ndarray:
+        """Get the priors of the calibration phase error.
+
+        Args:
+            detector (str): Label of the detector.
+
+        Raises:
+            ValueError: priors are not found.
+            ValueError: Input priors are not understood.
+
+        Returns:
+            np.ndarray: Prior of the calibration phase error.
+        """
+        priors = getattr(self, 'priors', False)
+        if isinstance(priors, dict):
+            phase_priors_params = self.get_calibration_phase_parameters(detector=detector)
+            return np.array([priors[param] for param in phase_priors_params])
+        elif priors is False:
+            raise ValueError(f'priors are not found.')
+        else:
+            raise ValueError(f'Input priors={priors} not understood')
+
+    def get_calibration_amplitude_error_prior_samples(self, detector: str, n_samples: int = 10000) -> np.ndarray:
         """Get the prior samples of the calibration amplitude error.
 
         Args:
@@ -157,17 +229,10 @@ class Result(CoreResult):
         Returns:
             np.ndarray: Prior samples of the calibration amplitude error.
         """
-        priors = getattr(self, 'priors', False)
-        if isinstance(priors, dict):
-            amp_priors_params = self.get_calibration_amplitude_parameters(detector=detector)
-            return np.transpose([priors[param].sample(n_samples)
-                                                        for param in amp_priors_params])
-        elif priors is False:
-            raise ValueError(f'priors are not found.')
-        else:
-            raise ValueError(f'Input priors={priors} not understood')
+        amp_priors = self.get_calibration_amplitude_error_priors(detector=detector)
+        return np.transpose([prior.sample(n_samples) for prior in amp_priors])
 
-    def get_calibration_phase_error_prior_samples(self, detector: str, n_samples: int=10000) -> np.ndarray:
+    def get_calibration_phase_error_prior_samples(self, detector: str, n_samples: int = 10000) -> np.ndarray:
         """Get the prior samples of the calibration phase error.
 
         Args:
@@ -181,15 +246,8 @@ class Result(CoreResult):
         Returns:
             np.ndarray: Prior samples of the calibration phase error.
         """
-        priors = getattr(self, 'priors', False)
-        if isinstance(priors, dict):
-            phase_priors_params = self.get_calibration_phase_parameters(detector=detector)
-            return np.transpose([priors[param].sample(n_samples)
-                                                        for param in phase_priors_params])
-        elif priors is False:
-            raise ValueError(f'priors are not found.')
-        else:
-            raise ValueError(f'Input priors={priors} not understood')
+        phase_priors = self.get_calibration_phase_error_priors(detector=detector)
+        return np.transpose([prior.sample(n_samples) for prior in phase_priors])
 
     def get_calibration_amplitude_error_posterior_samples(self, detector: str) -> np.ndarray:
         """Get the posterior samples of the calibration amplitude error of the detectors.
@@ -215,16 +273,44 @@ class Result(CoreResult):
         parameters = self.get_calibration_phase_parameters(detector=detector)
         return np.column_stack([self.posterior[param] for param in parameters])
 
+    def compute_volume_ratio_at_knot_frequency(self) -> np.ndarray:
+        """Computes the ratio of posterior to prior volumes at each calibration knot frequency.
+
+        Returns:
+            np.ndarray: An array of volume ratios (posterior / prior) at each knot frequency.
+        """
+        # Get the priors at knot frequencies
+        priors_amplitude = np.transpose(
+            [self.get_calibration_amplitude_error_priors(ifo) for ifo in self.detectors])
+        priors_phase = np.transpose([self.get_calibration_phase_error_priors(ifo)
+                                    for ifo in self.detectors])
+        priors_at_knot_frequency = np.column_stack((priors_amplitude, priors_phase))
+
+        # Get the posterior samples at knot frequencies
+        posterior_amplitude = np.transpose([self.get_calibration_amplitude_error_posterior_samples(
+            ifo) for ifo in self.detectors], axes=(2, 0, 1))
+        posterior_phase = np.transpose([self.get_calibration_phase_error_posterior_samples(
+            ifo) for ifo in self.detectors], axes=(2, 0, 1))
+        posterior_at_knot_frequency = np.column_stack((posterior_amplitude, posterior_phase))
+
+        # Compute the priors and posterior volume at knot frequencies
+        priors_volume_at_knot_frequency = np.array([self.gaussian_prior_volume(
+            priors) for priors in priors_at_knot_frequency])
+        posterior_volume_at_knot_frequency = np.array([self.posterior_volume_from_samples(
+            posterior) for posterior in posterior_at_knot_frequency])
+
+        return posterior_volume_at_knot_frequency / priors_volume_at_knot_frequency
+
     def plot_calibration_posterior(self,
-                                   filename: str | None=None,
-                                   minimum_frequency: float | None=None,
-                                   maximum_frequency: float | None=None,
-                                   show_injected_value: bool | None=True,
-                                   show_priors: bool | None=True,
-                                   show_knots: bool | None=True,
-                                   show_errorbar: bool | None=False,
-                                   quantile: float | None=.9,
-                                   font_size: float | None=32):
+                                   filename: str | None = None,
+                                   minimum_frequency: float | None = None,
+                                   maximum_frequency: float | None = None,
+                                   show_injected_value: bool | None = True,
+                                   show_priors: bool | None = True,
+                                   show_knots: bool | None = True,
+                                   show_errorbar: bool | None = False,
+                                   quantile: float | None = .9,
+                                   font_size: float | None = 32):
         """
         Plots the calibration amplitude and phase uncertainty.
         Adapted from the same function in bilby.gw.result
@@ -280,7 +366,8 @@ class Result(CoreResult):
                 prior_phase = None
 
             # Get the posteriors.
-            posterior_amplitude = self.get_calibration_amplitude_error_posterior_samples(detector=ifo)
+            posterior_amplitude = self.get_calibration_amplitude_error_posterior_samples(
+                detector=ifo)
             posterior_phase = self.get_calibration_phase_error_posterior_samples(detector=ifo)
 
             # Amplitude calibration model
@@ -337,15 +424,15 @@ class Result(CoreResult):
             plt.show()
 
     def plot_relative_calibration_posterior(self,
-                                            filename: str | None=None,
-                                            minimum_frequency: float | None=None,
-                                            maximum_frequency: float | None=None,
-                                            show_injected_value: bool=True,
-                                            show_priors: bool=True,
-                                            show_knots: bool=True,
-                                            show_errorbar: bool=False,
-                                            quantile: float=.9,
-                                            font_size: float=32):
+                                            filename: str | None = None,
+                                            minimum_frequency: float | None = None,
+                                            maximum_frequency: float | None = None,
+                                            show_injected_value: bool = True,
+                                            show_priors: bool = True,
+                                            show_knots: bool = True,
+                                            show_errorbar: bool = False,
+                                            quantile: float = .9,
+                                            font_size: float = 32):
         """
         Plots the relative calibration amplitude and phase uncertainty
 
@@ -360,7 +447,7 @@ class Result(CoreResult):
             quantile (float, optional): Quantile for confidence levels, default=0.9, i.e., 90% interval.
             font_size (float, optional): Font size. Defaults to 32.
         """
-                # Assume spline control frequencies are constant
+        # Assume spline control frequencies are constant
         logfreqs = np.log(self.get_calibration_knot_frequency_array())
 
         # Detectors
@@ -373,14 +460,20 @@ class Result(CoreResult):
 
         # Get the data from the detector to be compared against
         if show_injected_value:
-            injected_amplitude_0 = self.get_injection_calibration_amplitude_error(detector=self.detectors[0])
-            injected_phase_0 = self.get_injection_calibration_phase_error(detector=self.detectors[0])
+            injected_amplitude_0 = self.get_injection_calibration_amplitude_error(
+                detector=self.detectors[0])
+            injected_phase_0 = self.get_injection_calibration_phase_error(
+                detector=self.detectors[0])
         if show_priors:
-            prior_amplitude_0 = self.get_calibration_amplitude_error_prior_samples(detector=self.detectors[0])
-            prior_phase_0 = self.get_calibration_phase_error_prior_samples(detector=self.detectors[0])
+            prior_amplitude_0 = self.get_calibration_amplitude_error_prior_samples(
+                detector=self.detectors[0])
+            prior_phase_0 = self.get_calibration_phase_error_prior_samples(
+                detector=self.detectors[0])
 
-        posterior_amplitude_0 = self.get_calibration_amplitude_error_posterior_samples(detector=self.detectors[0])
-        posterior_phase_0 = self.get_calibration_phase_error_posterior_samples(detector=self.detectors[0])
+        posterior_amplitude_0 = self.get_calibration_amplitude_error_posterior_samples(
+            detector=self.detectors[0])
+        posterior_phase_0 = self.get_calibration_phase_error_posterior_samples(
+            detector=self.detectors[0])
 
         for i, ifo in enumerate(ifos):
 
@@ -417,7 +510,8 @@ class Result(CoreResult):
                 relative_prior_phase = None
 
             # Get the posteriors.
-            posterior_amplitude = self.get_calibration_amplitude_error_posterior_samples(detector=ifo)
+            posterior_amplitude = self.get_calibration_amplitude_error_posterior_samples(
+                detector=ifo)
             posterior_phase = self.get_calibration_phase_error_posterior_samples(detector=ifo)
 
             relative_posterior_amplitude = (1 + posterior_amplitude) / (1 + posterior_amplitude_0)
