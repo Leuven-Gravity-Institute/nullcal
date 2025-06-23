@@ -301,6 +301,81 @@ class Result(CoreResult):
 
         return posterior_volume_at_knot_frequency / priors_volume_at_knot_frequency
 
+    def mahalanobis_distance(self, samples, point) -> float:
+        """Compute the Mahalanobis distance between a point P and a probability distribution D, as defined in https://en.wikipedia.org/wiki/Mahalanobis_distance
+
+        Args:
+            samples (array-like): Array of samples from the N-dimensional distribution D
+            point (array-like): The coordinates of the point P, defined in the N-dimensional space
+
+        Returns:
+            float: The Mahalanobis distance between P and D
+        """
+        dimension = len(samples[0])
+        if len(point) != dimension:
+            raise ValueError(
+                f'Impossible to compute the Mahalanobis distance between {dimension}-D distribution and {len(point)}-D array')
+
+        mean = np.mean(samples, axis=0)
+        cov = np.cov(samples, rowvar=False)
+        cov_inv = np.linalg.inv(cov)
+
+        difference = point - mean
+
+        return np.sqrt(difference.T @ cov_inv @ difference)
+
+    def compute_calibration_amplitude_bias_at_knot_frequency(self, use_priors: bool | None = False) -> np.ndarray:
+        """Compute the Mahalanobis distance between the injected calibration amplitude errors and the
+        N-dimensional calibration amplitude distributions (posterior or prior), evaluated at knot frequencies.
+
+        Args:
+            use_priors (bool, optional): If True, compute the distance using the prior distribution instead of the posterior. Defaults to False.
+
+        Returns:
+            np.ndarray:  Array of Mahalanobis distances computed at each knot frequency.
+        """
+        # Get the samples at knot frequencies
+        samples_amplitude_at_knot_frequency = np.transpose(
+            [self.get_calibration_amplitude_error_posterior_samples(ifo) for ifo in self.detectors], axes=(2, 1, 0))
+        if use_priors:
+            samples_amplitude_at_knot_frequency = np.transpose(
+                [self.get_calibration_amplitude_error_prior_samples(ifo) for ifo in self.detectors], axes=(2, 1, 0))
+
+        # Get the injected values at knot frequency
+        injected_amplitude_at_knot_frequency = np.transpose([self.get_injection_calibration_amplitude_error(
+            ifo) for ifo in self.detectors])
+
+        distance = [self.mahalanobis_distance(samples, inj_value) for (samples, inj_value) in zip(
+            samples_amplitude_at_knot_frequency, injected_amplitude_at_knot_frequency)]
+
+        return np.array(distance)
+
+    def compute_calibration_phase_bias_at_knot_frequency(self, use_priors: bool | None = False) -> np.ndarray:
+        """Compute the Mahalanobis distance between the injected calibration phase errors and the
+        N-dimensional calibration phase distributions (posterior or prior), evaluated at knot frequencies.
+
+        Args:
+            use_priors (bool, optional): If True, compute the distance using the prior distribution instead of the posterior. Defaults to False.
+
+        Returns:
+            np.ndarray:  Array of Mahalanobis distances computed at each knot frequency.
+        """
+        # Get the samples at knot frequencies
+        samples_phase_at_knot_frequency = np.transpose(
+            [self.get_calibration_phase_error_posterior_samples(ifo) for ifo in self.detectors], axes=(2, 1, 0))
+        if use_priors:
+            samples_phase_at_knot_frequency = np.transpose(
+                [self.get_calibration_phase_error_prior_samples(ifo) for ifo in self.detectors], axes=(2, 1, 0))
+
+        # Get the injected values at knot frequency
+        injected_phase_at_knot_frequency = np.transpose([self.get_injection_calibration_phase_error(
+            ifo) for ifo in self.detectors])
+
+        distance = [self.mahalanobis_distance(samples, inj_value) for (samples, inj_value) in zip(
+            samples_phase_at_knot_frequency, injected_phase_at_knot_frequency)]
+
+        return np.array(distance)
+
     def plot_calibration_posterior(self,
                                    filename: str | None = None,
                                    minimum_frequency: float | None = None,
