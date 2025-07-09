@@ -87,6 +87,24 @@ python-3.12:
     - merge_requests
     - main
 
+bandit:
+  stage: test
+  image: python:3.12
+  script:
+    - python -m pip install --upgrade pip setuptools wheel
+    - python -m pip install bandit
+    - *list-env
+    - bandit -c pyproject.toml -f json -r src > bandit-report.json
+  artifacts:
+    when: always
+    paths:
+      - bandit-report.json
+  needs: ["basic-3.12"]
+  only:
+    - merge_requests
+    - main
+  allow_failure: true
+
 # ------------- Coverage Report Summary -------------
 
 coverage-summary:
