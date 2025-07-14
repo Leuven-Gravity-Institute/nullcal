@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from . import result
-from .utils import logger
+from .utils import setup_logger
+from .version import __version__
 
-__version__ = '0.5.0'
+setup_logger()
 
 
-def log_version_information():
-    logger.info(f"Running nullcal: {__version__}")
+__all__ = [
+    "__version__",
+]

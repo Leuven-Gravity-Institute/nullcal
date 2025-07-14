@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import logging
 import tempfile
+from os import uname
 
 import bilby.core.utils.random
 import numpy as np
@@ -10,6 +12,7 @@ import scipy.stats
 from bilby.gw.conversion import convert_to_lal_binary_black_hole_parameters
 from bilby.gw.detector import CubicSpline, InterferometerList
 from bilby.gw.source import lal_binary_black_hole
+from bilby.gw.utils import noise_weighted_inner_product
 from bilby.gw.waveform_generator import WaveformGenerator
 
 from nullcal.clustering import single_clustering_by_threshold
@@ -18,10 +21,26 @@ from nullcal.null_stream import compute_calibrated_whitened_antenna_response
 from nullcal.time_frequency_transform import (get_shape_of_wavelet_transform,
                                               transform_wavelet_freq)
 
+bilby_logger = logging.getLogger("bilby")
+bilby_logger.setLevel(logging.WARNING)
+nullcal_logger = logging.getLogger("nullcal")
+nullcal_logger.setLevel(logging.WARNING)
+
+
+def compute_SNR(frequency_domain_strain, power_spectral_density_array, duration):
+    return np.sqrt(
+        noise_weighted_inner_product(
+            aa=frequency_domain_strain,
+            bb=frequency_domain_strain,
+            power_spectral_density=power_spectral_density_array,
+            duration=duration,
+        ).real
+    )
+
 
 @pytest.fixture
 def mock_data():
-    minimum_frequency = 20
+    minimum_frequency = 10
     maximum_frequency = 2048
     sampling_frequency = 4096
     duration = 16
@@ -32,22 +51,8 @@ def mock_data():
     seed = 12
     bilby.core.utils.random.seed(seed)
 
-    parameters = {
-        "mass_1": 35.6,
-        "mass_2": 30.6,
-        "a_1": 0.3,
-        "a_2": 0.36,
-        "tilt_1": 0.0,
-        "tilt_2": 0.0,
-        "phi_12": 0.0,
-        "phi_jl": 0.0,
-        "theta_jn": 2.68,
-        "psi": 1.6,
-        "phase": 0.0,
-        "geocent_time": 1126259462.4,
-        "ra": 1.97,
-        "dec": -1.21,
-        "luminosity_distance": 3903.3719941553823,
+    # calibration parameters
+    calibration_parameters = {
         "recalib_ET1_amplitude_0": -0.0015200418959315,
         "recalib_ET1_amplitude_1": 0.0137262334514915,
         "recalib_ET1_amplitude_2": -0.0098674551286916,
@@ -59,7 +64,7 @@ def mock_data():
         "recalib_ET1_amplitude_8": 0.0054113884142458,
         "recalib_ET1_amplitude_9": 0.0260352806778183,
         "recalib_ET1_phase_0": -0.0723524157564597,
-        "recalib_ET1_phase_1": -0.013634780567121,
+        "recalib_ET1_phase_1": -0.13634780567121,
         "recalib_ET1_phase_2": 0.0010756491344211,
         "recalib_ET1_phase_3": 0.0377631722932499,
         "recalib_ET1_phase_4": 0.048417333675392,
@@ -140,7 +145,73 @@ def mock_data():
         "recalib_ET3_frequency_9": 2048.0000000000005,
     }
 
-    start_time = int(parameters["geocent_time"] - duration / 2)
+    # The first signal.
+    parameters_0 = {
+        "mass_1": 35.6,
+        "mass_2": 30.6,
+        "a_1": 0.3,
+        "a_2": 0.36,
+        "tilt_1": 0.0,
+        "tilt_2": 0.0,
+        "phi_12": 0.0,
+        "phi_jl": 0.0,
+        "theta_jn": 2.68,
+        "psi": 1.6,
+        "phase": 0.0,
+        "geocent_time": 1126259462.4 + 2,
+        "ra": 1.97,
+        "dec": -1.21,
+        "luminosity_distance": 1500.3719941553823,
+    }
+
+    # The second signal.
+    parameters_1 = {
+        "mass_1": 31.6,
+        "mass_2": 30.6,
+        "a_1": 0.3,
+        "a_2": 0.36,
+        "tilt_1": 0.0,
+        "tilt_2": 0.0,
+        "phi_12": 0.0,
+        "phi_jl": 0.0,
+        "theta_jn": 2.68,
+        "psi": 1.6,
+        "phase": 0.0,
+        "geocent_time": 1126259462.4 - 2,
+        "ra": 1.97,
+        "dec": -1.21,
+        "luminosity_distance": 1500.3719941553823,
+    }
+
+    # The third signal.
+    parameters_2 = {
+        "mass_1": 31.6,
+        "mass_2": 30.6,
+        "a_1": 0.0,
+        "a_2": 0.0,
+        "tilt_1": 0.0,
+        "tilt_2": 0.0,
+        "phi_12": 0.0,
+        "phi_jl": 0.0,
+        "theta_jn": 0.0,
+        "psi": 0.0,
+        "phase": 0.0,
+        "geocent_time": 1126259462.4 + 6,
+        "ra": 1.97,
+        "dec": -1.21,
+        "luminosity_distance": 1500.3719941553823,
+    }
+
+    for key in calibration_parameters:
+        parameters_0[key] = calibration_parameters[key]
+        parameters_1[key] = calibration_parameters[key]
+        parameters_2[key] = calibration_parameters[key]
+
+    # Combine the full set of parameters
+    # parameters_list = [parameters_0, parameters_1, parameters_2]
+    parameters_list = [parameters_0, parameters_1, parameters_2]
+
+    start_time = int(1126259462.4 - duration / 2)
     waveform_arguments = dict(
         waveform_approximant="IMRPhenomXPHM",
         reference_frequency=50.0,
@@ -168,29 +239,58 @@ def mock_data():
         sampling_frequency=sampling_frequency,
         start_time=start_time,
         frequency_domain_source_model=lal_binary_black_hole,
-        parameters=parameters,
         parameter_conversion=convert_to_lal_binary_black_hole_parameters,
         waveform_arguments=waveform_arguments,
     )
 
-    interferometers.inject_signal(waveform_generator=waveform_generator, parameters=parameters)
+    for parameters in parameters_list:
+        interferometers.inject_signal(waveform_generator=waveform_generator, parameters=parameters)
 
     # Get the noiseless interferometers
-    noiseless_interferometers = InterferometerList(["ET"])
-    for interferometer in noiseless_interferometers:
-        interferometer.minimum_frequency = minimum_frequency
-        interferometer.maximum_frequency = maximum_frequency
-        interferometer.calibration_model = CubicSpline(
-            prefix=f"recalib_{interferometer.name}_",
-            minimum_frequency=interferometer.minimum_frequency,
-            maximum_frequency=maximum_frequency,
-            n_points=n_points,
+    noiseless_interferometers_list = []
+    for parameters in parameters_list:
+        noiseless_interferometers = InterferometerList(["ET"])
+        for interferometer in noiseless_interferometers:
+            interferometer.minimum_frequency = minimum_frequency
+            interferometer.maximum_frequency = maximum_frequency
+            interferometer.calibration_model = CubicSpline(
+                prefix=f"recalib_{interferometer.name}_",
+                minimum_frequency=interferometer.minimum_frequency,
+                maximum_frequency=maximum_frequency,
+                n_points=n_points,
+            )
+        # Create zero noise.
+        noiseless_interferometers.set_strain_data_from_zero_noise(
+            sampling_frequency=sampling_frequency, duration=duration, start_time=start_time
         )
-    # Create zero noise.
-    noiseless_interferometers.set_strain_data_from_zero_noise(
-        sampling_frequency=sampling_frequency, duration=duration, start_time=start_time
+        noiseless_interferometers.inject_signal(waveform_generator=waveform_generator, parameters=parameters)
+
+        noiseless_interferometers_list.append(noiseless_interferometers)
+
+    # Compute the SNRs
+    ET1_frequency_domain_strain = np.sum(
+        [ifos[0].frequency_domain_strain for ifos in noiseless_interferometers_list], axis=0
     )
-    noiseless_interferometers.inject_signal(waveform_generator=waveform_generator, parameters=parameters)
+    ET1_power_spectral_density = noiseless_interferometers_list[0][0].power_spectral_density_array
+    ET1_SNR = compute_SNR(ET1_frequency_domain_strain, ET1_power_spectral_density, duration)
+
+    ET2_frequency_domain_strain = np.sum(
+        [ifos[1].frequency_domain_strain for ifos in noiseless_interferometers_list], axis=0
+    )
+    ET2_power_spectral_density = noiseless_interferometers_list[0][1].power_spectral_density_array
+    ET2_SNR = compute_SNR(ET2_frequency_domain_strain, ET2_power_spectral_density, duration)
+    ET3_frequency_domain_strain = np.sum(
+        [ifos[2].frequency_domain_strain for ifos in noiseless_interferometers_list], axis=0
+    )
+    ET3_power_spectral_density = noiseless_interferometers_list[0][2].power_spectral_density_array
+    ET3_SNR = compute_SNR(ET3_frequency_domain_strain, ET3_power_spectral_density, duration)
+
+    null_stream = ET1_frequency_domain_strain + ET2_frequency_domain_strain + ET3_frequency_domain_strain
+    null_stream_power_spectral_density = (
+        ET1_power_spectral_density + ET2_power_spectral_density + ET3_power_spectral_density
+    ) / np.sqrt(3)
+
+    null_stream_SNR = compute_SNR(null_stream, null_stream_power_spectral_density, duration)
 
     return {
         "sampling_frequency": sampling_frequency,
@@ -201,12 +301,17 @@ def mock_data():
         "start_time": start_time,
         "waveform_arguments": waveform_arguments,
         "interferometers": interferometers,
-        "noiseless_interferometers": noiseless_interferometers,
-        "injection_parameters": parameters,
+        "noiseless_interferometers_list": noiseless_interferometers_list,
+        "calibration_parameters": calibration_parameters,
+        "injection_parameters": parameters_list,
         "wavelet_transform_frequency_resolution": wavelet_transform_frequency_resolution,
         "wavelet_transform_nx": wavelet_transform_nx,
         "clustering_threshold": clustering_threshold,
         "frequency_mask": np.all([interferometer.frequency_mask for interferometer in interferometers], axis=0),
+        "ET1_SNR": ET1_SNR,
+        "ET2_SNR": ET2_SNR,
+        "ET3_SNR": ET3_SNR,
+        "null_stream_SNR": null_stream_SNR,
     }
 
 
@@ -233,7 +338,7 @@ def recalibration_likelihood(mock_data):
 
     with tempfile.NamedTemporaryFile(suffix=".csv", delete=True) as f:
         clustering_parameter_file = f.name
-        parameters_df = pd.DataFrame.from_dict({key: [value] for key, value in injection_parameters.items()})
+        parameters_df = pd.DataFrame.from_dict(injection_parameters)
         # Save to file.
         parameters_df.to_csv(clustering_parameter_file)
         likelihood = RecalibrationLikelihood(
@@ -282,23 +387,28 @@ def test_initialization(mock_data, recalibration_likelihood):
 
 
 def test_clustering(mock_data, recalibration_likelihood):
-    noiseless_interferometers = mock_data["noiseless_interferometers"]
+    noiseless_interferometers_list = mock_data["noiseless_interferometers_list"]
     wavelet_transform_frequency_resolution = mock_data["wavelet_transform_frequency_resolution"]
     wavelet_transform_nx = mock_data["wavelet_transform_nx"]
     clustering_threshold = mock_data["clustering_threshold"]
     minimum_frequency = mock_data["minimum_frequency"]
     maximum_frequency = mock_data["maximum_frequency"]
-    expected_time_frequency_filter = single_clustering_by_threshold(
-        interferometers=noiseless_interferometers,
-        frequency_resolution=wavelet_transform_frequency_resolution,
-        nx=wavelet_transform_nx,
-        threshold=clustering_threshold,
-        padding_time=0.0,
-        padding_freq=0.0,
-        minimum_frequency=minimum_frequency,
-        maximum_frequency=maximum_frequency,
+    expected_time_frequency_filter = np.logical_or.reduce(
+        [
+            single_clustering_by_threshold(
+                interferometers=noiseless_interferometers,
+                frequency_resolution=wavelet_transform_frequency_resolution,
+                nx=wavelet_transform_nx,
+                threshold=clustering_threshold,
+                padding_time=0.0,
+                padding_freq=0.0,
+                minimum_frequency=minimum_frequency,
+                maximum_frequency=maximum_frequency,
+            )
+            for noiseless_interferometers in noiseless_interferometers_list
+        ]
     )
-    # Check whether the time_frequency_filter is correct.
+
     assert np.array_equal(expected_time_frequency_filter, recalibration_likelihood.time_frequency_filter)
 
 
@@ -316,8 +426,16 @@ def test_uncalibrated_time_frequency_domain_null_stream(mock_data, recalibration
     uncalibrated_frequency_domain_null_stream = (
         recalibration_likelihood.compute_uncalibrated_frequency_domain_null_stream()
     )
+    rotated_uncalibrated_frequency_domain_null_stream = np.zeros_like(uncalibrated_frequency_domain_null_stream)
+    for i in range(len(frequency_mask)):
+        if frequency_mask[i]:
+            U, _, _ = np.linalg.svd(recalibration_likelihood._whitened_antenna_response[i, :, :])
+            rotated_uncalibrated_frequency_domain_null_stream[:, i] = np.einsum(
+                "ij,j->i", np.conj(U).T, uncalibrated_frequency_domain_null_stream[:, i]
+            )
+
     # Perform the time-frequency transform
-    uncalibrated_time_frequency_domain_null_stream = np.array(
+    rotated_uncalibrated_time_frequency_domain_null_stream = np.array(
         [
             transform_wavelet_freq(
                 data=data,
@@ -325,24 +443,15 @@ def test_uncalibrated_time_frequency_domain_null_stream(mock_data, recalibration
                 Nt=wavelet_transform_Nt,
                 nx=wavelet_transform_nx,
             )
-            for data in uncalibrated_frequency_domain_null_stream
+            for data in rotated_uncalibrated_frequency_domain_null_stream
         ]
     )
-    # Apply the filter
-    uncalibrated_time_frequency_domain_null_stream_filtered = uncalibrated_time_frequency_domain_null_stream[
-        :, recalibration_likelihood.time_frequency_filter
-    ]
-    # Perform coordinate transformation
-    # This is correct only if the PSDs of the detectors are the same.
-    frequency_mask = recalibration_likelihood.frequency_mask
-    antenna_response = recalibration_likelihood._whitened_antenna_response[np.argmax(frequency_mask), :, :]
-    U, _, _ = np.linalg.svd(antenna_response)
-    rotated_null_stream = np.einsum("ji,if->jf", np.conj(U.T), uncalibrated_time_frequency_domain_null_stream_filtered)
-    # The last dimension is null stream.
-    # Exclude the last frequency
-    # samples = np.concatenate((rotated_null_stream.real, rotated_null_stream.imag))
-    rotated_null_stream = rotated_null_stream[2, :]
-    result = scipy.stats.kstest(rotated_null_stream, cdf="norm", args=(0.0, 1.0))
+    rotated_uncalibrated_time_frequency_domain_null_stream_filtered = (
+        rotated_uncalibrated_time_frequency_domain_null_stream[2, recalibration_likelihood.time_frequency_filter]
+    )
+    result = scipy.stats.kstest(
+        rotated_uncalibrated_time_frequency_domain_null_stream_filtered, cdf="norm", args=(0.0, 1.0)
+    )
     assert result.pvalue < 0.05
 
 
@@ -352,13 +461,13 @@ def test_calibrated_time_frequency_domain_null_stream(mock_data, recalibration_l
     wavelet_transform_frequency_resolution = mock_data["wavelet_transform_frequency_resolution"]
     wavelet_transform_nx = mock_data["wavelet_transform_nx"]
     frequency_mask = mock_data["frequency_mask"]
-    injection_parameters = mock_data["injection_parameters"]
+    calibration_parameters = mock_data["calibration_parameters"]
     wavelet_transform_Nt, wavelet_transform_Nf = get_shape_of_wavelet_transform(
         t_length=int(duration * sampling_frequency),
         sampling_frequency=sampling_frequency,
         frequency_resolution=wavelet_transform_frequency_resolution,
     )
-    calibration_factor = recalibration_likelihood.construct_calibration_factor_from_parameters(injection_parameters)
+    calibration_factor = recalibration_likelihood.construct_calibration_factor_from_parameters(calibration_parameters)
     calibrated_frequency_domain_null_stream = recalibration_likelihood.compute_calibrated_frequency_domain_null_stream(
         calibration_factor
     )
@@ -400,14 +509,14 @@ def test_incorrectly_calibrated_time_frequency_domain_null_stream(mock_data, rec
     wavelet_transform_frequency_resolution = mock_data["wavelet_transform_frequency_resolution"]
     wavelet_transform_nx = mock_data["wavelet_transform_nx"]
     frequency_mask = mock_data["frequency_mask"]
-    injection_parameters = mock_data["injection_parameters"]
+    calibration_parameters = mock_data["calibration_parameters"]
     n_points = mock_data["n_points"]
     wavelet_transform_Nt, wavelet_transform_Nf = get_shape_of_wavelet_transform(
         t_length=int(duration * sampling_frequency),
         sampling_frequency=sampling_frequency,
         frequency_resolution=wavelet_transform_frequency_resolution,
     )
-    incorrect_parameters = injection_parameters.copy()
+    incorrect_parameters = calibration_parameters.copy()
     np.random.seed(13)
     for i in range(n_points):
         incorrect_parameters[f"recalib_ET1_amplitude_{i}"] = np.random.randn()
