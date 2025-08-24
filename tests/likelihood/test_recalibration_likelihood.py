@@ -14,10 +14,12 @@ from bilby.gw.source import lal_binary_black_hole
 from bilby.gw.utils import noise_weighted_inner_product
 from bilby.gw.waveform_generator import WaveformGenerator
 
-from nullcal.clustering import single_clustering_by_threshold
+from nullcal.clustering.base import Clustering
+from nullcal.clustering.single import single_clustering_by_threshold
 from nullcal.likelihood import RecalibrationLikelihood
-from nullcal.null_stream import compute_calibrated_whitened_antenna_response
-from nullcal.time_frequency_transform import get_shape_of_wavelet_transform, transform_wavelet_freq
+from nullcal.null_stream.calibration import compute_calibrated_whitened_antenna_response
+from nullcal.null_stream.null_stream import NullStream
+from nullcal.time_frequency_transform.wavelet_transforms import WaveletTransform
 
 bilby_logger = logging.getLogger("bilby")
 bilby_logger.setLevel(logging.WARNING)
@@ -36,7 +38,7 @@ def compute_snr(frequency_domain_strain, power_spectral_density_array, duration)
     )
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def mock_data():
     minimum_frequency = 10
     maximum_frequency = 2048
@@ -313,8 +315,20 @@ def mock_data():
     }
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
+def time_frequency_transform(mock_data):
+    """A WaveletTransform instance for testing."""
+    return WaveletTransform(
+        duration=mock_data["duration"],
+        sampling_frequency=mock_data["sampling_frequency"],
+        frequency_resolution=mock_data["wavelet_transform_frequency_resolution"],
+        nx=mock_data["wavelet_transform_nx"],
+    )
+
+
+@pytest.fixture(scope="module")
 def recalibration_likelihood(mock_data):
+    """A RecalibrationLikelihood instance for testing."""
     interferometers = mock_data["interferometers"]
     injection_parameters = mock_data["injection_parameters"]
     duration = mock_data["duration"]
@@ -348,46 +362,19 @@ def recalibration_likelihood(mock_data):
             clustering_parameter_file=clustering_parameter_file,
             clustering_threshold=clustering_threshold,
         )
-        # Run the time-frequency clustering before the temp file is deleted.
-        _ = likelihood.time_frequency_filter
 
     return likelihood
 
 
-def test_initialization(mock_data, recalibration_likelihood):
-    duration = mock_data["duration"]
-    sampling_frequency = mock_data["sampling_frequency"]
-    minimum_frequency = mock_data["minimum_frequency"]
-    maximum_frequency = mock_data["maximum_frequency"]
-    wavelet_transform_frequency_resolution = mock_data["wavelet_transform_frequency_resolution"]
-    wavelet_transform_nx = mock_data["wavelet_transform_nx"]
-    frequency_mask = mock_data["frequency_mask"]
-    interferometers = mock_data["interferometers"]
-    frequency_array = interferometers[0].frequency_array
-
+def test_initialization(recalibration_likelihood):
     assert isinstance(recalibration_likelihood.interferometers, InterferometerList)
-    expected_wavelet_transform_n_t, expected_wavelet_transform_n_f = get_shape_of_wavelet_transform(
-        t_length=int(duration * sampling_frequency),
-        sampling_frequency=sampling_frequency,
-        frequency_resolution=wavelet_transform_frequency_resolution,
-    )
-    assert recalibration_likelihood._wavelet_transform_n_t == expected_wavelet_transform_n_t
-    assert recalibration_likelihood._wavelet_transform_n_f == expected_wavelet_transform_n_f
-    assert recalibration_likelihood._wavelet_transform_nx == wavelet_transform_nx
-    assert np.array_equal(recalibration_likelihood.frequency_mask, frequency_mask)
-    assert np.array_equal(
-        recalibration_likelihood.masked_frequency_array, interferometers[0].frequency_array[frequency_mask]
-    )
-    assert recalibration_likelihood.minimum_frequency == minimum_frequency
-    assert recalibration_likelihood.maximum_frequency == maximum_frequency
-    assert recalibration_likelihood._whitened_antenna_response.shape == (len(frequency_array), 3, 2)
-    assert recalibration_likelihood._whitened_frequency_domain_strain_array.shape == (3, len(frequency_array))
+    assert isinstance(recalibration_likelihood.time_frequency_transform, WaveletTransform)
+    assert isinstance(recalibration_likelihood.clustering, Clustering)
+    assert isinstance(recalibration_likelihood.null_stream_calculator, NullStream)
 
 
-def test_clustering(mock_data, recalibration_likelihood):
+def test_clustering(mock_data, recalibration_likelihood, time_frequency_transform):
     noiseless_interferometers_list = mock_data["noiseless_interferometers_list"]
-    wavelet_transform_frequency_resolution = mock_data["wavelet_transform_frequency_resolution"]
-    wavelet_transform_nx = mock_data["wavelet_transform_nx"]
     clustering_threshold = mock_data["clustering_threshold"]
     minimum_frequency = mock_data["minimum_frequency"]
     maximum_frequency = mock_data["maximum_frequency"]
@@ -395,8 +382,7 @@ def test_clustering(mock_data, recalibration_likelihood):
         [
             single_clustering_by_threshold(
                 interferometers=noiseless_interferometers,
-                frequency_resolution=wavelet_transform_frequency_resolution,
-                nx=wavelet_transform_nx,
+                time_frequency_transform=time_frequency_transform,
                 threshold=clustering_threshold,
                 padding_time=0.0,
                 padding_freq=0.0,
@@ -407,27 +393,19 @@ def test_clustering(mock_data, recalibration_likelihood):
         ]
     )
 
-    assert np.array_equal(expected_time_frequency_filter, recalibration_likelihood.time_frequency_filter)
+    assert np.array_equal(expected_time_frequency_filter, recalibration_likelihood.clustering.time_frequency_filter)
 
 
-def test_uncalibrated_time_frequency_domain_null_stream(mock_data, recalibration_likelihood):
-    duration = mock_data["duration"]
-    sampling_frequency = mock_data["sampling_frequency"]
-    wavelet_transform_frequency_resolution = mock_data["wavelet_transform_frequency_resolution"]
-    wavelet_transform_nx = mock_data["wavelet_transform_nx"]
+def test_uncalibrated_time_frequency_domain_null_stream(mock_data, recalibration_likelihood, time_frequency_transform):
     frequency_mask = mock_data["frequency_mask"]
-    wavelet_transform_n_t, wavelet_transform_n_f = get_shape_of_wavelet_transform(
-        t_length=int(duration * sampling_frequency),
-        sampling_frequency=sampling_frequency,
-        frequency_resolution=wavelet_transform_frequency_resolution,
-    )
     uncalibrated_frequency_domain_null_stream = (
-        recalibration_likelihood.compute_uncalibrated_frequency_domain_null_stream()
+        recalibration_likelihood.null_stream_calculator.compute_uncalibrated_frequency_domain_null_stream()
     )
     rotated_uncalibrated_frequency_domain_null_stream = np.zeros_like(uncalibrated_frequency_domain_null_stream)
+
     for i in range(len(frequency_mask)):
         if frequency_mask[i]:
-            u, _, _ = np.linalg.svd(recalibration_likelihood._whitened_antenna_response[i, :, :])
+            u, _, _ = np.linalg.svd(recalibration_likelihood.null_stream_calculator._whitened_antenna_response[i, :, :])
             rotated_uncalibrated_frequency_domain_null_stream[:, i] = np.einsum(
                 "ij,j->i", np.conj(u).T, uncalibrated_frequency_domain_null_stream[:, i]
             )
@@ -435,17 +413,14 @@ def test_uncalibrated_time_frequency_domain_null_stream(mock_data, recalibration
     # Perform the time-frequency transform
     rotated_uncalibrated_time_frequency_domain_null_stream = np.array(
         [
-            transform_wavelet_freq(
-                data=data,
-                n_f=wavelet_transform_n_f,
-                n_t=wavelet_transform_n_t,
-                nx=wavelet_transform_nx,
-            )
+            time_frequency_transform.frequency_to_wavelet(frequency_domain_data=data)
             for data in rotated_uncalibrated_frequency_domain_null_stream
         ]
     )
     rotated_uncalibrated_time_frequency_domain_null_stream_filtered = (
-        rotated_uncalibrated_time_frequency_domain_null_stream[2, recalibration_likelihood.time_frequency_filter]
+        rotated_uncalibrated_time_frequency_domain_null_stream[
+            2, recalibration_likelihood.clustering.time_frequency_filter
+        ]
     )
     result = scipy.stats.kstest(
         rotated_uncalibrated_time_frequency_domain_null_stream_filtered, cdf="norm", args=(0.0, 1.0)
@@ -453,25 +428,21 @@ def test_uncalibrated_time_frequency_domain_null_stream(mock_data, recalibration
     assert result.pvalue < 0.05
 
 
-def test_calibrated_time_frequency_domain_null_stream(mock_data, recalibration_likelihood):
-    duration = mock_data["duration"]
-    sampling_frequency = mock_data["sampling_frequency"]
-    wavelet_transform_frequency_resolution = mock_data["wavelet_transform_frequency_resolution"]
-    wavelet_transform_nx = mock_data["wavelet_transform_nx"]
+def test_calibrated_time_frequency_domain_null_stream(mock_data, recalibration_likelihood, time_frequency_transform):
+    """Test the calibrated time-frequency domain null stream with correct calibration parameters."""
     frequency_mask = mock_data["frequency_mask"]
     calibration_parameters = mock_data["calibration_parameters"]
-    wavelet_transform_n_t, wavelet_transform_n_f = get_shape_of_wavelet_transform(
-        t_length=int(duration * sampling_frequency),
-        sampling_frequency=sampling_frequency,
-        frequency_resolution=wavelet_transform_frequency_resolution,
+    calibration_factor = recalibration_likelihood.null_stream_calculator.construct_calibration_factor_from_parameters(
+        calibration_parameters
     )
-    calibration_factor = recalibration_likelihood.construct_calibration_factor_from_parameters(calibration_parameters)
-    calibrated_frequency_domain_null_stream = recalibration_likelihood.compute_calibrated_frequency_domain_null_stream(
-        calibration_factor
+    calibrated_frequency_domain_null_stream = (
+        recalibration_likelihood.null_stream_calculator.compute_calibrated_frequency_domain_null_stream(
+            calibration_factor
+        )
     )
     # Get the calibrated whitened antenna response.
     calibrated_whitened_antenna_response = compute_calibrated_whitened_antenna_response(
-        recalibration_likelihood._whitened_antenna_response, calibration_factor, frequency_mask
+        recalibration_likelihood.null_stream_calculator._whitened_antenna_response, calibration_factor, frequency_mask
     )
     rotated_calibrated_frequency_domain_null_stream = np.zeros_like(calibrated_frequency_domain_null_stream)
     for i in range(len(frequency_mask)):
@@ -483,17 +454,14 @@ def test_calibrated_time_frequency_domain_null_stream(mock_data, recalibration_l
     # Perform the time-frequency transform
     rotated_calibrated_time_frequency_domain_null_stream = np.array(
         [
-            transform_wavelet_freq(
-                data=data,
-                n_f=wavelet_transform_n_f,
-                n_t=wavelet_transform_n_t,
-                nx=wavelet_transform_nx,
-            )
+            time_frequency_transform.frequency_to_wavelet(frequency_domain_data=data)
             for data in rotated_calibrated_frequency_domain_null_stream
         ]
     )
     rotated_calibrated_time_frequency_domain_null_stream_filtered = (
-        rotated_calibrated_time_frequency_domain_null_stream[2, recalibration_likelihood.time_frequency_filter]
+        rotated_calibrated_time_frequency_domain_null_stream[
+            2, recalibration_likelihood.clustering.time_frequency_filter
+        ]
     )
     result = scipy.stats.kstest(
         rotated_calibrated_time_frequency_domain_null_stream_filtered, cdf="norm", args=(0.0, 1.0)
@@ -501,19 +469,12 @@ def test_calibrated_time_frequency_domain_null_stream(mock_data, recalibration_l
     assert result.pvalue > 0.05
 
 
-def test_incorrectly_calibrated_time_frequency_domain_null_stream(mock_data, recalibration_likelihood):
-    duration = mock_data["duration"]
-    sampling_frequency = mock_data["sampling_frequency"]
-    wavelet_transform_frequency_resolution = mock_data["wavelet_transform_frequency_resolution"]
-    wavelet_transform_nx = mock_data["wavelet_transform_nx"]
+def test_incorrectly_calibrated_time_frequency_domain_null_stream(
+    mock_data, recalibration_likelihood, time_frequency_transform
+):
     frequency_mask = mock_data["frequency_mask"]
     calibration_parameters = mock_data["calibration_parameters"]
     n_points = mock_data["n_points"]
-    wavelet_transform_n_t, wavelet_transform_n_f = get_shape_of_wavelet_transform(
-        t_length=int(duration * sampling_frequency),
-        sampling_frequency=sampling_frequency,
-        frequency_resolution=wavelet_transform_frequency_resolution,
-    )
     incorrect_parameters = calibration_parameters.copy()
     np.random.seed(13)
     for i in range(n_points):
@@ -524,13 +485,17 @@ def test_incorrectly_calibrated_time_frequency_domain_null_stream(mock_data, rec
         incorrect_parameters[f"recalib_ET2_phase_{i}"] = np.random.randn()
         incorrect_parameters[f"recalib_ET3_phase_{i}"] = np.random.randn()
 
-    calibration_factor = recalibration_likelihood.construct_calibration_factor_from_parameters(incorrect_parameters)
-    calibrated_frequency_domain_null_stream = recalibration_likelihood.compute_calibrated_frequency_domain_null_stream(
-        calibration_factor
+    calibration_factor = recalibration_likelihood.null_stream_calculator.construct_calibration_factor_from_parameters(
+        incorrect_parameters
+    )
+    calibrated_frequency_domain_null_stream = (
+        recalibration_likelihood.null_stream_calculator.compute_calibrated_frequency_domain_null_stream(
+            calibration_factor
+        )
     )
     # Get the calibrated whitened antenna response.
     calibrated_whitened_antenna_response = compute_calibrated_whitened_antenna_response(
-        recalibration_likelihood._whitened_antenna_response, calibration_factor, frequency_mask
+        recalibration_likelihood.null_stream_calculator._whitened_antenna_response, calibration_factor, frequency_mask
     )
     rotated_calibrated_frequency_domain_null_stream = np.zeros_like(calibrated_frequency_domain_null_stream)
     for i in range(len(frequency_mask)):
@@ -542,17 +507,14 @@ def test_incorrectly_calibrated_time_frequency_domain_null_stream(mock_data, rec
     # Perform the time-frequency transform
     rotated_calibrated_time_frequency_domain_null_stream = np.array(
         [
-            transform_wavelet_freq(
-                data=data,
-                n_f=wavelet_transform_n_f,
-                n_t=wavelet_transform_n_t,
-                nx=wavelet_transform_nx,
-            )
+            time_frequency_transform.frequency_to_wavelet(frequency_domain_data=data)
             for data in rotated_calibrated_frequency_domain_null_stream
         ]
     )
     rotated_calibrated_time_frequency_domain_null_stream_filtered = (
-        rotated_calibrated_time_frequency_domain_null_stream[2, recalibration_likelihood.time_frequency_filter]
+        rotated_calibrated_time_frequency_domain_null_stream[
+            2, recalibration_likelihood.clustering.time_frequency_filter
+        ]
     )
     result = scipy.stats.kstest(
         rotated_calibrated_time_frequency_domain_null_stream_filtered, cdf="norm", args=(0.0, 1.0)
