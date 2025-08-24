@@ -1,3 +1,7 @@
+"""
+Functions for projections.
+"""
+
 from __future__ import annotations
 
 import numpy as np
@@ -23,7 +27,9 @@ def compute_projector(
     if n_freq != frequency_mask.shape[0]:
         raise ValueError(
             "Frequency mask shape mismatch."
-            f"calibrated_whitened_antenna_response_function: (frequency={n_freq},detector={n_det},mode={_}) and frequency_mask: (frequency={frequency_mask.shape[0]})."
+            "calibrated_whitened_antenna_response_function:"
+            f"(frequency={n_freq},detector={n_det},mode={_})"
+            f"and frequency_mask: (frequency={frequency_mask.shape[0]})."
             "The frequency dimensions must have the same length."
         )
     calibrated_whitened_antenna_response_function_masked = calibrated_whitened_antenna_response_function[
@@ -32,11 +38,11 @@ def compute_projector(
     output = np.eye(n_det, dtype=calibrated_whitened_antenna_response_function.dtype)[np.newaxis, :, :].repeat(
         n_freq, axis=0
     )
-    F_dagger = np.transpose(np.conj(calibrated_whitened_antenna_response_function_masked), axes=(0, 2, 1))
+    f_dagger = np.transpose(np.conj(calibrated_whitened_antenna_response_function_masked), axes=(0, 2, 1))
     # I - F@(F'F)^-1 F'
-    Pgw = np.matmul(
+    projector_gw = np.matmul(
         calibrated_whitened_antenna_response_function_masked,
-        np.matmul(np.linalg.inv(np.matmul(F_dagger, calibrated_whitened_antenna_response_function_masked)), F_dagger),
+        np.matmul(np.linalg.inv(np.matmul(f_dagger, calibrated_whitened_antenna_response_function_masked)), f_dagger),
     )
-    output[frequency_mask, :, :] = output[frequency_mask, :, :] - Pgw
+    output[frequency_mask, :, :] = output[frequency_mask, :, :] - projector_gw
     return output

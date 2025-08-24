@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-import bilby.core.utils
 import numpy as np
 import pytest
 
-from nullcal.null_stream import compute_projector
+from nullcal.null_stream.projector import compute_projector
 
 
 @pytest.fixture
@@ -14,7 +13,7 @@ def mock_projector_data():
     n_mode = 2  # GW polarization modes
     n_freq = 1000  # Frequency bins
     frequencies = np.linspace(1, 1000, n_freq)
-    frequency_mask = (frequencies >= 10) & (frequencies <= 500)  # 10–500 Hz
+    frequency_mask = (frequencies >= 10) & (frequencies <= 500)  # 10—500 Hz
     # Mock calibrated whitened antenna response (complex-valued)
     antenna_response = np.random.randn(n_freq, n_det, n_mode) + np.random.randn(n_freq, n_det, n_mode) * 1.0j
     return {
@@ -71,11 +70,13 @@ def test_single_frequency(mock_projector_data):
     mask[500] = True
     antenna = mock_projector_data["antenna_response"]
     projector = compute_projector(antenna, mask)
-    F = antenna[500:501]
-    F_dagger = np.transpose(np.conj(F), axes=(0, 2, 1))
+    antenna_k = antenna[500:501]
+    antenna_k_dagger = np.transpose(np.conj(antenna_k), axes=(0, 2, 1))
     expected = np.eye(mock_projector_data["n_det"], dtype=np.complex128)[np.newaxis, :, :]
-    Pgw = np.matmul(F, np.matmul(np.linalg.inv(np.matmul(F_dagger, F)), F_dagger))
-    expected[0] -= Pgw[0]
+    projector_gw = np.matmul(
+        antenna_k, np.matmul(np.linalg.inv(np.matmul(antenna_k_dagger, antenna_k)), antenna_k_dagger)
+    )
+    expected[0] -= projector_gw[0]
     np.testing.assert_allclose(projector[500:501], expected, rtol=1e-5)
 
 

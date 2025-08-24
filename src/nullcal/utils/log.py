@@ -1,14 +1,21 @@
+"""
+Functions for logging.
+"""
+
 from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Optional
 
-logger = logging.getLogger("nullcal")
+from ..version import __version__
 
 
 def get_version_information() -> str:
-    from ..version import __version__
+    """Get the version information.
+
+    Returns:
+        str: Version information.
+    """
 
     return __version__
 
@@ -31,8 +38,8 @@ def setup_logger(
     if isinstance(log_level, str):
         try:
             level = getattr(logging, log_level.upper())
-        except AttributeError:
-            raise ValueError(f"log_level {log_level} not understood")
+        except AttributeError as err:
+            raise ValueError(f"log_level {log_level} not understood") from err
     else:
         level = int(log_level)
 
@@ -40,7 +47,7 @@ def setup_logger(
     logger.propagate = False
     logger.setLevel(level)
 
-    if not any([isinstance(h, logging.StreamHandler) for h in logger.handlers]):
+    if not any(isinstance(h, logging.StreamHandler) for h in logger.handlers):
         stream_handler = logging.StreamHandler()
         stream_handler.setFormatter(
             logging.Formatter("%(asctime)s %(name)s %(levelname)-8s: %(message)s", datefmt="%H:%M")
@@ -48,7 +55,7 @@ def setup_logger(
         stream_handler.setLevel(level)
         logger.addHandler(stream_handler)
 
-    if not any([isinstance(h, logging.FileHandler) for h in logger.handlers]):
+    if not any(isinstance(h, logging.FileHandler) for h in logger.handlers):
         if label:
             Path(outdir).mkdir(parents=True, exist_ok=True)
             log_file = f"{outdir}/{label}.log"
@@ -63,4 +70,4 @@ def setup_logger(
 
     if print_version:
         version = get_version_information()
-        logger.info(f"Running nullcal version: {version}")
+        logger.info("Running nullcal version: %s", version)
