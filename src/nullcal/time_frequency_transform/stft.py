@@ -1,12 +1,13 @@
+"""
+Short-time Fourier transform.
+"""
+
 from __future__ import annotations
 
 import numpy as np
 
 
-def stft(data: np.ndarray,
-         sampling_frequency: float,
-         frequency_resolution: float,
-         window: np.ndarray):
+def stft(data: np.ndarray, sampling_frequency: float, frequency_resolution: float, window: np.ndarray):
     """Short-time Fourier transform.
 
     Args:

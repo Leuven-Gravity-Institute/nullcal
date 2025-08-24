@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import tempfile
-from os import uname
 
 import bilby.core.utils.random
 import numpy as np
@@ -18,8 +17,7 @@ from bilby.gw.waveform_generator import WaveformGenerator
 from nullcal.clustering import single_clustering_by_threshold
 from nullcal.likelihood import RecalibrationLikelihood
 from nullcal.null_stream import compute_calibrated_whitened_antenna_response
-from nullcal.time_frequency_transform import (get_shape_of_wavelet_transform,
-                                              transform_wavelet_freq)
+from nullcal.time_frequency_transform import get_shape_of_wavelet_transform, transform_wavelet_freq
 
 bilby_logger = logging.getLogger("bilby")
 bilby_logger.setLevel(logging.WARNING)
@@ -27,7 +25,7 @@ nullcal_logger = logging.getLogger("nullcal")
 nullcal_logger.setLevel(logging.WARNING)
 
 
-def compute_SNR(frequency_domain_strain, power_spectral_density_array, duration):
+def compute_snr(frequency_domain_strain, power_spectral_density_array, duration):
     return np.sqrt(
         noise_weighted_inner_product(
             aa=frequency_domain_strain,
@@ -212,11 +210,11 @@ def mock_data():
     parameters_list = [parameters_0, parameters_1, parameters_2]
 
     start_time = int(1126259462.4 - duration / 2)
-    waveform_arguments = dict(
-        waveform_approximant="IMRPhenomXPHM",
-        reference_frequency=50.0,
-        minimum_frequency=minimum_frequency,
-    )
+    waveform_arguments = {
+        "waveform_approximant": "IMRPhenomXPHM",
+        "reference_frequency": 50.0,
+        "minimum_frequency": minimum_frequency,
+    }
 
     interferometers = InterferometerList(["ET"])
     for interferometer in interferometers:
@@ -268,29 +266,29 @@ def mock_data():
         noiseless_interferometers_list.append(noiseless_interferometers)
 
     # Compute the SNRs
-    ET1_frequency_domain_strain = np.sum(
+    et1_frequency_domain_strain = np.sum(
         [ifos[0].frequency_domain_strain for ifos in noiseless_interferometers_list], axis=0
     )
-    ET1_power_spectral_density = noiseless_interferometers_list[0][0].power_spectral_density_array
-    ET1_SNR = compute_SNR(ET1_frequency_domain_strain, ET1_power_spectral_density, duration)
+    et1_power_spectral_density = noiseless_interferometers_list[0][0].power_spectral_density_array
+    et1_snr = compute_snr(et1_frequency_domain_strain, et1_power_spectral_density, duration)
 
-    ET2_frequency_domain_strain = np.sum(
+    et2_frequency_domain_strain = np.sum(
         [ifos[1].frequency_domain_strain for ifos in noiseless_interferometers_list], axis=0
     )
-    ET2_power_spectral_density = noiseless_interferometers_list[0][1].power_spectral_density_array
-    ET2_SNR = compute_SNR(ET2_frequency_domain_strain, ET2_power_spectral_density, duration)
-    ET3_frequency_domain_strain = np.sum(
+    et2_power_spectral_density = noiseless_interferometers_list[0][1].power_spectral_density_array
+    et2_snr = compute_snr(et2_frequency_domain_strain, et2_power_spectral_density, duration)
+    et3_frequency_domain_strain = np.sum(
         [ifos[2].frequency_domain_strain for ifos in noiseless_interferometers_list], axis=0
     )
-    ET3_power_spectral_density = noiseless_interferometers_list[0][2].power_spectral_density_array
-    ET3_SNR = compute_SNR(ET3_frequency_domain_strain, ET3_power_spectral_density, duration)
+    et3_power_spectral_density = noiseless_interferometers_list[0][2].power_spectral_density_array
+    et3_snr = compute_snr(et3_frequency_domain_strain, et3_power_spectral_density, duration)
 
-    null_stream = ET1_frequency_domain_strain + ET2_frequency_domain_strain + ET3_frequency_domain_strain
+    null_stream = (et1_frequency_domain_strain + et2_frequency_domain_strain + et3_frequency_domain_strain) / np.sqrt(3)
     null_stream_power_spectral_density = (
-        ET1_power_spectral_density + ET2_power_spectral_density + ET3_power_spectral_density
-    ) / np.sqrt(3)
+        et1_power_spectral_density + et2_power_spectral_density + et3_power_spectral_density
+    ) / 3
 
-    null_stream_SNR = compute_SNR(null_stream, null_stream_power_spectral_density, duration)
+    null_stream_snr = compute_snr(null_stream, null_stream_power_spectral_density, duration)
 
     return {
         "sampling_frequency": sampling_frequency,
@@ -308,10 +306,10 @@ def mock_data():
         "wavelet_transform_nx": wavelet_transform_nx,
         "clustering_threshold": clustering_threshold,
         "frequency_mask": np.all([interferometer.frequency_mask for interferometer in interferometers], axis=0),
-        "ET1_SNR": ET1_SNR,
-        "ET2_SNR": ET2_SNR,
-        "ET3_SNR": ET3_SNR,
-        "null_stream_SNR": null_stream_SNR,
+        "ET1_SNR": et1_snr,
+        "ET2_SNR": et2_snr,
+        "ET3_SNR": et3_snr,
+        "null_stream_snr": null_stream_snr,
     }
 
 
@@ -368,13 +366,13 @@ def test_initialization(mock_data, recalibration_likelihood):
     frequency_array = interferometers[0].frequency_array
 
     assert isinstance(recalibration_likelihood.interferometers, InterferometerList)
-    expected_wavelet_transform_Nt, expected_wavelet_transform_Nf = get_shape_of_wavelet_transform(
+    expected_wavelet_transform_n_t, expected_wavelet_transform_n_f = get_shape_of_wavelet_transform(
         t_length=int(duration * sampling_frequency),
         sampling_frequency=sampling_frequency,
         frequency_resolution=wavelet_transform_frequency_resolution,
     )
-    assert recalibration_likelihood._wavelet_transform_Nt == expected_wavelet_transform_Nt
-    assert recalibration_likelihood._wavelet_transform_Nf == expected_wavelet_transform_Nf
+    assert recalibration_likelihood._wavelet_transform_n_t == expected_wavelet_transform_n_t
+    assert recalibration_likelihood._wavelet_transform_n_f == expected_wavelet_transform_n_f
     assert recalibration_likelihood._wavelet_transform_nx == wavelet_transform_nx
     assert np.array_equal(recalibration_likelihood.frequency_mask, frequency_mask)
     assert np.array_equal(
@@ -418,7 +416,7 @@ def test_uncalibrated_time_frequency_domain_null_stream(mock_data, recalibration
     wavelet_transform_frequency_resolution = mock_data["wavelet_transform_frequency_resolution"]
     wavelet_transform_nx = mock_data["wavelet_transform_nx"]
     frequency_mask = mock_data["frequency_mask"]
-    wavelet_transform_Nt, wavelet_transform_Nf = get_shape_of_wavelet_transform(
+    wavelet_transform_n_t, wavelet_transform_n_f = get_shape_of_wavelet_transform(
         t_length=int(duration * sampling_frequency),
         sampling_frequency=sampling_frequency,
         frequency_resolution=wavelet_transform_frequency_resolution,
@@ -429,9 +427,9 @@ def test_uncalibrated_time_frequency_domain_null_stream(mock_data, recalibration
     rotated_uncalibrated_frequency_domain_null_stream = np.zeros_like(uncalibrated_frequency_domain_null_stream)
     for i in range(len(frequency_mask)):
         if frequency_mask[i]:
-            U, _, _ = np.linalg.svd(recalibration_likelihood._whitened_antenna_response[i, :, :])
+            u, _, _ = np.linalg.svd(recalibration_likelihood._whitened_antenna_response[i, :, :])
             rotated_uncalibrated_frequency_domain_null_stream[:, i] = np.einsum(
-                "ij,j->i", np.conj(U).T, uncalibrated_frequency_domain_null_stream[:, i]
+                "ij,j->i", np.conj(u).T, uncalibrated_frequency_domain_null_stream[:, i]
             )
 
     # Perform the time-frequency transform
@@ -439,8 +437,8 @@ def test_uncalibrated_time_frequency_domain_null_stream(mock_data, recalibration
         [
             transform_wavelet_freq(
                 data=data,
-                Nf=wavelet_transform_Nf,
-                Nt=wavelet_transform_Nt,
+                n_f=wavelet_transform_n_f,
+                n_t=wavelet_transform_n_t,
                 nx=wavelet_transform_nx,
             )
             for data in rotated_uncalibrated_frequency_domain_null_stream
@@ -462,7 +460,7 @@ def test_calibrated_time_frequency_domain_null_stream(mock_data, recalibration_l
     wavelet_transform_nx = mock_data["wavelet_transform_nx"]
     frequency_mask = mock_data["frequency_mask"]
     calibration_parameters = mock_data["calibration_parameters"]
-    wavelet_transform_Nt, wavelet_transform_Nf = get_shape_of_wavelet_transform(
+    wavelet_transform_n_t, wavelet_transform_n_f = get_shape_of_wavelet_transform(
         t_length=int(duration * sampling_frequency),
         sampling_frequency=sampling_frequency,
         frequency_resolution=wavelet_transform_frequency_resolution,
@@ -478,17 +476,17 @@ def test_calibrated_time_frequency_domain_null_stream(mock_data, recalibration_l
     rotated_calibrated_frequency_domain_null_stream = np.zeros_like(calibrated_frequency_domain_null_stream)
     for i in range(len(frequency_mask)):
         if frequency_mask[i]:
-            U, _, _ = np.linalg.svd(calibrated_whitened_antenna_response[i, :, :])
+            u, _, _ = np.linalg.svd(calibrated_whitened_antenna_response[i, :, :])
             rotated_calibrated_frequency_domain_null_stream[:, i] = np.einsum(
-                "ij,j->i", np.conj(U).T, calibrated_frequency_domain_null_stream[:, i]
+                "ij,j->i", np.conj(u).T, calibrated_frequency_domain_null_stream[:, i]
             )
     # Perform the time-frequency transform
     rotated_calibrated_time_frequency_domain_null_stream = np.array(
         [
             transform_wavelet_freq(
                 data=data,
-                Nf=wavelet_transform_Nf,
-                Nt=wavelet_transform_Nt,
+                n_f=wavelet_transform_n_f,
+                n_t=wavelet_transform_n_t,
                 nx=wavelet_transform_nx,
             )
             for data in rotated_calibrated_frequency_domain_null_stream
@@ -511,7 +509,7 @@ def test_incorrectly_calibrated_time_frequency_domain_null_stream(mock_data, rec
     frequency_mask = mock_data["frequency_mask"]
     calibration_parameters = mock_data["calibration_parameters"]
     n_points = mock_data["n_points"]
-    wavelet_transform_Nt, wavelet_transform_Nf = get_shape_of_wavelet_transform(
+    wavelet_transform_n_t, wavelet_transform_n_f = get_shape_of_wavelet_transform(
         t_length=int(duration * sampling_frequency),
         sampling_frequency=sampling_frequency,
         frequency_resolution=wavelet_transform_frequency_resolution,
@@ -537,17 +535,17 @@ def test_incorrectly_calibrated_time_frequency_domain_null_stream(mock_data, rec
     rotated_calibrated_frequency_domain_null_stream = np.zeros_like(calibrated_frequency_domain_null_stream)
     for i in range(len(frequency_mask)):
         if frequency_mask[i]:
-            U, _, _ = np.linalg.svd(calibrated_whitened_antenna_response[i, :, :])
+            u, _, _ = np.linalg.svd(calibrated_whitened_antenna_response[i, :, :])
             rotated_calibrated_frequency_domain_null_stream[:, i] = np.einsum(
-                "ij,j->i", np.conj(U).T, calibrated_frequency_domain_null_stream[:, i]
+                "ij,j->i", np.conj(u).T, calibrated_frequency_domain_null_stream[:, i]
             )
     # Perform the time-frequency transform
     rotated_calibrated_time_frequency_domain_null_stream = np.array(
         [
             transform_wavelet_freq(
                 data=data,
-                Nf=wavelet_transform_Nf,
-                Nt=wavelet_transform_Nt,
+                n_f=wavelet_transform_n_f,
+                n_t=wavelet_transform_n_t,
                 nx=wavelet_transform_nx,
             )
             for data in rotated_calibrated_frequency_domain_null_stream

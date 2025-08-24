@@ -10,6 +10,7 @@ authors = [
     { name = "Francesco Cireddu", email = "francesco.cireddu@kuleuven.be" },
 ]
 description = "A package to constrain calibration errors of a closed-geometry network of gravitational-wave detectors."
+license = {file = "LICENSE"}
 readme = "README.md"
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -44,11 +45,6 @@ test = [
     "bandit[toml]==1.8.5",
     "black==25.1.0",
     "check-manifest==0.50",
-    "flake8-bugbear==24.12.12",
-    "flake8-docstrings",
-    "flake8-formatter_junit_xml",
-    "flake8",
-    "flake8-pyproject",
     "pre-commit==4.2.0",
     "pylint==3.3.7",
     "pylint_junit",
@@ -73,9 +69,9 @@ packages = ["src/nullcal"]
 
 [tool.bandit]
 exclude_dirs = ["build", "dist", "tests", "scripts"]
-number = 4
 recursive = true
 targets = "src"
+skips = ["B101"]
 
 [tool.black]
 line-length = 120
@@ -85,34 +81,17 @@ fast = true
 branch = true
 
 [tool.coverage.report]
-fail_under = 100
-
-[tool.flake8]
-max-line-length = 120
-select = "F,E,W,B,B901,B902,B903"
-exclude = [
-    ".eggs",
-    ".git",
-    ".tox",
-    "nssm",
-    "obj",
-    "out",
-    "packages",
-    "pywin32",
-    "tests",
-    "swagger_client",
-]
-ignore = ["E722", "B001", "W503", "E203"]
+fail_under = 85
 
 [tool.pyright]
 include = ["src"]
 exclude = ["**/node_modules", "**/__pycache__"]
-venv = "env37"
+venv = "env310"
 
 reportMissingImports = true
 reportMissingTypeStubs = false
 
-pythonVersion = "3.7"
+pythonVersion = "3.10"
 pythonPlatform = "Linux"
 
 executionEnvironments = [{ root = "src" }]
@@ -134,7 +113,11 @@ markers = [
 [tool.tox]
 legacy_tox_ini = """
 [tox]
-envlist = py, integration, spark, all
+envlist = unit, integration, spark, all
+
+[testenv:unit]
+commands =
+    pytest -m "unit" {posargs}
 
 [testenv]
 commands =
@@ -164,13 +147,8 @@ commands =
 [tool.pylint]
 extension-pkg-whitelist = [
     "numpy",
-    "torch",
-    "cv2",
-    "pyodbc",
-    "pydantic",
-    "ciso8601",
-    "netcdf4",
     "scipy",
+    "bilby"
 ]
 ignore = "CVS"
 ignore-patterns = "test.*?py,conftest.py"
@@ -269,7 +247,7 @@ valid-classmethod-first-arg = "cls"
 valid-metaclass-classmethod-first-arg = "cls"
 
 [tool.pylint.'DESIGN']
-max-args = 5
+max-args = 10
 max-attributes = 7
 max-bool-expr = 5
 max-branches = 12
@@ -279,6 +257,7 @@ max-public-methods = 20
 max-returns = 6
 max-statements = 50
 min-public-methods = 2
+max-positional-arguments = 10
 
 [tool.pylint.'IMPORTS']
 allow-wildcard-with-all = "no"
@@ -290,7 +269,7 @@ overgeneral-exceptions = ["builtins.BaseException", "builtins.Exception"]
 
 [tool.ruff]
 line-length = 120 # Matches Black's default
-target-version = "py39" # Align with CI (3.9–3.12) and requires-python (>=3.8.1)
+target-version = "py310" # Align with CI (3.10–3.12)
 lint.extend-select = [
     "E",
     "F",

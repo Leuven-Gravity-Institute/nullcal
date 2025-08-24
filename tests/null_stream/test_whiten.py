@@ -6,9 +6,7 @@ import pytest
 import scipy.stats
 from bilby.gw.detector import InterferometerList
 
-from nullcal.null_stream.whiten import (
-    compute_whitened_antenna_response,
-    compute_whitened_frequency_domain_strain)
+from nullcal.null_stream.whiten import compute_whitened_antenna_response, compute_whitened_frequency_domain_strain
 
 
 @pytest.fixture
@@ -18,7 +16,7 @@ def mock_data():
     n_mode = 2  # GW polarization modes
     delta_f = 0.1  # Frequency resolution in Hz
     frequencies = np.linspace(1, 1000, n_freq)
-    frequency_mask = (frequencies >= 10) & (frequencies <= 500)  # Mask for 10–500 Hz
+    frequency_mask = (frequencies >= 10) & (frequencies <= 500)  # Mask for 10-500 Hz
     strain = np.ones((n_det, n_freq), dtype=np.complex128) * 1e-21  # Mock strain
     psd = np.ones((n_det, n_freq)) * 1e-46  # Mock PSD (~10⁻²³ strain/√Hz squared)
     antenna_response = np.ones((n_det, n_mode), dtype=np.complex128)  # Mock antenna response

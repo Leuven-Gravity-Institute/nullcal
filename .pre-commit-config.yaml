@@ -36,18 +36,17 @@ repos:
         args: [--rcfile=pyproject.toml]
         additional_dependencies:
           - numpy
-          - torch
-          - pyodbc
-          - pydantic
-          - ciso8601
-          - netcdf4
           - scipy
-          - pyspark>=3.5.3
+          - bilby
+          - numba
+          - PyYAML
 
   -   repo: https://github.com/PyCQA/bandit
       rev: 1.8.6
       hooks:
       - id: bandit
+        args: [-c=pyproject.toml]
+        additional_dependencies: [".[toml]"]
 
   - repo: https://github.com/streetsidesoftware/cspell-cli
     rev: v9.1.1 # Keep this version or update to the latest stable

@@ -6,10 +6,9 @@ import pytest
 import scipy.stats
 from bilby.gw.detector import InterferometerList
 
-from nullcal.null_stream import (compute_projected_strain_data,
-                                 compute_projector,
-                                 compute_whitened_antenna_response,
-                                 compute_whitened_frequency_domain_strain)
+from nullcal.null_stream.null_stream import compute_projected_strain_data
+from nullcal.null_stream.projector import compute_projector
+from nullcal.null_stream.whiten import compute_whitened_antenna_response, compute_whitened_frequency_domain_strain
 
 
 @pytest.fixture
@@ -19,7 +18,7 @@ def mock_projected_strain_data():
     n_freq = 1000  # Frequency bins
     delta_f = 0.1  # Frequency resolution in Hz
     frequencies = np.linspace(0, n_freq * delta_f, n_freq, endpoint=False)
-    frequency_mask = (frequencies >= 10) & (frequencies <= 500)  # 10–50 Hz
+    frequency_mask = (frequencies >= 10) & (frequencies <= 500)
     np.random.seed(12)
 
     # Mock whitened antenna response for projector
@@ -127,8 +126,8 @@ def test_projection_orthogonality(mock_projected_strain_data):
     mask = mock_projected_strain_data["frequency_mask"]
     antenna = mock_projected_strain_data["antenna_response"]
     output = compute_projected_strain_data(projector, strain, mask)
-    F_dagger = np.transpose(np.conj(antenna[mask]), axes=(0, 2, 1))
-    result = np.einsum("fij,jf->if", F_dagger, output[:, mask])
+    f_dagger = np.transpose(np.conj(antenna[mask]), axes=(0, 2, 1))
+    result = np.einsum("fij,jf->if", f_dagger, output[:, mask])
     np.testing.assert_allclose(result, 0, atol=1e-10, err_msg="Projected strain not orthogonal to antenna response")
 
 
@@ -147,8 +146,8 @@ def test_projector_gaussianity(mock_colored_noise_data):
     projector = compute_projector(whitened_antenna, mask)
     projected_strain_data = compute_projected_strain_data(projector, whitened_strain, mask)
     # This is valid only when the PSDs are the same.
-    U, _, _ = np.linalg.svd(antenna_response)
-    rotated_projected_strain_data = np.einsum("ji,if->jf", np.conj(U.T), projected_strain_data[:, mask])
+    u, _, _ = np.linalg.svd(antenna_response)
+    rotated_projected_strain_data = np.einsum("ji,if->jf", np.conj(u.T), projected_strain_data[:, mask])
     samples = np.concatenate((rotated_projected_strain_data[2, :].real, rotated_projected_strain_data[2, :].imag))
     result = scipy.stats.kstest(samples, cdf="norm", args=(0.0, np.sqrt(0.5)))
     assert result.pvalue > 0.05
