@@ -44,7 +44,7 @@ spark = ["pyspark>=3.0.0"]
 test = [
     "bandit[toml]==1.8.5",
     "black==25.1.0",
-    "check-manifest==0.50",
+    "check-manifest==0.51",
     "pre-commit==4.2.0",
     "pylint==3.3.7",
     "pylint_junit",
