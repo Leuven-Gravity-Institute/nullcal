@@ -1,13 +1,7 @@
-# pytest results
-test-results.xml
-
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
-
-# Version file
-_version.py
 
 # C extensions
 *.so
@@ -26,6 +20,7 @@ parts/
 sdist/
 var/
 wheels/
+pip-wheel-metadata/
 share/python-wheels/
 *.egg-info/
 .installed.cfg
@@ -52,8 +47,10 @@ htmlcov/
 nosetests.xml
 coverage.xml
 *.cover
+*.py,cover
 .hypothesis/
 .pytest_cache/
+*results.xml
 
 # Translations
 *.mo
@@ -63,6 +60,7 @@ coverage.xml
 *.log
 local_settings.py
 db.sqlite3
+db.sqlite3-journal
 
 # Flask stuff:
 instance/
@@ -79,7 +77,6 @@ target/
 
 # Jupyter Notebook
 .ipynb_checkpoints
-*.ipynb
 
 # IPython
 profile_default/
@@ -88,11 +85,18 @@ ipython_config.py
 # pyenv
 .python-version
 
-# celery beat schedule file
+# PEP 582; used by e.g. github.com/David-OConnor/pyflow
+__pypackages__/
+
+# Celery stuff
 celerybeat-schedule
+celerybeat.pid
 
 # SageMath parsed files
 *.sage.py
+
+# Pypirc (no credentials tracked)
+.pypirc
 
 # Environments
 .env
@@ -113,6 +117,9 @@ venv.bak/
 # mkdocs documentation
 /site
 
+# Version file
+_version.py
+
 # mypy
 .mypy_cache/
 .dmypy.json
@@ -121,5 +128,15 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-## Mac metadata file
+# MacOS
 .DS_Store
+
+# VS Code
+.vscode/
+
+# Temporary files
+tmp/
+
+# Node modules (if using Node.js for frontend)
+node_modules/
+package-lock.json

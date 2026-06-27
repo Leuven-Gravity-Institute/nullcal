@@ -1,8 +1,0 @@
-autodoc
-html5lib==1.1  # Hack to ensure documentation generated
-myst_parser
-nbsphinx
-numpydoc
-sphinx
-sphinx_rtd_theme
-sphinx_tabs

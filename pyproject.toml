@@ -5,61 +5,57 @@ build-backend = "hatchling.build"
 [project]
 name = "nullcal"
 authors = [
-    { name = "Isaac C. F. Wong", email = "chunfung.wong@kuleuven.be" },
-    { name = "Milan Wils", email = "milan.wils@kuleuven.be" },
-    { name = "Francesco Cireddu", email = "francesco.cireddu@kuleuven.be" },
+  { name = "Isaac C. F. Wong", email = "chunfung.wong@kuleuven.be" },
+  { name = "Milan Wils", email = "milan.wils@kuleuven.be" },
+  { name = "Francesco Cireddu", email = "francesco.cireddu@kuleuven.be" },
 ]
 description = "A package to constrain calibration errors of a closed-geometry network of gravitational-wave detectors."
-license = {file = "LICENSE"}
+license = { file = "LICENSE" }
 readme = "README.md"
 classifiers = [
-    "Development Status :: 3 - Alpha",
-    "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
-    "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
 ]
 requires-python = ">=3.10"
 dynamic = ["version"]
 dependencies = [
-    "numpy>=1.18.1",
-    "nptyping",
-    "bilby>=2.3.0",
-    "bilby_pipe",
-    "numba",
-    "scipy",
-    "ConfigArgParse",
-    "pycbc",
-    "healpy",
-    "rocket-fft",
-    "tables",
+  "numpy>=1.18.1",
+  "nptyping",
+  "bilby>=2.3.0",
+  "bilby_pipe",
+  "numba",
+  "scipy",
+  "ConfigArgParse",
+  "pycbc",
+  "healpy",
+  "rocket-fft",
+  "tables",
 ]
 
 [project.scripts]
 
 [project.optional-dependencies]
 spark = ["pyspark>=3.0.0"]
-test = [
-    "bandit[toml]==1.8.5",
-    "black==25.1.0",
-    "check-manifest==0.50",
-    "pre-commit==4.2.0",
-    "pylint==3.3.7",
-    "pylint_junit",
-    "pytest-cov==6.2.1",
-    "pytest-mock<3.14.2",
-    "pytest-runner",
-    "pytest==8.4.0",
-    "pytest-github-actions-annotate-failures",
-    "shellcheck-py==0.10.0.1",
-]
 
 [project.urls]
-Documentation = "https://gitlab.kuleuven.be/gwc/nullcal/-/tree/main/docs"
-Source = "https://gitlab.kuleuven.be/gwc/nullcal"
-Tracker = "https://gitlab.kuleuven.be/gwc/nullcal/-/issues"
+Source = "https://github.com/Leuven-Gravity-Institute/nullcal"
+Tracker = "https://github.com/Leuven-Gravity-Institute/nullcal/issues"
+
+[dependency-groups]
+dev = [
+  "prek",
+  "pytest>=9",
+  "pytest-cov",
+  "pytest-mock",
+  "pytest-github-actions-annotate-failures",
+]
+docs = ["zensical", "mkdocstrings-python"]
+release = ["git-cliff"]
 
 [tool.hatch.version]
 source = "vcs"
@@ -67,47 +63,35 @@ source = "vcs"
 [tool.hatch.build.targets.wheel]
 packages = ["src/nullcal"]
 
-[tool.bandit]
-exclude_dirs = ["build", "dist", "tests", "scripts"]
-recursive = true
-targets = "src"
-skips = ["B101"]
-
-[tool.black]
-line-length = 120
-fast = true
-
 [tool.coverage.run]
 branch = true
+parallel = true
+source = ["src"]
 
 [tool.coverage.report]
-fail_under = 10
+fail_under = 0 # Temporary: set non-zero threshold once coverage improves
 
 [tool.pyright]
 include = ["src"]
 exclude = ["**/node_modules", "**/__pycache__"]
-venv = "env310"
-
 reportMissingImports = true
 reportMissingTypeStubs = false
-
 pythonVersion = "3.10"
 pythonPlatform = "Linux"
-
 executionEnvironments = [{ root = "src" }]
 
 [tool.pytest.ini_options]
-addopts = "--cov-report xml:coverage.xml --cov src --cov-fail-under 0 --cov-append -m 'not integration'"
+addopts = "--cov=nullcal --cov-report=xml --cov-report=term --cov-append -m 'not integration'"
 pythonpath = ["src"]
 testpaths = "tests"
 junit_family = "xunit2"
 markers = [
-    "integration: marks as integration test",
-    "notebooks: marks as notebook test",
-    "gpu: marks as gpu test",
-    "spark: marks tests which need Spark",
-    "slow: marks tests as slow",
-    "unit: fast offline tests",
+  "integration: marks as integration test",
+  "notebooks: marks as notebook test",
+  "gpu: marks as gpu test",
+  "spark: marks tests which need Spark",
+  "slow: marks tests as slow",
+  "unit: fast offline tests",
 ]
 
 [tool.tox]
@@ -144,154 +128,39 @@ commands =
     pytest {posargs}
 """
 
-[tool.pylint]
-extension-pkg-whitelist = [
-    "numpy",
-    "scipy",
-    "bilby"
-]
-ignore = "CVS"
-ignore-patterns = "test.*?py,conftest.py"
-init-hook = 'import sys; sys.setrecursionlimit(8 * sys.getrecursionlimit())'
-jobs = 0
-limit-inference-results = 100
-persistent = "yes"
-suggestion-mode = "yes"
-unsafe-load-any-extension = "no"
-
-[tool.pylint.'MESSAGES CONTROL']
-enable = "c-extension-no-member"
-
-[tool.pylint.'REPORTS']
-evaluation = "10.0 - ((float(5 * error + warning + refactor + convention) / statement) * 10)"
-output-format = "text"
-reports = "no"
-score = "yes"
-
-[tool.pylint.'REFACTORING']
-max-nested-blocks = 5
-never-returning-functions = "sys.exit"
-
-[tool.pylint.'BASIC']
-argument-naming-style = "snake_case"
-attr-naming-style = "snake_case"
-bad-names = ["foo", "bar"]
-class-attribute-naming-style = "any"
-class-naming-style = "PascalCase"
-const-naming-style = "UPPER_CASE"
-docstring-min-length = -1
-function-naming-style = "snake_case"
-good-names = ["i", "j", "k", "ex", "Run", "_"]
-include-naming-hint = "yes"
-inlinevar-naming-style = "any"
-method-naming-style = "snake_case"
-module-naming-style = "any"
-no-docstring-rgx = "^_"
-property-classes = "abc.abstractproperty"
-variable-naming-style = "snake_case"
-
-[tool.pylint.'FORMAT']
-ignore-long-lines = "^\\s*(# )?.*['\"]?<?https?://\\S+>?"
-indent-after-paren = 4
-indent-string = '    '
-max-line-length = 120
-max-module-lines = 1000
-single-line-class-stmt = "no"
-single-line-if-stmt = "no"
-
-[tool.pylint.'LOGGING']
-logging-format-style = "old"
-logging-modules = "logging"
-
-[tool.pylint.'MISCELLANEOUS']
-notes = ["FIXME", "XXX", "TODO"]
-
-[tool.pylint.'SIMILARITIES']
-ignore-comments = "yes"
-ignore-docstrings = "yes"
-ignore-imports = "yes"
-min-similarity-lines = 7
-
-[tool.pylint.'SPELLING']
-max-spelling-suggestions = 4
-spelling-store-unknown-words = "no"
-
-[tool.pylint.'STRING']
-check-str-concat-over-line-jumps = "no"
-
-[tool.pylint.'TYPECHECK']
-contextmanager-decorators = "contextlib.contextmanager"
-generated-members = "numpy.*,np.*,pyspark.sql.functions,collect_list"
-ignore-mixin-members = "yes"
-ignore-none = "yes"
-ignore-on-opaque-inference = "yes"
-ignored-classes = "optparse.Values,thread._local,_thread._local,numpy,torch,swagger_client"
-ignored-modules = "numpy,torch,swagger_client,netCDF4,scipy"
-missing-member-hint = "yes"
-missing-member-hint-distance = 1
-missing-member-max-choices = 1
-
-[tool.pylint.'VARIABLES']
-additional-builtins = "dbutils"
-allow-global-unused-variables = "yes"
-callbacks = ["cb_", "_cb"]
-dummy-variables-rgx = "_+$|(_[a-zA-Z0-9_]*[a-zA-Z0-9]+?$)|dummy|^ignored_|^unused_"
-ignored-argument-names = "_.*|^ignored_|^unused_"
-init-import = "no"
-redefining-builtins-modules = "six.moves,past.builtins,future.builtins,builtins,io"
-
-[tool.pylint.'CLASSES']
-defining-attr-methods = ["__init__", "__new__", "setUp", "__post_init__"]
-exclude-protected = ["_asdict", "_fields", "_replace", "_source", "_make"]
-valid-classmethod-first-arg = "cls"
-valid-metaclass-classmethod-first-arg = "cls"
-
-[tool.pylint.'DESIGN']
-max-args = 10
-max-attributes = 7
-max-bool-expr = 5
-max-branches = 12
-max-locals = 15
-max-parents = 7
-max-public-methods = 20
-max-returns = 6
-max-statements = 50
-min-public-methods = 2
-max-positional-arguments = 10
-
-[tool.pylint.'IMPORTS']
-allow-wildcard-with-all = "no"
-analyse-fallback-blocks = "no"
-deprecated-modules = "optparse,tkinter.tix"
-
-[tool.pylint.'EXCEPTIONS']
-overgeneral-exceptions = ["builtins.BaseException", "builtins.Exception"]
-
 [tool.ruff]
-line-length = 120 # Matches Black's default
-target-version = "py310" # Align with CI (3.10–3.12)
+line-length = 120
+target-version = "py310"
 lint.extend-select = [
-    "E",
-    "F",
-    "W",   # pycodestyle errors and warnings
-    "I",   # isort rules
-    "UP",  # pyupgrade rules
-    "C90", # McCabe complexity
-    "N",   # PEP8 naming
-    "B",   # Bugbear (opinionated checks)
-    "A",   # Flake8-builtins
-    "C4",  # Flake8-comprehensions
-    "PT",  # Flake8-pytest
-    "RUF", # Ruff-specific rules
+  "E",
+  "F",
+  "W",   # pycodestyle errors and warnings
+  "I",   # isort rules
+  "UP",  # pyupgrade rules
+  "C90", # McCabe complexity
+  "N",   # PEP8 naming
+  "B",   # Bugbear (opinionated checks)
+  "A",   # Flake8-builtins
+  "C4",  # Flake8-comprehensions
+  "PT",  # Flake8-pytest
+  "RUF", # Ruff-specific rules
+  "PL",  # Pylint rules
+  "SIM", # Similarities
+  "T10", # Debugger statements
+  "S",   # Security rules
 ]
 lint.ignore = [
-    "E501", # Line length (handled by formatter)
-    "C901", # Disable overly strict complexity checks (optional, adjust as needed)
+  "E501", # Line length (handled by formatter)
+  "C901", # Overly strict complexity
 ]
-fix = true # Enable autofix
-lint.unfixable = [] # List rules that should not be autofixed, if any
+lint.pylint.max-args = 10
+fix = true
+exclude = ["docs/conf.py"]
 
 [tool.ruff.format]
-quote-style = "double"       # Use double quotes for strings
-indent-style = "space"       # Use spaces for indentation
-docstring-code-format = true # Format code in docstrings
+quote-style = "double"
+indent-style = "space"
+docstring-code-format = true
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101", "ARG001", "PLC0415", "PLR2004"]

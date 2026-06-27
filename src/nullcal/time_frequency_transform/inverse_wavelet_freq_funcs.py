@@ -96,9 +96,6 @@ def pack_wave_inverse(m, n_t, n_f, prefactor2s, wave_in):
     else:
         for n in range(0, n_t):
             val = wave_in[n, m]
-            if (n + m) % 2:
-                mult2 = -1j
-            else:
-                mult2 = 1
+            mult2 = -1j if (n + m) % 2 else 1
 
             prefactor2s[n] = mult2 * val

@@ -174,9 +174,7 @@ def dx_assign_loop(m, n_t, n_f, dx, data, phif):
     for jj in range(jj_base + 1 - n_t // 2, jj_base + n_t // 2):
         j = np.abs(jj - jj_base)
         i = i_base - jj_base + jj
-        if m == n_f and jj > jj_base:
-            dx[i] = 0.0
-        elif m == 0 and jj < jj_base:
+        if (m == n_f and jj > jj_base) or (m == 0 and jj < jj_base):
             dx[i] = 0.0
         elif j == 0:
             continue
@@ -210,11 +208,10 @@ def dx_unpack_loop(m, n_t, n_f, dx_trans, wave):
                     wave[n, m] = -np.imag(dx_trans[n])
                 else:
                     wave[n, m] = np.real(dx_trans[n])
+            elif (n + m) % 2:
+                wave[n, m] = np.imag(dx_trans[n])
             else:
-                if (n + m) % 2:
-                    wave[n, m] = np.imag(dx_trans[n])
-                else:
-                    wave[n, m] = np.real(dx_trans[n])
+                wave[n, m] = np.real(dx_trans[n])
 
 
 @njit
@@ -243,8 +240,7 @@ def dx_unpack_loop_quadrature(m, n_t, n_f, dx_trans, wave):
                     wave[n, m] = np.real(dx_trans[n])
                 else:
                     wave[n, m] = -np.imag(dx_trans[n])
+            elif (n + m) % 2:
+                wave[n, m] = np.real(dx_trans[n])
             else:
-                if (n + m) % 2:
-                    wave[n, m] = np.real(dx_trans[n])
-                else:
-                    wave[n, m] = np.imag(dx_trans[n])
+                wave[n, m] = np.imag(dx_trans[n])

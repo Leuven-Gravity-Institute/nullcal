@@ -1,32 +1,29 @@
 # nullcal
 
+A Python package for constraining calibration errors of a closed-geometry
+network of gravitational-wave detectors.
+
 [![PyPI version](https://badge.fury.io/py/nullcal.svg)](https://pypi.org/project/nullcal/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Build](https://gitlab.kuleuven.be/gwc/software/nullcal/badges/main/pipeline.svg)](https://gitlab.kuleuven.be/gwc/software/nullcal/-/pipelines)
-[![codecov](https://codecov.io/gh/username/package_name/branch/main/graph/badge.svg)](https://codecov.io/gh/username/package_name)
+[![CI](https://github.com/Leuven-Gravity-Institute/nullcal/actions/workflows/ci.yml/badge.svg)](https://github.com/Leuven-Gravity-Institute/nullcal/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/Leuven-Gravity-Institute/nullcal/branch/main/graph/badge.svg)](https://codecov.io/gh/Leuven-Gravity-Institute/nullcal)
 [![Python Version](https://img.shields.io/pypi/pyversions/nullcal)](https://pypi.org/project/nullcal/)
-[![Security: bandit](https://img.shields.io/badge/security-bandit-yellow.svg)](https://github.com/PyCQA/bandit)
-[![Documentation Status](https://img.shields.io/badge/documentation-online-brightgreen)](https://groupname.gitlab.io/package_name/)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![Documentation](https://img.shields.io/badge/documentation-online-brightgreen)](https://leuven-gravity-institute.github.io/nullcal/)
 [![DOI](https://zenodo.org/badge/ID.svg)](https://doi.org/DOI)
 
-## Pre-commit hooks
+## Development
 
-Set up Git hook scripts to automatically check files for issues before each commit.
+### Pre-commit hooks
 
-Install `pre-commit`:
+Install `prek` (a wrapper around `pre-commit`):
 
 ```console
-pip install pre-commit
+uv run prek install
 ```
 
-Install the git hook scripts:
+Run all hooks against all files:
 
 ```console
-pre-commit install
-```
-
-(Optional) it's usually a good idea to run the hooks against all of the files when adding new hooks (usually pre-commit will only run on the changed files during git hooks)
-
-```console
-pre-commit run --all-files
+uv run prek run --all-files
 ```
