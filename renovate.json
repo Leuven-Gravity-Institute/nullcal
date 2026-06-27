@@ -26,7 +26,10 @@
         },
         {
             "matchManagers": ["pep621"],
-            "matchDepTypes": ["project.optional-dependencies"],
+            "matchDepTypes": [
+                "project.optional-dependencies",
+                "dependency-groups"
+            ],
             "groupName": "test/dev/docs/build tools",
             "automerge": true,
             "automergeType": "pr",
