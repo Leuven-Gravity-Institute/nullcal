@@ -9,7 +9,6 @@ repos:
       rev: v6.0.0
       hooks:
           - id: check-added-large-files
-            args: ['--maxkb=1000']
           - id: check-case-conflict
           - id: check-merge-conflict
           - id: check-symlinks
@@ -53,12 +52,6 @@ repos:
             args:
                 - --config
                 - .markdownlint.yaml
-
-    - repo: https://github.com/astral-sh/uv-pre-commit
-      rev: 0.11.25
-      hooks:
-          # Update the uv lockfile
-          - id: uv-lock
 
     - repo: https://github.com/gitleaks/gitleaks
       rev: v8.30.1
