@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling", "uv-dynamic-versioning"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
 [project]
@@ -57,12 +57,8 @@ dev = [
 docs = ["zensical", "mkdocstrings-python"]
 release = ["git-cliff"]
 
-[tool.uv-dynamic-versioning]
-vcs = "git"      # default
-style = "semver" # or pep440, semver, etc.
-
 [tool.hatch.version]
-source = "uv-dynamic-versioning"
+source = "vcs"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/nullcal"]
@@ -74,6 +70,15 @@ source = ["src"]
 
 [tool.coverage.report]
 fail_under = 0 # Temporary: set non-zero threshold once coverage improves
+
+[tool.pyright]
+include = ["src"]
+exclude = ["**/node_modules", "**/__pycache__"]
+reportMissingImports = true
+reportMissingTypeStubs = false
+pythonVersion = "3.10"
+pythonPlatform = "Linux"
+executionEnvironments = [{ root = "src" }]
 
 [tool.pytest.ini_options]
 addopts = "--cov=nullcal --cov-report=xml --cov-report=term --cov-append -m 'not integration'"
@@ -88,6 +93,40 @@ markers = [
   "slow: marks tests as slow",
   "unit: fast offline tests",
 ]
+
+[tool.tox]
+legacy_tox_ini = """
+[tox]
+envlist = unit, integration, spark, all
+
+[testenv:unit]
+commands =
+    pytest -m "unit" {posargs}
+
+[testenv]
+commands =
+    pytest -m "not integration and not spark" {posargs}
+
+[testenv:integration]
+commands =
+    pytest -m "integration" {posargs}
+
+[testenv:spark]
+extras = spark
+setenv =
+       PYSPARK_DRIVER_PYTHON = {envpython}
+       PYSPARK_PYTHON = {envpython}
+commands =
+    pytest -m "spark" {posargs}
+
+[testenv:all]
+extras = all
+setenv =
+       PYSPARK_DRIVER_PYTHON = {envpython}
+       PYSPARK_PYTHON = {envpython}
+commands =
+    pytest {posargs}
+"""
 
 [tool.ruff]
 line-length = 120
@@ -125,9 +164,3 @@ docstring-code-format = true
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["S101", "ARG001", "PLC0415", "PLR2004"]
-
-[[tool.uv.index]]
-name = "testpypi"
-url = "https://test.pypi.org/simple/"
-publish-url = "https://test.pypi.org/legacy/"
-explicit = true
