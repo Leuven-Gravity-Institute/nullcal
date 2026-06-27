@@ -55,6 +55,7 @@ dev = [
   "pytest-github-actions-annotate-failures",
 ]
 docs = ["sphinx"]
+release = ["git-cliff"]
 
 [tool.hatch.version]
 source = "vcs"
