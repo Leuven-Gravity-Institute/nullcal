@@ -61,7 +61,7 @@ class InjectionClustering(Clustering):
 
             # Get the name of interferometers.
             if (
-                len(self.interferometers) == 3
+                len(self.interferometers) == 3  # noqa: PLR2004
                 and self.interferometers[0].name == "ET1"
                 and self.interferometers[1].name == "ET2"
                 and self.interferometers[2].name == "ET3"
@@ -78,9 +78,9 @@ class InjectionClustering(Clustering):
 
                 # Copy the power spectral density
                 interferometers = InterferometerList(interferometers_name)
-                for i, ifo in enumerate(interferometers):
-                    ifo.power_spectral_density = self.interferometers[i].power_spectral_density
-                    ifo.calibration_model = self.interferometers[i].calibration_model
+                for j, ifo in enumerate(interferometers):
+                    ifo.power_spectral_density = self.interferometers[j].power_spectral_density
+                    ifo.calibration_model = self.interferometers[j].calibration_model
                 interferometers.set_strain_data_from_zero_noise(
                     sampling_frequency=self.interferometers[0].sampling_frequency,
                     duration=self.interferometers[0].duration,

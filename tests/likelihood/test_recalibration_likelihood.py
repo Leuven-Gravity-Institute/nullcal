@@ -202,10 +202,10 @@ def mock_data():
         "luminosity_distance": 1500.3719941553823,
     }
 
-    for key in calibration_parameters:
-        parameters_0[key] = calibration_parameters[key]
-        parameters_1[key] = calibration_parameters[key]
-        parameters_2[key] = calibration_parameters[key]
+    for key, value in calibration_parameters.items():
+        parameters_0[key] = value
+        parameters_1[key] = value
+        parameters_2[key] = value
 
     # Combine the full set of parameters
     # parameters_list = [parameters_0, parameters_1, parameters_2]
