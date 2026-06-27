@@ -32,8 +32,7 @@ jobs:
             - name: Install dependencies
               run: uv sync --group docs --frozen
 
-            - name: Build docs
-              run: uv run --frozen sphinx-build -b html docs/ site/
+            - run: uv run --frozen zensical build
 
             - uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4
               with:
