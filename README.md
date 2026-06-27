@@ -97,6 +97,22 @@ likelihood = RecalibrationLikelihood(
 )
 ```
 
+## Development
+
+### Pre-commit hooks
+
+Install `prek` (a wrapper around `pre-commit`):
+
+```console
+uv run prek install
+```
+
+Run all hooks against all files:
+
+```console
+uv run prek run --all-files
+```
+
 ## Documentation
 
 Full documentation is available at
