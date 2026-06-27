@@ -24,9 +24,9 @@ classifiers = [
 requires-python = ">=3.10"
 dynamic = ["version"]
 dependencies = [
-  "numpy>=1.18.1",
+  "numpy>=1.26.4",
   "nptyping",
-  "bilby>=2.3.0",
+  "bilby>=2.8.0",
   "bilby_pipe",
   "numba",
   "scipy",
