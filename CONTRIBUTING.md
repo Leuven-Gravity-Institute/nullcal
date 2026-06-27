@@ -29,7 +29,7 @@ cd nullcal
 
 #### 3. Create a New Branch:
 
-- Create a new branch for your changes:
+- Create a new branch for you changes:
 
 ```bash
 git checkout -b feature/your-feature-name
