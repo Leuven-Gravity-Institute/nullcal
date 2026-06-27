@@ -54,7 +54,7 @@ dev = [
   "pytest-mock",
   "pytest-github-actions-annotate-failures",
 ]
-docs = ["sphinx"]
+docs = ["zensical", "mkdocstrings-python"]
 release = ["git-cliff"]
 
 [tool.hatch.version]
