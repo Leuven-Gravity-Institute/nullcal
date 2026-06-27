@@ -12,18 +12,69 @@ network of gravitational-wave detectors.
 [![Documentation](https://img.shields.io/badge/documentation-online-brightgreen)](https://leuven-gravity-institute.github.io/nullcal/)
 [![DOI](https://zenodo.org/badge/ID.svg)](https://doi.org/DOI)
 
-## Development
+## Features
 
-### Pre-commit hooks
+- **Null stream construction** for closed-geometry detector networks
+- **Calibration error constraint** via Bayesian recalibration likelihood
+- **Time-frequency transforms** (Short-Time Fourier Transform, wavelet
+  transforms)
+- **Clustering algorithms** for time-frequency map analysis
+- **Modular architecture** with clean separation between null stream,
+  likelihood, prior, result, and utility layers
 
-Install `prek` (a wrapper around `pre-commit`):
+## Installation
+
+### Requirements
+
+- Python 3.10 or later
+- Linux, macOS, or Windows
+
+### From PyPI
 
 ```console
+pip install nullcal
+```
+
+### From Source
+
+```console
+git clone https://github.com/Leuven-Gravity-Institute/nullcal.git
+cd nullcal
+uv sync
+```
+
+### Development
+
+Install development dependencies and pre-commit hooks:
+
+```console
+uv sync --group dev
 uv run prek install
 ```
 
-Run all hooks against all files:
+## Quick Start
 
-```console
-uv run prek run --all-files
+```python
+from nullcal.null_stream import NullStreamComputer
+from nullcal.likelihood import RecalibrationLikelihood
+
+# Construct a null stream for a detector network
+null_stream = NullStreamComputer(
+    ifos=["ET1", "ET2", "ET3"],
+    sampling_frequency=4096,
+    waveform_duration=4,
+)
+
+# Apply calibration parameters
+# likelihood = RecalibrationLikelihood(...)
 ```
+
+## Documentation
+
+Full documentation is available at
+[https://leuven-gravity-institute.github.io/nullcal/](https://leuven-gravity-institute.github.io/nullcal/).
+
+## License
+
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file
+for details.

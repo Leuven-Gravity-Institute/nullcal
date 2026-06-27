@@ -24,6 +24,7 @@ nav = [
   { "API Reference" = [
     { "Overview" = "reference/index.md" },
     { "nullcal" = "reference/nullcal/index.md" },
+    { "nullcal.version" = "reference/nullcal/version.md" },
     { "nullcal.clustering" = "reference/nullcal/clustering/index.md" },
     { "nullcal.likelihood" = "reference/nullcal/likelihood/index.md" },
     { "nullcal.metadata" = "reference/nullcal/metadata/index.md" },
