@@ -69,7 +69,7 @@ parallel = true
 source = ["src"]
 
 [tool.coverage.report]
-fail_under = 0
+fail_under = 0 # Temporary: set non-zero threshold once coverage improves
 
 [tool.pyright]
 include = ["src"]
