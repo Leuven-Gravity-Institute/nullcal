@@ -55,18 +55,36 @@ uv run prek install
 ## Quick Start
 
 ```python
-from nullcal.null_stream import NullStreamComputer
+import numpy as np
+from bilby.gw.detector import InterferometerList
 from nullcal.likelihood import RecalibrationLikelihood
+from nullcal.null_stream.null_stream import NullStream
+from nullcal.time_frequency_transform.wavelet_transforms import WaveletTransform
 
-# Construct a null stream for a detector network
-null_stream = NullStreamComputer(
-    ifos=["ET1", "ET2", "ET3"],
-    sampling_frequency=4096,
-    waveform_duration=4,
+# Set up the Einstein Telescope interferometer triplet
+interferometers = InterferometerList(["ET"])
+interferometers.set_strain_data_from_power_spectral_densities(
+    sampling_frequency=4096, duration=4, start_time=0
 )
 
-# Apply calibration parameters
-# likelihood = RecalibrationLikelihood(...)
+# Compute the null stream
+wavelet_transform = WaveletTransform(nx=4, frequency_resolution=4)
+null_stream = NullStream(
+    interferometers=interferometers,
+    time_frequency_transform=wavelet_transform,
+    time_frequency_filter=None,
+)
+null_data = null_stream.compute_calibrated_frequency_domain_null_stream(
+    calibration_factor=np.ones_like(interferometers[0].frequency_array)
+)
+
+# Set up a recalibration likelihood for calibration error constraints
+likelihood = RecalibrationLikelihood(
+    interferometers=interferometers,
+    waveform_generator=...,
+    wavelet_transform_frequency_resolution=4,
+    wavelet_transform_nx=4,
+)
 ```
 
 ## Documentation
