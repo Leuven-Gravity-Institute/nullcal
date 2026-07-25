@@ -38,7 +38,7 @@ def transform_wavelet_time_helper(data, n_f, n_t, phi, mult):
     data_pad[:n_d] = data
     data_pad[n_d : n_d + n_k] = data[:n_k]
 
-    for i in range(0, n_t):
+    for i in range(n_t):
         assign_wdata(i, n_k, n_d, n_f, wdata, data_pad, phi)
         wdata_trans = np.fft.rfft(wdata, n_k)
         pack_wave(i, mult, n_f, wdata_trans, wave)
@@ -65,7 +65,7 @@ def assign_wdata(i, k_cutoff, n_d, n_f, wdata, data_pad, phi):
         jj += n_d  # periodically wrap the data
     if jj >= n_d:
         jj -= n_d  # periodically wrap the data
-    for j in range(0, k_cutoff):
+    for j in range(k_cutoff):
         # jj = i*n_f-half_K+j
         wdata[j] = data_pad[jj] * phi[j]  # apply the window
         jj += 1

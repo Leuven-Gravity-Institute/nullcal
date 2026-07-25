@@ -69,7 +69,7 @@ def tukey(data, alpha, n_sample):
     imax = np.int64((n_sample - 1) * (1 - alpha / 2))
     n_win = n_sample - imax
 
-    for i in range(0, n_sample):
+    for i in range(n_sample):
         f_mult = 1.0
         if i < imin:
             f_mult = 0.5 * (1.0 + np.cos(np.pi * (i / imin - 1.0)))
@@ -141,7 +141,7 @@ def transform_wavelet_freq_quadrature_helper(data, n_f, n_t, phif):
     wave = np.zeros((n_t, n_f))  # wavelet wavepacket transform of the signal
 
     dx = np.zeros(n_t, dtype=np.complex128)
-    for m in range(0, n_f + 1):
+    for m in range(n_f + 1):
         dx_assign_loop(m, n_t, n_f, dx, data, phif)
         dx_trans = np.fft.ifft(dx, n_t)
         dx_unpack_loop_quadrature(m, n_t, n_f, dx_trans, wave)
@@ -202,7 +202,7 @@ def dx_unpack_loop(m, n_t, n_f, dx_trans, wave):
         for n in range(0, n_t, 2):
             wave[n + 1, 0] = np.real(dx_trans[n] * np.sqrt(2))
     else:
-        for n in range(0, n_t):
+        for n in range(n_t):
             if m % 2:
                 if (n + m) % 2:
                     wave[n, m] = -np.imag(dx_trans[n])
@@ -234,7 +234,7 @@ def dx_unpack_loop_quadrature(m, n_t, n_f, dx_trans, wave):
         for n in range(0, n_t, 2):
             wave[n + 1, 0] = np.real(dx_trans[n + 1] * np.sqrt(2))
     else:
-        for n in range(0, n_t):
+        for n in range(n_t):
             if m % 2:
                 if (n + m) % 2:
                     wave[n, m] = np.real(dx_trans[n])
