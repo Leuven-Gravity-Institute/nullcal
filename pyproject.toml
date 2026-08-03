@@ -54,6 +54,7 @@ dev = [
   "pytest-mock",
   "pytest-github-actions-annotate-failures",
 ]
+
 docs = ["zensical", "mkdocstrings-python"]
 release = ["git-cliff"]
 
