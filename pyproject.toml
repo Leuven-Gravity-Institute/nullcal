@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling", "uv-dynamic-versioning"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
 [project]
@@ -17,11 +17,11 @@ classifiers = [
   "Intended Audience :: Developers",
   "License :: OSI Approved :: MIT License",
   "Programming Language :: Python :: 3 :: Only",
-  "Programming Language :: Python :: 3.10",
-  "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 dynamic = ["version"]
 dependencies = [
   "numpy>=1.26.4",
@@ -56,14 +56,18 @@ dev = [
 ]
 
 docs = ["zensical", "mkdocstrings-python"]
+build = ["hatch>=1.17.1"]
 release = ["git-cliff"]
 
-[tool.uv-dynamic-versioning]
-vcs = "git"      # default
-style = "semver" # or pep440, semver, etc.
+[tool.dependency-support-policy]
+# Rolling support floors (SPEC 0): runtime lower bounds are raised on a schedule
+# by the support_floor_update.yml workflow, not by Renovate. See renovate.json.
+policy = "spec0"
+groups = ["project"]
+lock = "minimal"
 
 [tool.hatch.version]
-source = "uv-dynamic-versioning"
+source = "vcs"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/nullcal"]
@@ -92,7 +96,7 @@ markers = [
 
 [tool.ruff]
 line-length = 120
-target-version = "py310"
+target-version = "py312"
 lint.extend-select = [
   "E",
   "F",
@@ -117,7 +121,6 @@ lint.ignore = [
 ]
 lint.pylint.max-args = 10
 fix = true
-exclude = ["docs/conf.py"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -126,9 +129,3 @@ docstring-code-format = true
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["S101", "ARG001", "PLC0415", "PLR2004"]
-
-[[tool.uv.index]]
-name = "testpypi"
-url = "https://test.pypi.org/simple/"
-publish-url = "https://test.pypi.org/legacy/"
-explicit = true
