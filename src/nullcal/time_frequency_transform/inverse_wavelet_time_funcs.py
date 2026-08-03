@@ -31,7 +31,7 @@ def inverse_wavelet_time_helper_fast(wave_in, phi, n_f, n_t, mult):
 
     afins = np.zeros(2 * n_f, dtype=np.complex128)
 
-    for n in range(0, n_t):
+    for n in range(n_t):
         # old unpacked way, should still work but is necessarily slower,
         # might be more comparable if it could be written as an irfft instead
         # pack_wave_time_helper(n,n_f,n_t,wave_in,afins)
@@ -74,7 +74,7 @@ def unpack_time_wave_helper(n, n_f, n_t, k_cutoff, phis, fft_fin_real, res):
     idxf = (-k_cutoff // 2 + n * n_f + n_d) % (2 * n_f)
     k = (-k_cutoff // 2 + n * n_f) % n_d
 
-    for k_ind in range(0, k_cutoff):
+    for k_ind in range(k_cutoff):
         res_loc = fft_fin_real[idxf]
         res[k] += phis[k_ind] * res_loc
         idxf += 1
@@ -103,7 +103,7 @@ def unpack_time_wave_helper_compact(n, n_f, n_t, k_cutoff, phis, fft_fin, res): 
     n_d = n_f * n_t
     fft_fin_real = np.zeros(4 * n_f)
     fft_fin_imag = np.zeros(4 * n_f)
-    for itrf in range(0, 2 * n_f):
+    for itrf in range(2 * n_f):
         fft_fin_real[itrf] = np.real(fft_fin[itrf])
         fft_fin_real[itrf + 2 * n_f] = fft_fin_real[itrf]
         fft_fin_imag[itrf] = np.imag(fft_fin[(itrf + n_f) % (2 * n_f)])
@@ -112,7 +112,7 @@ def unpack_time_wave_helper_compact(n, n_f, n_t, k_cutoff, phis, fft_fin, res): 
     idxf1_base = (-k_cutoff // 2 + n * n_f + n_d) % (2 * n_f)
     k1_base = (-k_cutoff // 2 + n * n_f) % n_d
     for k_ind in range(0, k_cutoff, 2 * n_f):
-        for idxf1_add in range(0, 2 * n_f):
+        for idxf1_add in range(2 * n_f):
             idxf1 = idxf1_base + idxf1_add
             k_ind_loc = k_ind + idxf1_add
             k1 = k1_base + k_ind_loc
@@ -166,7 +166,7 @@ def pack_wave_time_helper(n, n_f, n_t, wave_in, afins):
         afins[0] = 0.0
         afins[n_f] = 0.0
 
-    for idxm in range(0, n_f // 2 - 1):
+    for idxm in range(n_f // 2 - 1):
         if n % 2:
             afins[2 * idxm + 2] = 1j * wave_in[n, 2 * idxm + 2]
             afins[2 * n_f - 2 * idxm - 2] = -1j * wave_in[n, 2 * idxm + 2]
@@ -174,7 +174,7 @@ def pack_wave_time_helper(n, n_f, n_t, wave_in, afins):
             afins[2 * idxm + 2] = 1 * wave_in[n, 2 * idxm + 2]
             afins[2 * n_f - 2 * idxm - 2] = 1 * wave_in[n, 2 * idxm + 2]
 
-    for idxm in range(0, n_f // 2):
+    for idxm in range(n_f // 2):
         if n % 2:
             afins[2 * idxm + 1] = -1 * wave_in[n, 2 * idxm + 1]
             afins[2 * n_f - 2 * idxm - 1] = -1 * wave_in[n, 2 * idxm + 1]

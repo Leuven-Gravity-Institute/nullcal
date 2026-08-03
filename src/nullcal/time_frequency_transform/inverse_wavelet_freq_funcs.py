@@ -24,7 +24,7 @@ def inverse_wavelet_freq_helper_fast(wave_in, phif, n_f, n_t):
     prefactor2s = np.zeros(n_t, np.complex128)
     res = np.zeros(n_d // 2 + 1, dtype=np.complex128)
 
-    for m in range(0, n_f + 1):
+    for m in range(n_f + 1):
         pack_wave_inverse(m, n_t, n_f, prefactor2s, wave_in)
         # with numba.objmode(fft_prefactor2s="complex128[:]"):
         fft_prefactor2s = np.fft.fft(prefactor2s)
@@ -47,7 +47,7 @@ def unpack_wave_inverse(m, n_t, n_f, phif, fft_prefactor2s, res):
     """
 
     if m in (0, n_f):
-        for i_ind in range(0, n_t // 2):
+        for i_ind in range(n_t // 2):
             i = np.abs(m * n_t // 2 - i_ind)  # i_off+i_min2
             ind3 = (2 * i) % n_t
             res[i] += fft_prefactor2s[ind3] * phif[i_ind]
@@ -59,7 +59,7 @@ def unpack_wave_inverse(m, n_t, n_f, phif, fft_prefactor2s, res):
     else:
         ind31 = (n_t // 2 * m) % n_t
         ind32 = (n_t // 2 * m) % n_t
-        for i_ind in range(0, n_t // 2):
+        for i_ind in range(n_t // 2):
             i1 = n_t // 2 * m - i_ind
             i2 = n_t // 2 * m + i_ind
             # assert ind31 == i1%n_t
@@ -88,13 +88,13 @@ def pack_wave_inverse(m, n_t, n_f, prefactor2s, wave_in):
         wave_in (2D numpy array): Input data in wavelet domain.
     """
     if m == 0:
-        for n in range(0, n_t):
+        for n in range(n_t):
             prefactor2s[n] = 1 / np.sqrt(2) * wave_in[(2 * n) % n_t, 0]
     elif m == n_f:
-        for n in range(0, n_t):
+        for n in range(n_t):
             prefactor2s[n] = 1 / np.sqrt(2) * wave_in[(2 * n) % n_t + 1, 0]
     else:
-        for n in range(0, n_t):
+        for n in range(n_t):
             val = wave_in[n, m]
             mult2 = -1j if (n + m) % 2 else 1
 
