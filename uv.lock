@@ -2430,7 +2430,7 @@ requires-dist = [
     { name = "numba" },
     { name = "numpy", specifier = ">=1.26.4" },
     { name = "pycbc" },
-    { name = "pyspark", marker = "extra == 'spark'", specifier = ">=3.5.9" },
+    { name = "pyspark", marker = "extra == 'spark'", specifier = ">=4.2.0" },
     { name = "rocket-fft" },
     { name = "scipy" },
     { name = "tables" },
