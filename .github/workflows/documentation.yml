@@ -17,6 +17,9 @@ concurrency:
 jobs:
     deploy:
         runs-on: ubuntu-latest
+        # Set the repository variable DEPLOY_DOCS to "true" once GitHub Pages
+        # is enabled (Settings -> Pages -> Source: GitHub Actions).
+        if: vars.DEPLOY_DOCS == 'true'
         environment:
             name: github-pages
             url: ${{ steps.deployment.outputs.page_url }}
@@ -26,7 +29,7 @@ jobs:
             - name: Install uv
               uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
               with:
-                  python-version: '3.12'
+                  python-version: '3.14.3'
                   enable-cache: 'true'
 
             - name: Install dependencies

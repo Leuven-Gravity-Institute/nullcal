@@ -2,7 +2,7 @@
 
 ## Requirements
 
-- Python 3.10 or later
+- Python 3.12 or later
 - Linux, macOS, or Windows
 
 ## From PyPI
@@ -40,7 +40,7 @@ python -c "import nullcal; print(nullcal.__version__)"
 
 ## Troubleshooting
 
-- Ensure Python 3.10 or later is installed (`python --version`)
+- Ensure Python 3.12 or later is installed (`python --version`)
 - Use a virtual environment to avoid dependency conflicts
 - If you encounter issues, please open an issue on
   [GitHub](https://github.com/Leuven-Gravity-Institute/nullcal/issues)
