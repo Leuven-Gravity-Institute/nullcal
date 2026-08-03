@@ -40,7 +40,7 @@ dependencies = [
 [project.scripts]
 
 [project.optional-dependencies]
-spark = ["pyspark>=3.5.9"]
+spark = ["pyspark>=4.2.0"]
 
 [project.urls]
 Source = "https://github.com/Leuven-Gravity-Institute/nullcal"
