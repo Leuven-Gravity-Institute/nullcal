@@ -25,16 +25,16 @@ requires-python = ">=3.12"
 dynamic = ["version"]
 dependencies = [
   "numpy>=1.26.4",
-  "nptyping",
+  "nptyping>=2.5.0",
   "bilby>=2.8.1",
-  "bilby_pipe",
-  "numba",
-  "scipy",
-  "ConfigArgParse",
-  "pycbc",
-  "healpy",
-  "rocket-fft",
-  "tables",
+  "bilby_pipe>=1.9.0",
+  "numba>=0.65.1",
+  "scipy>=1.16.3",
+  "ConfigArgParse>=1.7.5",
+  "pycbc>=2.11.0",
+  "healpy>=1.19.0",
+  "rocket-fft>=0.3.1",
+  "tables>=3.11.1",
 ]
 
 [project.scripts]
@@ -48,16 +48,17 @@ Tracker = "https://github.com/Leuven-Gravity-Institute/nullcal/issues"
 
 [dependency-groups]
 dev = [
-  "prek",
+  "ruff>=0.16.1",
+  "prek>=0.4.11",
+  "pytest-github-actions-annotate-failures>=0.4.2",
+  "pytest-cov>=7.1.0",
+  "pytest-mock>=3.15.1",
   "pytest>=9.1.1",
-  "pytest-cov",
-  "pytest-mock",
-  "pytest-github-actions-annotate-failures",
 ]
 
-docs = ["zensical", "mkdocstrings-python"]
+docs = ["zensical>=0.0.52", "mkdocstrings-python>=2.0.5"]
 build = ["hatch>=1.17.1"]
-release = ["git-cliff"]
+release = ["git-cliff>=2.13.1"]
 
 [tool.dependency-support-policy]
 # Rolling support floors (SPEC 0): runtime lower bounds are raised on a schedule
