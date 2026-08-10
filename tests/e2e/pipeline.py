@@ -25,6 +25,7 @@ from nullcal.likelihood import RecalibrationLikelihood
 
 from . import config
 
+
 @contextlib.contextmanager
 def quiet_loggers() -> Iterator[None]:
     """Silence bilby's and nullcal's chatter for the duration of a build, then restore it.

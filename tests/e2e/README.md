@@ -104,7 +104,7 @@ published results that never called `noise_log_likelihood()` are not implicated.
 **fails on the unfixed code** — verified, not assumed. Its three tests carry a
 module-level `xfail(strict=True, raises=IndexError)`, so on this revision they
 report `XFAIL`. They do **not** flip to passing by themselves: `strict=True`
-turns an unexpected pass into an *error*, which is deliberate — it forces the
+turns an unexpected pass into an _error_, which is deliberate — it forces the
 fixing commit to delete the marker rather than leave a stale one behind. So the
 repair, a separate change with its own review, consists of fixing the defect
 **and** removing that marker in the same commit; the tests then pass normally.
