@@ -136,8 +136,7 @@ def test_artifact_matches_reference(reference, computed, key):
     difference = float(np.max(np.abs(actual - expected)))
     relative = difference / peak if peak > 0.0 else difference
     assert relative <= RTOL, (
-        f"{key}: max|diff| = {difference:.6e}, peak = {peak:.6e}, peak-relative = {relative:.3e} "
-        f"exceeds rtol={RTOL}"
+        f"{key}: max|diff| = {difference:.6e}, peak = {peak:.6e}, peak-relative = {relative:.3e} exceeds rtol={RTOL}"
     )
 
 
