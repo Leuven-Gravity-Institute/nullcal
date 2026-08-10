@@ -91,13 +91,14 @@ would make any comparison vacuously true. That was wrong and is recorded here
 because the conclusion survived the reasoning. The frozen arrays are not of
 order 1e-24: the null streams peak at ~1.7, `log_likelihood` is ~-204, and
 `whitened_antenna_response` peaks at ~1.3e24 — they span some 24 orders between
-them, so no single statement about `atol` covers all of them. For the O(1) bulk a
-1e-8 floor would not swamp anything; it would loosen the effective tolerance to
-~1e-8 relative, costing about four orders of sensitivity. At the smallest
+them, so no single statement about `atol` covers all of them. For the O(1) bulk
+a 1e-8 floor would not swamp anything; it would loosen the effective tolerance
+to ~1e-8 relative, costing about four orders of sensitivity. At the smallest
 wavelet-tail pixels (~1e-4) it would swamp them outright. Either way it is the
-wrong floor, but not for the originally stated reason. The ~1e-24 quantity is the
-raw unwhitened strain, which is not among the frozen artifacts; a default `atol`
-_would_ be vacuous there, and that is the case this argument was borrowed from.
+wrong floor, but not for the originally stated reason. The ~1e-24 quantity is
+the raw unwhitened strain, which is not among the frozen artifacts; a default
+`atol` _would_ be vacuous there, and that is the case this argument was borrowed
+from.
 
 The tolerance for the future JAX implementation is a separate decision and will
 be larger. It must be stated with its basis _before_ the port is compared, not
