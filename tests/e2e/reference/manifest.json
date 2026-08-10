@@ -1,131 +1,102 @@
 {
-  "artifacts": {
-    "calibrated_frequency_domain_null_stream": {
-      "dtype": "complex128",
-      "sha256": "cf1196e1c5e5b5227c65e05056c28aaf66f1be4761e2d7d1194cde21d83fafa5",
-      "shape": [
-        3,
-        8193
-      ]
+    "artifacts": {
+        "calibrated_frequency_domain_null_stream": {
+            "dtype": "complex128",
+            "sha256": "cf1196e1c5e5b5227c65e05056c28aaf66f1be4761e2d7d1194cde21d83fafa5",
+            "shape": [3, 8193]
+        },
+        "calibrated_time_frequency_domain_null_stream": {
+            "dtype": "float64",
+            "sha256": "eb9ec90980798537875056342da1e94040b699fdc93cac62a16b96c368fc684c",
+            "shape": [3, 256, 64]
+        },
+        "calibration_factor": {
+            "dtype": "complex128",
+            "sha256": "d773d0a9d823bf4a81fd2029f37d114cd198d5c5e641f9d160d05689cfd7dfa7",
+            "shape": [3, 8193]
+        },
+        "frequency_mask": {
+            "dtype": "bool",
+            "sha256": "d623467f9464be22c5620af6ec316443958a51f38b67be5cb4c7acc65847b0cf",
+            "shape": [8193]
+        },
+        "log_likelihood": {
+            "dtype": "float64",
+            "sha256": "26d1611a38a4153092768f2f28d04e286d78b656ad0a4a1a6d7fe4401f62b0fc",
+            "shape": []
+        },
+        "projector": {
+            "dtype": "float64",
+            "sha256": "f9a66325147f79f5fbe4ec1d0707ca69617669da4d2e5c2b7d374920190e9161",
+            "shape": [8193, 3, 3]
+        },
+        "time_frequency_filter": {
+            "dtype": "bool",
+            "sha256": "ce5445261c4e7d9bd7a3def137ff184bfb4f6335dc866b2d7a0818cc8f7f4320",
+            "shape": [256, 64]
+        },
+        "uncalibrated_frequency_domain_null_stream": {
+            "dtype": "complex128",
+            "sha256": "7f7bb77e66ce1d5f688cbc712513efceafd68c7d1b57da508479ed65ff511848",
+            "shape": [3, 8193]
+        },
+        "wavelet_probe_output": {
+            "dtype": "float64",
+            "sha256": "768b43da5e5da82709793efb91ddf7f4584f92a2be92bc87712b7aceb3a8342f",
+            "shape": [256, 64]
+        },
+        "whitened_antenna_response": {
+            "dtype": "float64",
+            "sha256": "f831238f6d0884fa98539d75a3be1d44f5d205f141060a55810ddfe9ac595f44",
+            "shape": [8193, 3, 2]
+        }
     },
-    "calibrated_time_frequency_domain_null_stream": {
-      "dtype": "float64",
-      "sha256": "eb9ec90980798537875056342da1e94040b699fdc93cac62a16b96c368fc684c",
-      "shape": [
-        3,
-        256,
-        64
-      ]
+    "configuration": {
+        "clustering_threshold": 0.1,
+        "duration": 8,
+        "frequency_resolution": 16,
+        "maximum_frequency": 1024.0,
+        "minimum_frequency": 20.0,
+        "n_points": 10,
+        "nx": 4.0,
+        "sampling_frequency": 2048,
+        "seed": 20260810,
+        "source_parameters": {
+            "a_1": 0.0,
+            "a_2": 0.0,
+            "dec": -1.2108,
+            "geocent_time": 1126259462.4,
+            "luminosity_distance": 800.0,
+            "mass_1": 36.0,
+            "mass_2": 29.0,
+            "phase": 1.3,
+            "phi_12": 0.0,
+            "phi_jl": 0.0,
+            "psi": 2.659,
+            "ra": 1.375,
+            "theta_jn": 0.4,
+            "tilt_1": 0.0,
+            "tilt_2": 0.0
+        },
+        "waveform_arguments": {
+            "minimum_frequency": 20.0,
+            "reference_frequency": 50.0,
+            "waveform_approximant": "IMRPhenomXPHM"
+        }
     },
-    "calibration_factor": {
-      "dtype": "complex128",
-      "sha256": "d773d0a9d823bf4a81fd2029f37d114cd198d5c5e641f9d160d05689cfd7dfa7",
-      "shape": [
-        3,
-        8193
-      ]
+    "git_revision": "9a3b557b44ebaf5842954ae094c17ff1a6ce6970",
+    "known_defects": {
+        "noise_log_likelihood": "RecalibrationLikelihood.noise_log_likelihood() raises IndexError on this revision: compute_uncalibrated_time_frequency_domain_null_stream applies the 2-D time-frequency filter to the 2-D frequency-domain array. No reference value exists for it; the behaviour is pinned by test_noise_log_likelihood_filter_domain."
     },
-    "frequency_mask": {
-      "dtype": "bool",
-      "sha256": "d623467f9464be22c5620af6ec316443958a51f38b67be5cb4c7acc65847b0cf",
-      "shape": [
-        8193
-      ]
+    "packages": {
+        "bilby": "2.8.1",
+        "lalsuite": "7.26.15",
+        "nullcal": "0.1.1.dev6+g9a3b557b4",
+        "numba": "0.66.0",
+        "numpy": "1.26.4",
+        "rocket-fft": "0.3.1",
+        "scipy": "1.16.3"
     },
-    "log_likelihood": {
-      "dtype": "float64",
-      "sha256": "26d1611a38a4153092768f2f28d04e286d78b656ad0a4a1a6d7fe4401f62b0fc",
-      "shape": []
-    },
-    "projector": {
-      "dtype": "float64",
-      "sha256": "f9a66325147f79f5fbe4ec1d0707ca69617669da4d2e5c2b7d374920190e9161",
-      "shape": [
-        8193,
-        3,
-        3
-      ]
-    },
-    "time_frequency_filter": {
-      "dtype": "bool",
-      "sha256": "ce5445261c4e7d9bd7a3def137ff184bfb4f6335dc866b2d7a0818cc8f7f4320",
-      "shape": [
-        256,
-        64
-      ]
-    },
-    "uncalibrated_frequency_domain_null_stream": {
-      "dtype": "complex128",
-      "sha256": "7f7bb77e66ce1d5f688cbc712513efceafd68c7d1b57da508479ed65ff511848",
-      "shape": [
-        3,
-        8193
-      ]
-    },
-    "wavelet_probe_output": {
-      "dtype": "float64",
-      "sha256": "768b43da5e5da82709793efb91ddf7f4584f92a2be92bc87712b7aceb3a8342f",
-      "shape": [
-        256,
-        64
-      ]
-    },
-    "whitened_antenna_response": {
-      "dtype": "float64",
-      "sha256": "f831238f6d0884fa98539d75a3be1d44f5d205f141060a55810ddfe9ac595f44",
-      "shape": [
-        8193,
-        3,
-        2
-      ]
-    }
-  },
-  "configuration": {
-    "clustering_threshold": 0.1,
-    "duration": 8,
-    "frequency_resolution": 16,
-    "maximum_frequency": 1024.0,
-    "minimum_frequency": 20.0,
-    "n_points": 10,
-    "nx": 4.0,
-    "sampling_frequency": 2048,
-    "seed": 20260810,
-    "source_parameters": {
-      "a_1": 0.0,
-      "a_2": 0.0,
-      "dec": -1.2108,
-      "geocent_time": 1126259462.4,
-      "luminosity_distance": 800.0,
-      "mass_1": 36.0,
-      "mass_2": 29.0,
-      "phase": 1.3,
-      "phi_12": 0.0,
-      "phi_jl": 0.0,
-      "psi": 2.659,
-      "ra": 1.375,
-      "theta_jn": 0.4,
-      "tilt_1": 0.0,
-      "tilt_2": 0.0
-    },
-    "waveform_arguments": {
-      "minimum_frequency": 20.0,
-      "reference_frequency": 50.0,
-      "waveform_approximant": "IMRPhenomXPHM"
-    }
-  },
-  "git_revision": "9a3b557b44ebaf5842954ae094c17ff1a6ce6970",
-  "known_defects": {
-    "noise_log_likelihood": "RecalibrationLikelihood.noise_log_likelihood() raises IndexError on this revision: compute_uncalibrated_time_frequency_domain_null_stream applies the 2-D time-frequency filter to the 2-D frequency-domain array. No reference value exists for it; the behaviour is pinned by test_noise_log_likelihood_filter_domain."
-  },
-  "packages": {
-    "bilby": "2.8.1",
-    "lalsuite": "7.26.15",
-    "nullcal": "0.1.1.dev6+g9a3b557b4",
-    "numba": "0.66.0",
-    "numpy": "1.26.4",
-    "rocket-fft": "0.3.1",
-    "scipy": "1.16.3"
-  },
-  "platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
-  "python": "3.13.12"
+    "platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+    "python": "3.13.12"
 }
