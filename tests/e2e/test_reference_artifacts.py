@@ -34,12 +34,20 @@ pytestmark = [pytest.mark.e2e, pytest.mark.slow]
 #: was meant to allow.
 #:
 #: Note on ``atol``: the numpy default of 1e-8 is wrong here, but not because it would be
-#: vacuous. The quantities compared are *whitened* — the null streams peak at ~1.7 and
-#: ``log_likelihood`` is ~-204 — so a 1e-8 absolute floor would not swamp them; it would loosen
-#: the effective tolerance to ~1e-8 relative, a ~1e4 loss of sensitivity. (The ~1e-24 quantity
-#: is the raw unwhitened strain, which is not among the compared artifacts.) A default atol
-#: *would* be vacuous on unwhitened strain; that argument simply does not apply to these arrays.
+#: vacuous. The frozen arrays span ~24 orders — the null streams peak at ~1.7, ``log_likelihood``
+#: is ~-204, ``whitened_antenna_response`` peaks at ~1.3e24 — so no single claim about ``atol``
+#: covers all of them: on the O(1) bulk a 1e-8 floor loosens the tolerance to ~1e-8 relative
+#: (~1e4 loss of sensitivity), while at the ~1e-4 wavelet-tail pixels it swamps them outright.
+#: (The ~1e-24 quantity is the raw unwhitened strain, which is not among the compared artifacts;
+#: a default atol *would* be vacuous there, which is the case this argument was borrowed from.)
 RTOL = 1e-12
+
+#: Elements at or above this fraction of the array peak are additionally held to ``RTOL`` in
+#: *per-element* relative terms, which closes the gap where a peak-scaled budget alone is a loose
+#: relative bound on a small element. The value is not a preference: round-off is ~``eps * peak``,
+#: so per-element relative ``RTOL`` is only attainable above ``eps / RTOL ~= 2.2e-4`` of the peak.
+#: 1e-3 sits an order above that, so the stricter assertion is satisfiable by construction.
+LOCAL_FLOOR = 1e-3
 
 #: Names whose reference is stored but which are compared exactly rather than approximately,
 #: because they are integer- or boolean-valued and any change is structural.
@@ -139,6 +147,74 @@ def test_artifact_matches_reference(reference, computed, key):
         f"{key}: max|diff| = {difference:.6e}, peak = {peak:.6e}, peak-relative = {relative:.3e} exceeds rtol={RTOL}"
     )
 
+    # Second, stricter check on the elements where per-element relative precision is actually
+    # attainable. The peak-scaled rule above allows an absolute residue of RTOL * peak anywhere,
+    # which for a small element is a large *relative* change: at the wavelet tail (~1e-4 against a
+    # peak of ~4.3) it permits ~3.7e-8 relative, four orders looser than the stated target. So a
+    # tail-localised regression could pass the global rule.
+    #
+    # It cannot simply be tightened everywhere: round-off in these sums is ~eps * peak, so an
+    # element of magnitude m can only be held to ~eps * peak / m in relative terms. Demanding
+    # RTOL relative therefore requires m >= eps * peak / RTOL ~= 2.2e-4 * peak. LOCAL_FLOOR is set
+    # an order above that boundary, so this assertion is achievable by construction rather than by
+    # luck, and elements below it remain covered only peak-relative — a limit stated in the README
+    # rather than left for someone to discover.
+    if peak > 0.0:
+        magnitudes = np.abs(expected)
+        significant = magnitudes >= LOCAL_FLOOR * peak
+        if significant.any():
+            local = np.max(np.abs(actual[significant] - expected[significant]) / magnitudes[significant])
+            assert local <= RTOL, (
+                f"{key}: worst per-element relative change among elements above "
+                f"{LOCAL_FLOOR:.0e} of peak is {float(local):.3e}, exceeding rtol={RTOL}; "
+                f"{int(significant.sum())} of {expected.size} elements are in that band"
+            )
+
+
+def test_masked_frequency_bins_are_exactly_zero(computed):
+    """Outside the frequency mask, the frequency-domain arrays must be exactly zero.
+
+    This is the structural half of the tolerance. The peak-scaled comparison allows an absolute
+    residue of ``1e-12 * peak`` everywhere, which for ``whitened_antenna_response`` (peak ~1.3e24)
+    is a budget of ~1e12 in bins that are supposed to hold nothing at all. The time-frequency
+    arrays already have a confinement test; the frequency-domain ones did not, so a bug that
+    filled masked bins with sub-budget junk would have passed. Asserting exact zeros structurally
+    restores the strict property the old per-element rule gave for free, without reintroducing its
+    fragility at small non-zero elements.
+    """
+    frequency_mask = computed["frequency_mask"]
+    masked = ~frequency_mask
+
+    assert masked.any(), "no masked frequency bins, so this test cannot detect anything"
+
+    # (detector, frequency)
+    for key in ("uncalibrated_frequency_domain_null_stream", "calibrated_frequency_domain_null_stream"):
+        residue = computed[key][:, masked]
+        assert np.count_nonzero(residue) == 0, (
+            f"{key}: {np.count_nonzero(residue)} non-zero values in masked frequency bins "
+            f"(max |value| = {float(np.max(np.abs(residue))):.6e})"
+        )
+
+    # (frequency, detector, polarisation)
+    residue = computed["whitened_antenna_response"][masked]
+    assert np.count_nonzero(residue) == 0, (
+        f"whitened_antenna_response: {np.count_nonzero(residue)} non-zero values in masked "
+        f"frequency bins (max |value| = {float(np.max(np.abs(residue))):.6e})"
+    )
+
+    # The projector is the exception, and deliberately so: ``compute_projector`` initialises the
+    # whole array to the identity and subtracts the GW projector only inside the mask, so masked
+    # bins keep an exact identity rather than zeros. That is harmless — ``compute_projected_strain_
+    # data`` zeroes outside the mask when it applies the projector — but it must be pinned as the
+    # identity rather than left to the peak-scaled budget, which would allow a residue of ~1e-12
+    # there. Asserting exact zeros here was wrong; asserting exact identity is the real invariant.
+    projector_masked = computed["projector"][masked]
+    identity = np.broadcast_to(np.eye(projector_masked.shape[-1], dtype=projector_masked.dtype), projector_masked.shape)
+    assert np.array_equal(projector_masked, identity), (
+        "projector: masked frequency bins are not the exact identity, which is what "
+        "compute_projector leaves there by construction"
+    )
+
 
 def test_manifest_configuration_matches_the_live_config(manifest):
     """The manifest's recorded configuration must equal what ``config.py`` says today.
@@ -183,10 +259,15 @@ def test_manifest_records_the_provenance_fields_it_promises(manifest):
     which the regeneration policy exists to prevent. What can be checked is that they are
     recorded at all.
     """
+    from .generate_reference import TRACKED_PACKAGES
+
     for field in ("git_revision", "platform", "python", "packages"):
         assert manifest.get(field), f"manifest is missing the {field!r} provenance field"
-    for package in ("bilby", "numpy", "scipy", "numba", "lalsuite"):
-        assert package in manifest["packages"], f"manifest packages omits {package!r}"
+    # Take the list from the generator rather than restating it: a hand-written subset here let
+    # `nullcal` and `rocket-fft` be dropped from the manifest with the suite still green, which is
+    # the same two-encodings-of-one-list problem the configuration check exists to prevent.
+    missing = [package for package in TRACKED_PACKAGES if package not in manifest["packages"]]
+    assert not missing, f"manifest packages omits {missing}, which generate_reference records"
 
 
 def test_filter_is_not_degenerate(computed):

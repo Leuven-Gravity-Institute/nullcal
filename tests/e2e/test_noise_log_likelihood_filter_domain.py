@@ -115,8 +115,14 @@ def test_noise_and_signal_log_likelihood_share_a_summation_domain(likelihood):
     # uncalibrated branch through the calibrated computation makes the two arrays *identical*,
     # which satisfies every structural check above — confined to the filter, finite, equal
     # support — while destroying the quantity's meaning, since noise_log_likelihood would then
-    # be the signal likelihood and their difference identically zero. The injected calibration
-    # is a ~2% deviation, so the two arrays must differ well above round-off.
+    # be the signal likelihood and their difference identically zero.
+    #
+    # The threshold is 1e-6 against a *measured* separation of ~0.8 peak-relative, with round-off
+    # at ~1e-15: six orders of margin below the real value and nine above the noise floor. Do not
+    # "tighten" this toward the ~2% scale of the injected calibration error — that intuition is
+    # wrong and re-creates the hole. The calibration rotates the projector's null subspace, and
+    # projecting O(1) noise onto two subspaces differing by ~2% gives an O(1) difference, not a 2%
+    # one.
     assert not np.array_equal(uncalibrated, calibrated), (
         "uncalibrated and calibrated null streams are bit-identical; the uncalibrated branch is "
         "applying the calibration factor, so noise_log_likelihood is not a noise likelihood"
