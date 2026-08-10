@@ -110,3 +110,20 @@ def test_noise_and_signal_log_likelihood_share_a_summation_domain(likelihood):
         f"{mismatched} pixels are non-zero in one null stream but not the other, so "
         "noise_log_likelihood and log_likelihood are normalised against different domains"
     )
+
+    # Same domain, different values. Without this, the cheapest wrong fix passes: routing the
+    # uncalibrated branch through the calibrated computation makes the two arrays *identical*,
+    # which satisfies every structural check above — confined to the filter, finite, equal
+    # support — while destroying the quantity's meaning, since noise_log_likelihood would then
+    # be the signal likelihood and their difference identically zero. The injected calibration
+    # is a ~2% deviation, so the two arrays must differ well above round-off.
+    assert not np.array_equal(uncalibrated, calibrated), (
+        "uncalibrated and calibrated null streams are bit-identical; the uncalibrated branch is "
+        "applying the calibration factor, so noise_log_likelihood is not a noise likelihood"
+    )
+    separation = float(np.max(np.abs(uncalibrated - calibrated))) / float(np.max(np.abs(calibrated)))
+    assert separation > 1e-6, (
+        f"uncalibrated and calibrated null streams differ by only {separation:.3e} peak-relative; "
+        "the injected calibration error is ~2%, so this is too small for the calibration to have "
+        "been applied to one and not the other"
+    )

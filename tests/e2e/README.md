@@ -53,20 +53,33 @@ rather than passing quietly.
 
 ## Tolerances, and why they are what they are
 
-`rtol=1e-12`, **`atol=0.0`**.
+`max|diff| / max|reference| <= 1e-12` — a **peak-scaled** budget, asserted on
+exactly the quantity the failure message reports.
 
 The configuration is seeded end to end, so a rerun of the _same_ implementation
 may differ only by floating-point non-determinism in threaded reductions and in
 the FFT. A loose engineering tolerance would hide a real change.
 
-`atol=0.0` is not optional. Whitened strain quantities here are of order 1e-24;
-numpy's default `atol=1e-8` exceeds them by sixteen orders of magnitude, which
-would make `allclose` return `True` for any two such arrays and the assertion
-incapable of failing.
+**Why peak-scaled and not per-element.** A per-element relative budget
+(`np.allclose(rtol=1e-12, atol=0.0)`) is 0.0 wherever the reference element is
+exactly zero, and the calibrated time-frequency array is ~97.7% exact zeros — so
+that rule silently demands bit-exactness outside the filter. The smallest
+non-zero elements are ~1e-4, giving per-element budgets of ~1e-16, at or below
+the round-off of the wavelet and FFT sums; a per-element rule would therefore
+_not_ admit the reduction-order non-determinism stated above, contradicting its
+own justification. Peak-scaling admits round-off while still catching a 1e-12
+relative change in the array as a whole.
 
-Differences are reported **peak-relative** (`max|diff| / max|reference|`), never
-per-sample relative: these arrays cross zero, where a per-sample relative error
-is meaningless.
+**On `atol`.** An earlier version of this file justified `atol=0.0` by claiming
+the compared quantities are of order 1e-24, so that numpy's default `atol=1e-8`
+would make any comparison vacuously true. That was wrong and is recorded here
+because the conclusion survived the reasoning: the arrays compared are
+_whitened_ — the null streams peak at ~1.7 and `log_likelihood` is ~-204 — so a
+1e-8 absolute floor would not swamp them, it would loosen the effective
+tolerance to ~1e-8 relative, costing about four orders of sensitivity. The
+~1e-24 quantity is the raw unwhitened strain, which is not among the frozen
+artifacts. A default `atol` _would_ be vacuous on unwhitened strain; that
+argument just does not apply here.
 
 The tolerance for the future JAX implementation is a separate decision and will
 be larger. It must be stated with its basis _before_ the port is compared, not

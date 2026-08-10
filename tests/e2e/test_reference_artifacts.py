@@ -24,13 +24,22 @@ MANIFEST_PATH = REFERENCE_DIR / "manifest.json"
 
 pytestmark = [pytest.mark.e2e, pytest.mark.slow]
 
-#: Same-implementation reruns must agree to round-off, not to a loose engineering tolerance:
-#: the configuration is seeded, so the only admissible difference is floating-point
-#: non-determinism in threaded reductions and in the FFT. ``atol=0.0`` is mandatory — the
-#: numpy default of 1e-8 exceeds the magnitude of whitened strain quantities, which would make
-#: the comparison vacuously true.
+#: Tolerance on ``max|actual - expected|`` scaled by the reference array's peak. Applied as a
+#: peak-scaled absolute budget rather than a per-element relative one, because these arrays
+#: cross zero and are mostly zero outside the filter: the calibrated time-frequency array is
+#: ~97.7% exact zeros, and a per-element relative budget against an exact-zero reference is
+#: exactly 0.0, which silently demands bit-exactness. The smallest non-zero elements are ~1e-4,
+#: whose per-element budget would be ~1e-16 — at or below the round-off of the wavelet and FFT
+#: sums, so a per-element rule would not in fact admit the reduction-order non-determinism it
+#: was meant to allow.
+#:
+#: Note on ``atol``: the numpy default of 1e-8 is wrong here, but not because it would be
+#: vacuous. The quantities compared are *whitened* — the null streams peak at ~1.7 and
+#: ``log_likelihood`` is ~-204 — so a 1e-8 absolute floor would not swamp them; it would loosen
+#: the effective tolerance to ~1e-8 relative, a ~1e4 loss of sensitivity. (The ~1e-24 quantity
+#: is the raw unwhitened strain, which is not among the compared artifacts.) A default atol
+#: *would* be vacuous on unwhitened strain; that argument simply does not apply to these arrays.
 RTOL = 1e-12
-ATOL = 0.0
 
 #: Names whose reference is stored but which are compared exactly rather than approximately,
 #: because they are integer- or boolean-valued and any change is structural.
@@ -70,21 +79,44 @@ def test_reference_covers_every_computed_artifact(reference, computed):
     )
 
 
-@pytest.mark.parametrize(
-    "key",
-    [
-        "frequency_mask",
-        "time_frequency_filter",
-        "whitened_antenna_response",
-        "projector",
-        "calibration_factor",
-        "uncalibrated_frequency_domain_null_stream",
-        "calibrated_frequency_domain_null_stream",
-        "calibrated_time_frequency_domain_null_stream",
-        "wavelet_probe_output",
-        "log_likelihood",
-    ],
+#: The artifacts compared value-by-value. Spelled out rather than derived from the npz at
+#: collection time on purpose: parametrising over the file's keys would mean a missing or
+#: truncated artifact file silently collects fewer tests — the same "compares nothing quietly"
+#: failure the fixtures were changed to prevent, arriving from the other direction.
+#: ``test_compared_keys_cover_every_artifact`` is what stops this list drifting from reality.
+COMPARED_KEYS = (
+    "frequency_mask",
+    "time_frequency_filter",
+    "whitened_antenna_response",
+    "projector",
+    "calibration_factor",
+    "uncalibrated_frequency_domain_null_stream",
+    "calibrated_frequency_domain_null_stream",
+    "calibrated_time_frequency_domain_null_stream",
+    "wavelet_probe_output",
+    "log_likelihood",
 )
+
+
+def test_compared_keys_cover_every_artifact(reference, computed):
+    """Every frozen and every computed artifact must be in the value-comparison list.
+
+    Without this, adding a quantity to ``compute_artifacts`` and regenerating the reference
+    leaves it frozen, digested and set-equal — but never value-compared, so a later change to
+    that quantity alone passes the whole suite.
+    """
+    compared = set(COMPARED_KEYS)
+    assert compared == set(reference), (
+        f"frozen but not compared: {sorted(set(reference) - compared)}; "
+        f"compared but not frozen: {sorted(compared - set(reference))}"
+    )
+    assert compared == set(computed), (
+        f"computed but not compared: {sorted(set(computed) - compared)}; "
+        f"compared but not computed: {sorted(compared - set(computed))}"
+    )
+
+
+@pytest.mark.parametrize("key", COMPARED_KEYS)
 def test_artifact_matches_reference(reference, computed, key):
     expected = reference[key]
     actual = computed[key]
@@ -95,14 +127,67 @@ def test_artifact_matches_reference(reference, computed, key):
         assert np.array_equal(actual, expected), f"{key}: exact comparison failed"
         return
 
-    # Peak-relative, never per-sample relative: these arrays cross zero, where a per-sample
-    # relative error is meaningless.
-    peak = float(np.max(np.abs(expected))) if expected.size else 0.0
-    difference = float(np.max(np.abs(actual - expected))) if expected.size else 0.0
+    # Peak-relative, never per-element relative: these arrays cross zero and are mostly zero
+    # outside the filter, where a per-element relative budget is 0.0 and therefore demands
+    # bit-exactness. Assert exactly the quantity the failure message reports — asserting one
+    # tolerance while reporting another lets a failure print a number that reads like a pass.
+    assert expected.size > 0, f"{key}: reference array is empty, so the comparison is vacuous"
+    peak = float(np.max(np.abs(expected)))
+    difference = float(np.max(np.abs(actual - expected)))
     relative = difference / peak if peak > 0.0 else difference
-    assert np.allclose(actual, expected, rtol=RTOL, atol=ATOL), (
-        f"{key}: max|diff| = {difference:.6e}, peak = {peak:.6e}, peak-relative = {relative:.3e} (rtol={RTOL})"
+    assert relative <= RTOL, (
+        f"{key}: max|diff| = {difference:.6e}, peak = {peak:.6e}, peak-relative = {relative:.3e} "
+        f"exceeds rtol={RTOL}"
     )
+
+
+def test_manifest_configuration_matches_the_live_config(manifest):
+    """The manifest's recorded configuration must equal what ``config.py`` says today.
+
+    These are the same quantities encoded in two places, so they are a latent inconsistency
+    until something compares them. The arrays are protected by their digests; the *provenance*
+    is not, and a manifest whose recorded seed or source parameters have drifted from the module
+    misdescribes how the artifacts were made while every numerical test still passes. That turns
+    the manifest from a record into a decoration.
+    """
+    from . import config
+
+    recorded = manifest["configuration"]
+    expected = {
+        "duration": config.DURATION,
+        "sampling_frequency": config.SAMPLING_FREQUENCY,
+        "minimum_frequency": config.MINIMUM_FREQUENCY,
+        "maximum_frequency": config.MAXIMUM_FREQUENCY,
+        "n_points": config.N_POINTS,
+        "frequency_resolution": config.FREQUENCY_RESOLUTION,
+        "nx": config.NX,
+        "clustering_threshold": config.CLUSTERING_THRESHOLD,
+        "seed": config.SEED,
+        "source_parameters": dict(config.SOURCE_PARAMETERS),
+        "waveform_arguments": dict(config.WAVEFORM_ARGUMENTS),
+    }
+    assert set(recorded) == set(expected), (
+        f"manifest configuration keys differ from config.py: "
+        f"manifest-only {sorted(set(recorded) - set(expected))}, "
+        f"config-only {sorted(set(expected) - set(recorded))}"
+    )
+    for key, value in expected.items():
+        assert recorded[key] == value, f"manifest configuration[{key!r}] = {recorded[key]!r}, config.py says {value!r}"
+
+
+def test_manifest_records_the_provenance_fields_it_promises(manifest):
+    """The traceability block must be present and non-empty.
+
+    Not compared against the running environment: ``git_revision``, ``platform``, ``python`` and
+    ``packages`` describe where the artifacts *were generated*, which is deliberately not where
+    the test now runs. Asserting they match HEAD would force a regeneration on every commit,
+    which the regeneration policy exists to prevent. What can be checked is that they are
+    recorded at all.
+    """
+    for field in ("git_revision", "platform", "python", "packages"):
+        assert manifest.get(field), f"manifest is missing the {field!r} provenance field"
+    for package in ("bilby", "numpy", "scipy", "numba", "lalsuite"):
+        assert package in manifest["packages"], f"manifest packages omits {package!r}"
 
 
 def test_filter_is_not_degenerate(computed):
@@ -118,7 +203,13 @@ def test_calibrated_null_stream_is_confined_to_the_filter(computed):
     tf_filter = computed["time_frequency_filter"]
     outside = calibrated[:, ~tf_filter]
     assert np.count_nonzero(outside) == 0, f"{np.count_nonzero(outside)} non-zero pixels outside the filter"
-    assert np.count_nonzero(calibrated) == int(tf_filter.sum()) * calibrated.shape[0]
+    # Inside the filter, require that the array is substantially populated rather than that
+    # *every* pixel is non-zero: an exactly-zero wavelet coefficient at a filtered pixel is
+    # numerically possible and would fail an equality on the count without anything being wrong.
+    # The point of this assertion is to catch an all-zero array, not to pin the realisation.
+    inside = np.count_nonzero(calibrated[:, tf_filter])
+    total_inside = int(tf_filter.sum()) * calibrated.shape[0]
+    assert inside > 0.9 * total_inside, f"only {inside} of {total_inside} pixels inside the filter are non-zero"
 
 
 def test_manifest_matches_artifacts(reference, manifest):
