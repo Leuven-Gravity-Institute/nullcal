@@ -84,7 +84,7 @@ shape `(detector, frequency)` — using the _2-D_ time-frequency filter, shape
 `(n_t, n_f)`. A slice plus a 2-D boolean mask addresses three dimensions of a
 2-D array:
 
-```
+```text
 IndexError: too many indices for array: array is 2-dimensional, but 3 were indexed
 ```
 
