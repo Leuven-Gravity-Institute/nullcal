@@ -53,15 +53,15 @@ so a hand-edited artifact fails rather than passing quietly, and
 `test_manifest_configuration_matches_the_live_config` checks the recorded
 configuration against `config.py` field by field, so a stale manifest fails too.
 
-It is **not** a complete description of the inputs: `DETECTOR_NAMES`, the derived
-segment `start_time()` and the wavelet probe's own seed (`SEED + 1`) live only in
-`config.py`. Reproducing from the manifest alone is therefore not possible —
-reproduce from `config.py` at the recorded revision. Recording those fields is
-folded into the follow-up that freezes the strain and PSD as inputs, because that
-change regenerates the manifest anyway; doing it here would rewrite the recorded
-provenance for a documentation-only gain.
+It is **not** a complete description of the inputs: `DETECTOR_NAMES`, the
+derived segment `start_time()` and the wavelet probe's own seed (`SEED + 1`)
+live only in `config.py`. Reproducing from the manifest alone is therefore not
+possible — reproduce from `config.py` at the recorded revision. Recording those
+fields is folded into the follow-up that freezes the strain and PSD as inputs,
+because that change regenerates the manifest anyway; doing it here would rewrite
+the recorded provenance for a documentation-only gain.
 
-The provenance fields are asserted *present*, never compared against the running
+The provenance fields are asserted _present_, never compared against the running
 environment. They say where the artifacts were generated, which is deliberately
 not where the tests later run; requiring them to match `HEAD` would force a
 regeneration on every commit, which is exactly what the policy above forbids.
