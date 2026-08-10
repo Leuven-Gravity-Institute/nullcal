@@ -32,6 +32,11 @@ pytestmark = [
     pytest.mark.slow,
     pytest.mark.xfail(
         strict=True,
+        # raises=IndexError is what makes the marker discriminate. Without it, strict xfail
+        # accepts *any* failure as the expected one, so an assertion failing for an unrelated
+        # reason would also report XFAIL and stay invisible until someone removed the marker.
+        # Pinning the exception type means only this defect is tolerated.
+        raises=IndexError,
         reason=(
             "Known defect: NullStream.compute_uncalibrated_time_frequency_domain_null_stream "
             "indexes a 2-D frequency-domain array with the 2-D time-frequency filter, so "
@@ -74,9 +79,13 @@ def test_noise_log_likelihood_returns_a_finite_value(likelihood):
 def test_noise_and_signal_log_likelihood_share_a_summation_domain(likelihood):
     """Both branches must sum residual energy over the same pixels.
 
-    Checked structurally rather than by comparing the two scalars: equal counts of non-zero
-    pixels is the invariant that was violated, and it is not implied by the two numbers being
-    of similar size.
+    Checked structurally rather than by comparing the two scalars: which pixels are summed is
+    the invariant that was violated, and it is not implied by the two numbers being of similar
+    size.
+
+    Compares the *support* rather than the count of non-zero pixels. Equal counts are a weaker
+    statement that two disjoint pixel sets of the same size would also satisfy, so counting
+    alone would let a genuinely mismatched domain through.
     """
     null_stream = likelihood.null_stream_calculator
     from . import config
@@ -85,7 +94,19 @@ def test_noise_and_signal_log_likelihood_share_a_summation_domain(likelihood):
 
     uncalibrated = null_stream.compute_uncalibrated_time_frequency_domain_null_stream()
     calibrated = null_stream.compute_calibrated_time_frequency_domain_null_stream_from_parameters(parameters=parameters)
-    assert np.count_nonzero(uncalibrated) == np.count_nonzero(calibrated), (
-        "uncalibrated and calibrated null streams occupy different numbers of pixels, so "
+    tf_filter = null_stream.time_frequency_filter
+
+    assert uncalibrated.shape == calibrated.shape, (
+        f"uncalibrated {uncalibrated.shape} and calibrated {calibrated.shape} arrays are not comparable"
+    )
+
+    # Both must be confined to the filter, and to the *same* pixels within it.
+    for name, array in (("uncalibrated", uncalibrated), ("calibrated", calibrated)):
+        outside = np.count_nonzero(array[:, ~tf_filter])
+        assert outside == 0, f"{name} null stream has {outside} non-zero pixels outside the time-frequency filter"
+
+    mismatched = int(np.count_nonzero((uncalibrated != 0.0) != (calibrated != 0.0)))
+    assert mismatched == 0, (
+        f"{mismatched} pixels are non-zero in one null stream but not the other, so "
         "noise_log_likelihood and log_likelihood are normalised against different domains"
     )

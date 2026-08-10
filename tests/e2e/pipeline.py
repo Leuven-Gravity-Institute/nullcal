@@ -7,8 +7,10 @@ between them would look like a numerical regression.
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import tempfile
+from collections.abc import Iterator
 from pathlib import Path
 
 import bilby.core.utils.random
@@ -23,8 +25,23 @@ from nullcal.likelihood import RecalibrationLikelihood
 
 from . import config
 
-logging.getLogger("bilby").setLevel(logging.WARNING)
-logging.getLogger("nullcal").setLevel(logging.WARNING)
+@contextlib.contextmanager
+def quiet_loggers() -> Iterator[None]:
+    """Silence bilby's and nullcal's chatter for the duration of a build, then restore it.
+
+    Setting these levels at import time instead would apply during pytest collection, which the
+    ``e2e`` marker does not prevent — a normal run would then lose diagnostics from unrelated
+    tests sharing the worker.
+    """
+    loggers = [logging.getLogger("bilby"), logging.getLogger("nullcal")]
+    previous = [logger.level for logger in loggers]
+    for logger in loggers:
+        logger.setLevel(logging.WARNING)
+    try:
+        yield
+    finally:
+        for logger, level in zip(loggers, previous):
+            logger.setLevel(level)
 
 
 def build_waveform_generator() -> WaveformGenerator:
@@ -41,29 +58,30 @@ def build_waveform_generator() -> WaveformGenerator:
 
 def build_interferometers() -> InterferometerList:
     """ET triangle with the frozen noise realisation and the injected signal."""
-    bilby.core.utils.random.seed(config.SEED)
-    interferometers = InterferometerList(["ET"])
-    for interferometer in interferometers:
-        interferometer.minimum_frequency = config.MINIMUM_FREQUENCY
-        interferometer.maximum_frequency = config.MAXIMUM_FREQUENCY
-        interferometer.calibration_model = CubicSpline(
-            prefix=f"recalib_{interferometer.name}_",
-            minimum_frequency=config.MINIMUM_FREQUENCY,
-            maximum_frequency=config.MAXIMUM_FREQUENCY,
-            n_points=config.N_POINTS,
+    with quiet_loggers():
+        bilby.core.utils.random.seed(config.SEED)
+        interferometers = InterferometerList(["ET"])
+        for interferometer in interferometers:
+            interferometer.minimum_frequency = config.MINIMUM_FREQUENCY
+            interferometer.maximum_frequency = config.MAXIMUM_FREQUENCY
+            interferometer.calibration_model = CubicSpline(
+                prefix=f"recalib_{interferometer.name}_",
+                minimum_frequency=config.MINIMUM_FREQUENCY,
+                maximum_frequency=config.MAXIMUM_FREQUENCY,
+                n_points=config.N_POINTS,
+            )
+        interferometers.set_strain_data_from_power_spectral_densities(
+            sampling_frequency=config.SAMPLING_FREQUENCY,
+            duration=config.DURATION,
+            start_time=config.start_time(),
         )
-    interferometers.set_strain_data_from_power_spectral_densities(
-        sampling_frequency=config.SAMPLING_FREQUENCY,
-        duration=config.DURATION,
-        start_time=config.start_time(),
-    )
-    injected = dict(config.SOURCE_PARAMETERS)
-    injected.update(config.calibration_parameters())
-    interferometers.inject_signal(
-        waveform_generator=build_waveform_generator(),
-        parameters=injected,
-    )
-    return interferometers
+        injected = dict(config.SOURCE_PARAMETERS)
+        injected.update(config.calibration_parameters())
+        interferometers.inject_signal(
+            waveform_generator=build_waveform_generator(),
+            parameters=injected,
+        )
+        return interferometers
 
 
 def build_likelihood(tmp_path: Path | None = None) -> RecalibrationLikelihood:
@@ -75,14 +93,15 @@ def build_likelihood(tmp_path: Path | None = None) -> RecalibrationLikelihood:
     parameter_file = directory / "clustering_parameters.csv"
     pd.DataFrame([config.SOURCE_PARAMETERS]).to_csv(parameter_file, index=False)
 
-    return RecalibrationLikelihood(
-        interferometers=interferometers,
-        waveform_generator=waveform_generator,
-        wavelet_transform_frequency_resolution=config.FREQUENCY_RESOLUTION,
-        wavelet_transform_nx=config.NX,
-        clustering_parameter_file=str(parameter_file),
-        clustering_threshold=config.CLUSTERING_THRESHOLD,
-    )
+    with quiet_loggers():
+        return RecalibrationLikelihood(
+            interferometers=interferometers,
+            waveform_generator=waveform_generator,
+            wavelet_transform_frequency_resolution=config.FREQUENCY_RESOLUTION,
+            wavelet_transform_nx=config.NX,
+            clustering_parameter_file=str(parameter_file),
+            clustering_threshold=config.CLUSTERING_THRESHOLD,
+        )
 
 
 def compute_artifacts(likelihood: RecalibrationLikelihood) -> dict[str, np.ndarray | float]:

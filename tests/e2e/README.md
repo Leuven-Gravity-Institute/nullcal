@@ -101,6 +101,14 @@ The calibrated path is unaffected and `log_likelihood()` is correct, so
 published results that never called `noise_log_likelihood()` are not implicated.
 
 `test_noise_log_likelihood_filter_domain.py` asserts the fixed behaviour and
-**fails on the unfixed code** — verified, not assumed. Its three tests must flip
-to passing when the defect is repaired, and that repair is a separate change
-with its own review.
+**fails on the unfixed code** — verified, not assumed. Its three tests carry a
+module-level `xfail(strict=True, raises=IndexError)`, so on this revision they
+report `XFAIL`. They do **not** flip to passing by themselves: `strict=True`
+turns an unexpected pass into an *error*, which is deliberate — it forces the
+fixing commit to delete the marker rather than leave a stale one behind. So the
+repair, a separate change with its own review, consists of fixing the defect
+**and** removing that marker in the same commit; the tests then pass normally.
+
+`raises=IndexError` matters as much as `strict`. Without it a strict xfail
+accepts any failure as the expected one, so an assertion failing for an
+unrelated reason would still report `XFAIL` and hide real breakage.

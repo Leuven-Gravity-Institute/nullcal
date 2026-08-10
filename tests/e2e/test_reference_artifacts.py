@@ -39,8 +39,12 @@ EXACT_KEYS = frozenset({"frequency_mask", "time_frequency_filter"})
 
 @pytest.fixture(scope="module")
 def reference() -> dict[str, np.ndarray]:
+    # fail, not skip: these artifacts are committed inputs, so their absence is a broken
+    # checkout rather than an unavailable optional dependency. Skipping would let an explicit
+    # ``pytest -m e2e`` run report success having compared nothing at all, which is the one
+    # outcome this suite exists to prevent.
     if not ARTIFACT_PATH.exists():
-        pytest.skip(f"reference artifacts absent: {ARTIFACT_PATH} (run tests.e2e.generate_reference)")
+        pytest.fail(f"reference artifacts absent: {ARTIFACT_PATH} (run tests.e2e.generate_reference)")
     with np.load(ARTIFACT_PATH) as data:
         return {key: data[key] for key in data.files}
 
@@ -48,7 +52,7 @@ def reference() -> dict[str, np.ndarray]:
 @pytest.fixture(scope="module")
 def manifest() -> dict:
     if not MANIFEST_PATH.exists():
-        pytest.skip(f"reference manifest absent: {MANIFEST_PATH}")
+        pytest.fail(f"reference manifest absent: {MANIFEST_PATH} (run tests.e2e.generate_reference)")
     return json.loads(MANIFEST_PATH.read_text())
 
 
@@ -121,6 +125,22 @@ def test_manifest_matches_artifacts(reference, manifest):
     """The manifest's digests must describe the artifacts actually shipped beside it."""
     import hashlib
 
+    # Iterating the manifest alone cannot notice a deleted entry: drop a key from the manifest
+    # and the loop simply checks one fewer artifact, silently. Compare the two key sets first so
+    # the manifest is required to describe the npz exactly, in both directions.
+    assert set(manifest["artifacts"]) == set(reference), (
+        f"manifest describes {sorted(set(manifest['artifacts']) - set(reference))} "
+        f"which are absent from the npz, and omits {sorted(set(reference) - set(manifest['artifacts']))}"
+    )
+
     for key, meta in manifest["artifacts"].items():
-        stored = np.ascontiguousarray(reference[key])
+        raw = np.asarray(reference[key])
+        # Digest the contiguous bytes, but report shape from `raw`: np.ascontiguousarray
+        # promotes a 0-d array to shape (1,), so the scalar log_likelihood would appear to
+        # contradict the manifest's correct []. The promotion does not change the bytes.
+        stored = np.ascontiguousarray(raw)
         assert hashlib.sha256(stored.tobytes()).hexdigest() == meta["sha256"], f"{key}: manifest digest mismatch"
+        # The digest already pins the bytes, but shape and dtype are what a reader trusts when
+        # deciding whether an artifact is the thing they think it is; an unchecked field drifts.
+        assert list(raw.shape) == list(meta["shape"]), f"{key}: shape {raw.shape} != manifest {meta['shape']}"
+        assert raw.dtype.name == meta["dtype"], f"{key}: dtype {raw.dtype.name} != manifest {meta['dtype']}"
