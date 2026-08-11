@@ -35,6 +35,11 @@ dependencies = [
   "healpy>=1.19.0",
   "rocket-fft>=0.3.1",
   "tables>=3.11.1",
+  # Imported directly by nullcal (result/, clustering/, metadata/) but previously undeclared:
+  # they resolved only transitively through bilby, which is being removed. Floors are the
+  # versions currently resolved, so CI's lowest-direct job exercises exactly what is claimed.
+  "pandas>=2.3.3",
+  "pyyaml>=6.0.3",
 ]
 
 [project.scripts]
