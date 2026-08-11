@@ -82,7 +82,7 @@ source = ["src"]
 fail_under = 0 # Temporary: set non-zero threshold once coverage improves
 
 [tool.pytest.ini_options]
-addopts = "--cov=nullcal --cov-report=xml --cov-report=term --cov-append -m 'not integration'"
+addopts = "--cov=nullcal --cov-report=xml --cov-report=term --cov-append -m 'not integration and not e2e'"
 pythonpath = ["src"]
 testpaths = "tests"
 junit_family = "xunit2"
@@ -93,6 +93,7 @@ markers = [
   "spark: marks tests which need Spark",
   "slow: marks tests as slow",
   "unit: fast offline tests",
+  "e2e: end-to-end characterisation tests against frozen reference artifacts",
 ]
 
 [tool.ruff]
