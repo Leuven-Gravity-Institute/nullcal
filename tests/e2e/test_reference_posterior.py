@@ -1,11 +1,20 @@
-"""Checks on the frozen bilby reference posterior.
+"""Checks on the reference posterior, which is **provisional and not the anchor**.
 
-This artifact is the *distributional* anchor for the BlackJAX rebuild, alongside the
-fixed-parameter arrays in ``artifacts.npz``. R5's test will be that the ported sampler is
-statistically consistent with these samples on the same data and prior.
+Owner's decision, 2026-08-11: this posterior does *not* serve as the distributional anchor for the
+BlackJAX rebuild, and it does not block the migration. It is kept as a worked example and as a
+regression guard on ``generate_reference_posterior.py``. The samples are regenerable from the
+pre-migration revision, so what matters is that this revision and the generator survive — not these
+particular draws.
 
-It is also the one artifact that cannot be regenerated later: bilby produces it, and R5 removes
-bilby.
+It is not the anchor because the number is not yet anchored. Marginal widths (median
+``sigma_post/sigma_prior`` 0.720) are explained by measured degeneracy, but the conditional widths
+recovered from the samples, 0.292 median, still disagree with the 0.41 that a sampler-independent
+per-parameter scan predicts, and one covariance direction comes out broader than the prior beyond
+finite-sample noise. Closing those is what "anchored" would mean.
+
+The tests below are therefore integrity and sanity checks on a provisional artifact, not acceptance
+criteria for a reference. They still earn their place: they are what would catch a regenerated
+posterior that had silently reverted to returning the prior.
 
 The tests here deliberately do **not** re-run the sampler — that is a 12-minute 32-core job. They
 check the shipped artifact's integrity, and they check the property that makes it worth having at

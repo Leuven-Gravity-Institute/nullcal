@@ -163,7 +163,26 @@ reverting the one-line change fails these three tests with the original
 accepts any failure as the expected one, so an assertion failing for an
 unrelated reason would still report `XFAIL` and hide real breakage.
 
-## The frozen reference posterior
+## The reference posterior — PROVISIONAL, not the anchor
+
+> **Status (owner's decision, 2026-08-11): this posterior is provisional and is
+> _not_ the frozen distributional anchor for the rebuild.** It is kept as a
+> worked example and as a regression guard on the generator, not as something
+> the JAX port will be checked against. It does not block the migration: the
+> posterior is regenerable from the pre-migration commit, so what has to be
+> preserved is the _ability_ to regenerate — this revision plus
+> `generate_reference_posterior.py` — rather than these particular samples.
+>
+> Why it is not yet the anchor: the marginal widths (median
+> `sigma_post/sigma_prior` 0.720) are explained by measured degeneracy, but the
+> _conditional_ widths recovered from the samples, 0.292 median, still disagree
+> with the 0.41 predicted by a sampler-independent per-parameter scan — a ~40%
+> gap on exactly the quantity that scan predicts. One covariance direction also
+> comes out broader than the prior (2.08x the prior variance), which
+> finite-sample noise does not explain. Anchoring means closing those two, not
+> re-running the sampler. Until then, do not cite these numbers as the reference
+> distribution.
+
 
 `reference/posterior_samples.npz` (5937 samples x 60 calibration parameters) and
 `reference/posterior_manifest.json` are the _distributional_ anchor, alongside
