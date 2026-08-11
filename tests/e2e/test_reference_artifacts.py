@@ -261,9 +261,7 @@ def test_manifest_provenance_is_not_from_a_dirty_tree(manifest):
     passed. This asserts the generator was run on a clean tree, which is what makes
     ``git_revision`` a reproduction instruction rather than a decoration.
     """
-    assert "git_dirty" in manifest, (
-        "manifest predates the git_dirty field; regenerate so provenance can be trusted"
-    )
+    assert "git_dirty" in manifest, "manifest predates the git_dirty field; regenerate so provenance can be trusted"
     assert manifest["git_dirty"] is False, (
         f"artifacts were generated from a dirty working tree, so git_revision "
         f"({manifest['git_revision'][:10]}) does not identify the code that produced them"

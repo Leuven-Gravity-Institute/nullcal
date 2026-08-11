@@ -74,9 +74,7 @@ def test_both_direct_methods_are_confined_to_the_filter(likelihood):
     calibration_factor = null_stream.construct_calibration_factor_from_parameters(config.calibration_parameters())
 
     uncalibrated = null_stream.compute_uncalibrated_time_frequency_domain_null_stream()
-    calibrated = null_stream.compute_calibrated_time_frequency_domain_null_stream(
-        calibration_factor=calibration_factor
-    )
+    calibrated = null_stream.compute_calibrated_time_frequency_domain_null_stream(calibration_factor=calibration_factor)
 
     for name, array in (("uncalibrated", uncalibrated), ("calibrated", calibrated)):
         outside = int(np.count_nonzero(array[:, ~tf_filter]))
