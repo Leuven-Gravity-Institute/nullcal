@@ -41,7 +41,7 @@ def quiet_loggers() -> Iterator[None]:
     try:
         yield
     finally:
-        for logger, level in zip(loggers, previous):
+        for logger, level in zip(loggers, previous, strict=True):
             logger.setLevel(level)
 
 

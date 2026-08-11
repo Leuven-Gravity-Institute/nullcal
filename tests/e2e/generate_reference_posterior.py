@@ -17,8 +17,24 @@ frequencies.
 from sigma = 0.02. Wider than the injection on purpose: a prior tighter than the data's
 constraining power would hand back the prior as the posterior, and a prior-dominated posterior is
 reproduced equally well by a correct implementation and a broken one -- it would be an anchor that
-cannot fail. Measured before launching: the injection sits 154.6 nats above the median prior draw,
-so the likelihood, not the prior, sets the posterior.
+cannot fail.
+
+An earlier version of this docstring justified that with "the injection sits 154.6 nats above the
+median prior draw, so the likelihood, not the prior, sets the posterior". **That test is close to
+meaningless here and the claim was wrong.** In 60 dimensions a random prior draw is far from the
+peak by concentration of measure alone, whatever the marginals do -- and the first production run
+duly returned the prior. The check that actually bears on it is per-parameter: move one parameter by
+one prior sigma with the rest fixed and measure delta log L. Median 2.51 nats on this configuration,
+which is informative. It costs half a second; run it before spending a cluster job, not after.
+
+*Sampler.* ``rslice``, not ``rwalk``. This is not a preference. With ``rwalk`` this script produced
+a posterior identical to its prior (median sigma_post/sigma_prior 0.999 over all 60 parameters)
+while reporting convergence at dlogz=0.1 and writing a complete manifest: the proposal never mixed,
+at efficiency 0.0% with calls per iteration pinned at its ceiling and dynesty's "Hit maximum number"
+autocorrelation warning buried in stderr. Slice sampling is the standard remedy for random-walk
+proposals failing in tens of dimensions, and here it reached the expected widths in 12 minutes using
+8.4e5 likelihood calls against rwalk's 5.7e7. The manifest records an ``informativeness`` block so a
+future run that regresses says so in its own artifact.
 
 *bilby's noise-evidence call.* ``bilby.run_sampler`` calls ``likelihood.noise_log_likelihood()``
 unconditionally once sampling completes, on both branches of its ``use_ratio`` test. On this
@@ -68,9 +84,10 @@ PHASE_SIGMA = 0.05
 REFERENCE_SAMPLER_KWARGS = {
     "sampler": "dynesty",
     "nlive": 1000,
-    "sample": "rwalk",
-    "walks": 100,
-    "nact": 10,
+    # rslice, NOT rwalk. rwalk returned the prior on this 60-dimensional problem while reporting
+    # convergence; see the module docstring. Changing this back would silently reproduce that.
+    "sample": "rslice",
+    "slices": 10,
     "dlogz": 0.1,
     # Checkpoint so a walltime kill costs the last half hour rather than the whole run.
     "check_point": True,
@@ -86,9 +103,8 @@ REFERENCE_SAMPLER_KWARGS = {
 SMOKE_SAMPLER_KWARGS = {
     "sampler": "dynesty",
     "nlive": 50,
-    "sample": "rwalk",
-    "walks": 10,
-    "nact": 2,
+    "sample": "rslice",
+    "slices": 5,
     "dlogz": 5.0,
     "print_method": "interval-60",
 }
@@ -119,7 +135,7 @@ def build_prior() -> CalibrationPriorDict:
     """Calibration spline prior over the three ET detectors.
 
     bilby's ``constant_uncertainty_spline`` prepends ``recalib_`` to the label, so the label is
-    the bare detector name. Getting this wrong is not loud: a mis-prefixed key still passes
+    the bare detector name. Getting this wrong is not loud: a wrongly prefixed key still passes
     bilby's substring test in ``set_calibration_parameters``, is sliced to a junk key, and leaves
     the model's previous values in place -- the likelihood then silently stops responding to the
     parameters. The assertion below is what makes that failure visible.
@@ -192,7 +208,7 @@ def check_responds_to_parameters(likelihood: ReferenceLikelihood, prior: Calibra
 def git_revision() -> str:
     """Current revision of the checkout that produced the artifact."""
     return subprocess.run(
-        ["git", "rev-parse", "HEAD"],
+        ["git", "rev-parse", "HEAD"],  # noqa: S607
         capture_output=True,
         text=True,
         check=True,
@@ -274,7 +290,7 @@ def main() -> None:
     )
     wall_seconds = time.perf_counter() - start
 
-    free_parameters = [key for key in result.search_parameter_keys]
+    free_parameters = list(result.search_parameter_keys)
     posterior = result.posterior[free_parameters].to_numpy()
 
     # Did the sampler actually learn anything? Recorded in the manifest so the artifact carries its

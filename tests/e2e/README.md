@@ -184,6 +184,13 @@ data: varying one parameter at a time by one prior sigma gives a median
 reached the expected widths in 12 minutes, using 8.4e5 likelihood calls against
 `rwalk`'s 5.7e7.
 
+The frozen `posterior_manifest.json` also lists `walks` and `nact`, which are
+inert leftovers: the run was launched from the then-`rwalk` defaults with
+`--sample rslice` on the command line, and the recorded settings are the merged
+result. The generator now defaults to `rslice` and no longer sets them, so a
+regeneration produces a manifest without those two keys. The settings that
+matter — sampler, sample, slices, nlive, dlogz — agree.
+
 `test_reference_posterior.py` therefore asserts the shrinkage directly, and pins
 `sample="rslice"`, so a regeneration that silently reverted would fail.
 
