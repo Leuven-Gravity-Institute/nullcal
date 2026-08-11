@@ -20,6 +20,9 @@ advance, is what makes a regression visible.
 | `generate_reference.py`                      | Writes `reference/artifacts.npz` and `reference/manifest.json`.                                                                |
 | `test_reference_artifacts.py`                | Compares current output against the frozen artifacts.                                                                          |
 | `test_noise_log_likelihood_filter_domain.py` | Regression test for a known defect (below).                                                                                    |
+| `reference/posterior_samples.npz`            | The frozen bilby reference posterior — the distributional anchor (below).                                                       |
+| `test_reference_posterior.py`                | Integrity and informativeness checks on that posterior.                                                                        |
+| `test_noise_log_likelihood_defect_is_present.py` | Pins the known defect at its call site, with no `xfail`.                                                                   |
 
 ## Running
 
@@ -144,3 +147,57 @@ repair, a separate change with its own review, consists of fixing the defect
 `raises=IndexError` matters as much as `strict`. Without it a strict xfail
 accepts any failure as the expected one, so an assertion failing for an
 unrelated reason would still report `XFAIL` and hide real breakage.
+
+## The frozen reference posterior
+
+`reference/posterior_samples.npz` (5937 samples x 60 calibration parameters) and
+`reference/posterior_manifest.json` are the *distributional* anchor, alongside the
+fixed-parameter arrays. R5's test is that the ported sampler is statistically
+consistent with these samples on the same data and prior.
+
+This artifact **cannot be regenerated later**: bilby produces it, and the rewrite
+removes bilby.
+
+Only the calibration spline parameters are sampled — 60 free, plus 30
+`DeltaFunction` node frequencies. `RecalibrationLikelihood.log_likelihood` reads
+nothing else; the source parameters enter once, at construction, through the
+injection-clustering filter.
+
+Produced with dynesty `sample="rslice", slices=10, nlive=1000, dlogz=0.1` on
+Linux x86-64 in 12 minutes on 32 cores.
+
+**`rwalk` must not be used here, and the reason is recorded because it cost a
+day.** The first production run used dynesty's default random-walk proposal. It
+reported convergence at `dlogz=0.1`, wrote a complete manifest, and returned the
+**prior**: median `sigma_post/sigma_prior` of 0.999 across all 60 parameters,
+100% of injected values inside their 90% intervals, medians at the prior mean.
+`rwalk` had never mixed — efficiency fell to 0.0%, calls per iteration pinned at
+the 5001 ceiling, and dynesty warned `Hit maximum number` (its
+autocorrelation-not-met signal) into stderr. Nothing in the output said the
+result was worthless. A posterior equal to its prior is reproduced equally well
+by a correct implementation and a broken one, so as an anchor it would pass
+anything at all.
+
+A sampler-independent check settled that the fault was the sampler and not the
+data: varying one parameter at a time by one prior sigma gives a median
+`delta log L` of 2.51 nats. The likelihood is informative. Slice sampling then
+reached the expected widths in 12 minutes, using 8.4e5 likelihood calls against
+`rwalk`'s 5.7e7.
+
+`test_reference_posterior.py` therefore asserts the shrinkage directly, and pins
+`sample="rslice"`, so a regeneration that silently reverted would fail.
+
+**What the coverage number does and does not show.** 58 of 60 injected values lie
+inside their 90% credible intervals. That is *not* a calibration test: the
+injection was drawn from N(0, 0.02) while the prior is N(0, 0.05), so truths come
+from a narrower distribution than the prior and land inside intervals more often
+than nominal. Real calibration would need many injections drawn *from the prior*
+and a P-P plot.
+
+**Marginals are wider than conditionals, by design of the problem.** Conditional
+`sigma/sigma_prior` is 0.292 median against a marginal 0.720, and 26 of 60
+covariance directions are constrained below 0.5 prior sigma. The likelihood
+constrains *combinations* of spline nodes rather than individual nodes, so
+per-parameter marginals understate how much the data says. One covariance
+direction comes out broader than the prior (2.08x the prior variance), which
+finite-sample noise does not explain and which remains unaccounted for.
