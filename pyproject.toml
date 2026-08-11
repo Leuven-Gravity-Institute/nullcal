@@ -36,8 +36,14 @@ dependencies = [
   "rocket-fft>=0.3.1",
   "tables>=3.11.1",
   # Imported directly by nullcal (result/, clustering/, metadata/) but previously undeclared:
-  # they resolved only transitively through bilby, which is being removed. Floors are the
-  # versions currently resolved, so CI's lowest-direct job exercises exactly what is claimed.
+  # they resolved only transitively through bilby, which is being removed.
+  #
+  # Floors follow the SPEC 0 policy in [tool.dependency-support-policy], not the code's API needs,
+  # which are ancient (read_csv/to_csv/DataFrame; safe_load/safe_dump). Two reasons: the
+  # lowest-direct CI job installs exactly these, making a declared floor a *tested* bound; and
+  # support_floor_update.yml raises floors on a schedule anyway, so a lower one would not survive.
+  # The envelope spans two pandas generations - the lock resolves 3.0.5 below Python 3.14 and
+  # 2.3.3 at or above it - which the stable APIs above tolerate.
   "pandas>=2.3.3",
   "pyyaml>=6.0.3",
 ]
