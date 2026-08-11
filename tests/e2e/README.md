@@ -19,8 +19,8 @@ advance, is what makes a regression visible.
 | `pipeline.py`                                | Builds the interferometers, waveform generator and likelihood, and computes every frozen quantity. One construction path only. |
 | `generate_reference.py`                      | Writes `reference/artifacts.npz` and `reference/manifest.json`.                                                                |
 | `test_reference_artifacts.py`                | Compares current output against the frozen artifacts.                                                                          |
-| `test_noise_log_likelihood_filter_domain.py` | Regression test for a known defect (below).                                                                                    |
-| `reference/posterior_samples.npz`            | The frozen bilby reference posterior — the distributional anchor (below).                                                      |
+| `test_noise_log_likelihood_filter_domain.py` | Regression test for the defect below, now fixed.                                                                               |
+| `reference/posterior_samples.npz`            | A bilby posterior over the calibration parameters — **provisional, not the anchor** (below).                                   |
 | `test_reference_posterior.py`                | Integrity and informativeness checks on that posterior.                                                                        |
 
 ## Running
@@ -163,15 +163,40 @@ reverting the one-line change fails these three tests with the original
 accepts any failure as the expected one, so an assertion failing for an
 unrelated reason would still report `XFAIL` and hide real breakage.
 
-## The frozen reference posterior
+## The reference posterior — PROVISIONAL, not the anchor
+
+> **Status (owner's decision, 2026-08-11): this posterior is provisional and is
+> _not_ the frozen distributional anchor for the rebuild.** It is kept as a
+> worked example and as a regression guard on the generator, not as something
+> the JAX port will be checked against. It does not block the migration: the
+> posterior is regenerable from the pre-migration commit, so what has to be
+> preserved is the _ability_ to regenerate — this revision plus
+> `generate_reference_posterior.py` — rather than these particular samples.
+>
+> Why it is not yet the anchor: the marginal widths (median
+> `sigma_post/sigma_prior` 0.720) are explained by measured degeneracy, but the
+> _conditional_ widths recovered from the samples, 0.292 median, still disagree
+> with the 0.41 predicted by a sampler-independent per-parameter scan — a ~40%
+> gap on exactly the quantity that scan predicts. One covariance direction also
+> comes out broader than the prior (2.08x the prior variance), which
+> finite-sample noise does not explain. Anchoring means closing those two, not
+> re-running the sampler. Until then, do not cite these numbers as the reference
+> distribution.
 
 `reference/posterior_samples.npz` (5937 samples x 60 calibration parameters) and
-`reference/posterior_manifest.json` are the _distributional_ anchor, alongside
-the fixed-parameter arrays. R5's test is that the ported sampler is
-statistically consistent with these samples on the same data and prior.
+`reference/posterior_manifest.json` hold a bilby posterior over the calibration
+parameters. The intent was that it become the _distributional_ anchor, with R5
+testing the ported sampler for statistical consistency against it — that is
+**not** its status; see the note above. R5's acceptance test is therefore not
+yet defined against these samples, and defining it waits on the number being
+anchored.
 
-This artifact **cannot be regenerated later**: bilby produces it, and the
-rewrite removes bilby.
+An earlier version of this file said the artifact **cannot be regenerated
+later**, because bilby produces it and the rewrite removes bilby. That is wrong
+as stated: it can be regenerated from any pre-migration revision, so what has to
+be preserved is that revision together with `generate_reference_posterior.py`,
+not these particular draws. The urgency it implied — generate before bilby goes,
+or lose the chance — does not hold.
 
 Only the calibration spline parameters are sampled — 60 free, plus 30
 `DeltaFunction` node frequencies. `RecalibrationLikelihood.log_likelihood` reads
