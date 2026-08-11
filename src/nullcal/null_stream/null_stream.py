@@ -130,10 +130,17 @@ class NullStream:
         return np.einsum("ijk,ki->ji", projector, self._whitened_frequency_domain_strain_array)
 
     def compute_uncalibrated_time_frequency_domain_null_stream(self) -> np.ndarray:
-        """Compute the uncalibrated time-frequency domain null stream.
+        """Compute the uncalibrated time-frequency domain null stream, confined to the filter.
+
+        The returned array is zero outside ``time_frequency_filter``, matching what
+        ``compute_calibrated_time_frequency_domain_null_stream_from_parameters`` returns. That
+        symmetry is the point: ``noise_log_likelihood`` sums this array's energy and
+        ``log_likelihood`` sums the calibrated one's, so if the two were confined to different
+        domains their difference — the log Bayes factor, and anything derived from it — would be
+        normalised against different sets of pixels.
 
         Returns:
-            np.ndarray: Uncalibrated time-frequency domain null stream.
+            np.ndarray: Uncalibrated time-frequency domain null stream, zero outside the filter.
         """
         uncalibrated_frequency_domain_null_stream = self.compute_uncalibrated_frequency_domain_null_stream()
         # Transform to time-frequency domain
@@ -143,17 +150,23 @@ class NullStream:
                 for data in uncalibrated_frequency_domain_null_stream
             ]
         )
-        uncalibrated_frequency_domain_null_stream[:, ~self.time_frequency_filter] = 0.0
+        uncalibrated_time_frequency_domain_null_stream[:, ~self.time_frequency_filter] = 0.0
         return uncalibrated_time_frequency_domain_null_stream
 
     def compute_calibrated_time_frequency_domain_null_stream(self, calibration_factor: np.ndarray) -> np.ndarray:
-        """Compute the calibrated time-frequency domain null stream.
+        """Compute the calibrated time-frequency domain null stream, confined to the filter.
+
+        Like its uncalibrated counterpart, the returned array is zero outside
+        ``time_frequency_filter``. The two are deliberately symmetric: a caller that used one
+        filtered method and one unfiltered one would sum energies over different pixel domains and
+        recreate exactly the normalisation defect this pair was fixed for, silently and without an
+        exception.
 
         Args:
             calibration_factor (np.ndarray): Calibration factor.
 
         Returns:
-            np.ndarray: Calibrated time-frequency domain null stream.
+            np.ndarray: Calibrated time-frequency domain null stream, zero outside the filter.
         """
         calibrated_frequency_domain_null_stream = self.compute_calibrated_frequency_domain_null_stream(
             calibration_factor=calibration_factor
@@ -165,6 +178,7 @@ class NullStream:
                 for data in calibrated_frequency_domain_null_stream
             ]
         )
+        calibrated_time_frequency_domain_null_stream[:, ~self.time_frequency_filter] = 0.0
         return calibrated_time_frequency_domain_null_stream
 
     def construct_calibration_factor_from_parameters(self, parameters: dict) -> np.ndarray:
@@ -199,8 +213,6 @@ class NullStream:
             np.ndarray: Calibrated time-frequency domain null stream.
         """
         calibration_factor = self.construct_calibration_factor_from_parameters(parameters)
-        calibrated_time_frequency_domain_null_stream = self.compute_calibrated_time_frequency_domain_null_stream(
-            calibration_factor=calibration_factor
-        )
-        calibrated_time_frequency_domain_null_stream[:, ~self.time_frequency_filter] = 0.0
-        return calibrated_time_frequency_domain_null_stream
+        # The filtering lives in compute_calibrated_time_frequency_domain_null_stream, which
+        # guarantees confinement for every caller rather than only for this wrapper.
+        return self.compute_calibrated_time_frequency_domain_null_stream(calibration_factor=calibration_factor)

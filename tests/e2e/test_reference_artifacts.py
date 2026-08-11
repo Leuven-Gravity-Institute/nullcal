@@ -100,9 +100,11 @@ COMPARED_KEYS = (
     "calibration_factor",
     "uncalibrated_frequency_domain_null_stream",
     "calibrated_frequency_domain_null_stream",
+    "uncalibrated_time_frequency_domain_null_stream",
     "calibrated_time_frequency_domain_null_stream",
     "wavelet_probe_output",
     "log_likelihood",
+    "noise_log_likelihood",
 )
 
 
@@ -248,6 +250,22 @@ def test_manifest_configuration_matches_the_live_config(manifest):
     )
     for key, value in expected.items():
         assert recorded[key] == value, f"manifest configuration[{key!r}] = {recorded[key]!r}, config.py says {value!r}"
+
+
+def test_manifest_provenance_is_not_from_a_dirty_tree(manifest):
+    """A recorded revision that cannot reproduce the artifacts is worse than none.
+
+    R17's artifacts were first generated from a working tree carrying an uncommitted fix, so the
+    manifest named ``main``, whose code raises ``IndexError`` and cannot produce two of the keys
+    the manifest describes. Nothing detected it — the digests were self-consistent and every test
+    passed. This asserts the generator was run on a clean tree, which is what makes
+    ``git_revision`` a reproduction instruction rather than a decoration.
+    """
+    assert "git_dirty" in manifest, "manifest predates the git_dirty field; regenerate so provenance can be trusted"
+    assert manifest["git_dirty"] is False, (
+        f"artifacts were generated from a dirty working tree, so git_revision "
+        f"({manifest['git_revision'][:10]}) does not identify the code that produced them"
+    )
 
 
 def test_manifest_records_the_provenance_fields_it_promises(manifest):

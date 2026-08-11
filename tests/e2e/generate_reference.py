@@ -37,6 +37,25 @@ def _digest(array: np.ndarray) -> str:
     return hashlib.sha256(contiguous.tobytes()).hexdigest()
 
 
+def _git_is_dirty() -> bool:
+    """Whether tracked sources differ from HEAD, ignoring the reference artifacts being written.
+
+    Recorded because ``git_revision`` alone can lie. The R17 artifacts were first generated from a
+    working tree carrying an uncommitted fix, so the manifest named a revision that raises
+    ``IndexError`` and cannot produce them — provenance pointing at the opposite implementation
+    from the one that ran. A reviewer caught it; this makes it self-reporting.
+    """
+    try:
+        output = subprocess.check_output(
+            ["git", "status", "--porcelain", "--", "src", "tests"],  # noqa: S607
+            text=True,
+            stderr=subprocess.DEVNULL,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return False
+    return any(line.strip() and "tests/e2e/reference/" not in line for line in output.splitlines())
+
+
 def _git_revision() -> str:
     try:
         return subprocess.check_output(
@@ -69,6 +88,7 @@ def main() -> int:
 
     manifest = {
         "git_revision": _git_revision(),
+        "git_dirty": _git_is_dirty(),
         "python": sys.version.split()[0],
         "platform": platform.platform(),
         "packages": _package_versions(),
@@ -93,13 +113,15 @@ def main() -> int:
             }
             for key, value in artifacts.items()
         },
-        "known_defects": {
+        "fixed_defects": {
             "noise_log_likelihood": (
-                "RecalibrationLikelihood.noise_log_likelihood() raises IndexError on this "
-                "revision: compute_uncalibrated_time_frequency_domain_null_stream applies the "
-                "2-D time-frequency filter to the 2-D frequency-domain array. No reference "
-                "value exists for it; the behaviour is pinned by "
-                "test_noise_log_likelihood_filter_domain."
+                "Fixed in R17. Before that, RecalibrationLikelihood.noise_log_likelihood() raised "
+                "IndexError, because compute_uncalibrated_time_frequency_domain_null_stream applied "
+                "the 2-D time-frequency filter to the 2-D frequency-domain array it had already "
+                "consumed and returned the time-frequency array unfiltered. The fix filters the "
+                "array it returns, matching the calibrated path. noise_log_likelihood and "
+                "uncalibrated_time_frequency_domain_null_stream are frozen artifacts from this "
+                "revision onward; earlier manifests record them as absent under known_defects."
             )
         },
     }

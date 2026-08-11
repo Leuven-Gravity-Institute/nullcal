@@ -13,16 +13,15 @@ advance, is what makes a regression visible.
 
 ## Layout
 
-| Path                                             | Role                                                                                                                           |
-| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
-| `config.py`                                      | The frozen configuration. Single source of truth, imported by both the generator and the tests so they cannot drift.           |
-| `pipeline.py`                                    | Builds the interferometers, waveform generator and likelihood, and computes every frozen quantity. One construction path only. |
-| `generate_reference.py`                          | Writes `reference/artifacts.npz` and `reference/manifest.json`.                                                                |
-| `test_reference_artifacts.py`                    | Compares current output against the frozen artifacts.                                                                          |
-| `test_noise_log_likelihood_filter_domain.py`     | Regression test for a known defect (below).                                                                                    |
-| `reference/posterior_samples.npz`                | The frozen bilby reference posterior — the distributional anchor (below).                                                      |
-| `test_reference_posterior.py`                    | Integrity and informativeness checks on that posterior.                                                                        |
-| `test_noise_log_likelihood_defect_is_present.py` | Pins the known defect at its call site, with no `xfail`.                                                                       |
+| Path                                         | Role                                                                                                                           |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `config.py`                                  | The frozen configuration. Single source of truth, imported by both the generator and the tests so they cannot drift.           |
+| `pipeline.py`                                | Builds the interferometers, waveform generator and likelihood, and computes every frozen quantity. One construction path only. |
+| `generate_reference.py`                      | Writes `reference/artifacts.npz` and `reference/manifest.json`.                                                                |
+| `test_reference_artifacts.py`                | Compares current output against the frozen artifacts.                                                                          |
+| `test_noise_log_likelihood_filter_domain.py` | Regression test for a known defect (below).                                                                                    |
+| `reference/posterior_samples.npz`            | The frozen bilby reference posterior — the distributional anchor (below).                                                      |
+| `test_reference_posterior.py`                | Integrity and informativeness checks on that posterior.                                                                        |
 
 ## Running
 
@@ -107,12 +106,14 @@ The tolerance for the future JAX implementation is a separate decision and will
 be larger. It must be stated with its basis _before_ the port is compared, not
 chosen after seeing a diff.
 
-## Known defect pinned here
+## The defect this harness found, and its fix (R17)
 
-`RecalibrationLikelihood.noise_log_likelihood()` **raises `IndexError` on the
-revision this reference was taken from**, so no reference value for it exists.
+`RecalibrationLikelihood.noise_log_likelihood()` **raised `IndexError`** on the
+revision the original reference was taken from. R17 fixed it, and the repaired
+quantities are now frozen artifacts: `noise_log_likelihood` and
+`uncalibrated_time_frequency_domain_null_stream`.
 
-`NullStream.compute_uncalibrated_time_frequency_domain_null_stream` applies
+`NullStream.compute_uncalibrated_time_frequency_domain_null_stream` applied
 `[:, ~time_frequency_filter] = 0.0` to
 `uncalibrated_frequency_domain_null_stream` — the _frequency-domain_ array,
 shape `(detector, frequency)` — using the _2-D_ time-frequency filter, shape
@@ -125,8 +126,8 @@ IndexError: too many indices for array: array is 2-dimensional, but 3 were index
 
 Two consequences, in order:
 
-1. The method cannot return, so `noise_log_likelihood()` and anything reaching
-   it fails — including bilby's `log_likelihood_ratio`.
+1. The method could not return, so `noise_log_likelihood()` and anything
+   reaching it failed — including bilby's `log_likelihood_ratio`.
 2. Had it not raised, the returned time-frequency array would still be
    unfiltered, so the uncalibrated branch would sum residual energy over every
    pixel while the calibrated branch sums over the filter only, normalising the
@@ -135,14 +136,28 @@ Two consequences, in order:
 The calibrated path is unaffected and `log_likelihood()` is correct, so
 published results that never called `noise_log_likelihood()` are not implicated.
 
-`test_noise_log_likelihood_filter_domain.py` asserts the fixed behaviour and
-**fails on the unfixed code** — verified, not assumed. Its three tests carry a
-module-level `xfail(strict=True, raises=IndexError)`, so on this revision they
-report `XFAIL`. They do **not** flip to passing by themselves: `strict=True`
-turns an unexpected pass into an _error_, which is deliberate — it forces the
-fixing commit to delete the marker rather than leave a stale one behind. So the
-repair, a separate change with its own review, consists of fixing the defect
-**and** removing that marker in the same commit; the tests then pass normally.
+**The fix** applies the filter to the time-frequency array the method returns,
+matching what the calibrated path does in its `_from_parameters` wrapper. With
+it, `noise_log_likelihood` = -235.791023711555 against `log_likelihood` =
+-203.88870383371767, so the log Bayes factor is +31.90 — the correct sign, since
+the uncalibrated stream still carries the injected ~2% calibration error and
+must therefore hold _more_ residual energy. The energy ratio
+uncalibrated/calibrated is 1.156, which matches the 1.16 an independent reviewer
+measured by simulating the repaired branch before the fix existed.
+
+Structural checks alone would not have pinned that: they constrain the shape of
+the result (confined to the filter, finite, sharing the calibrated branch's
+support) but not its values, so the two repaired quantities are frozen as
+artifacts too.
+
+Historic note: `test_noise_log_likelihood_filter_domain.py` asserts the fixed
+behaviour and **failed on the unfixed code** — verified, not assumed. Its three
+tests carried a module-level `xfail(strict=True, raises=IndexError)` until R17.
+They did not flip to passing by themselves: `strict=True` makes an unexpected
+pass an _error_, which is deliberate — it forced the fixing commit to delete the
+markers rather than leave stale ones behind. Re-verified when the fix landed:
+reverting the one-line change fails these three tests with the original
+`IndexError`.
 
 `raises=IndexError` matters as much as `strict`. Without it a strict xfail
 accepts any failure as the expected one, so an assertion failing for an

@@ -37,12 +37,14 @@ proposals failing in tens of dimensions, and here it reached the expected widths
 future run that regresses says so in its own artifact.
 
 *bilby's noise-evidence call.* ``bilby.run_sampler`` calls ``likelihood.noise_log_likelihood()``
-unconditionally once sampling completes, on both branches of its ``use_ratio`` test. On this
-revision that raises ``IndexError`` (the R1 defect, fixed later in R17), which would destroy a
-finished run at the point where all the cost has already been paid. The subclass below returns NaN
-instead, so ``log_noise_evidence`` and ``log_bayes_factor`` come out NaN and are recorded as
-unavailable-at-this-revision. ``log_likelihood`` is inherited untouched, so the posterior samples
-are produced by exactly the code under characterisation.
+unconditionally once sampling completes, on both branches of its ``use_ratio`` test. Before R17
+that raised ``IndexError``, which would have destroyed a finished run at the point where all the
+cost had already been paid, so this script wrapped the likelihood in a subclass returning NaN.
+**R17 fixed the method, and the subclass has been removed**: ``noise_log_likelihood`` is now a real
+number, so ``log_noise_evidence`` and ``log_bayes_factor`` are recorded as computed values rather
+than as unavailable. Leaving the override in place would have suppressed a working quantity while
+documenting it as broken — the reviewer who caught it noted that the subclass existed solely to
+neutralise the raising method and, after the fix, neutralised a functioning one.
 
 Usage::
 
@@ -114,23 +116,6 @@ SMOKE_SAMPLER_KWARGS = {
 SAMPLER_SEED = 20260810
 
 
-class ReferenceLikelihood(RecalibrationLikelihood):
-    """``RecalibrationLikelihood`` with bilby's post-run noise-evidence call neutralised.
-
-    ``log_likelihood`` is inherited unchanged -- this subclass exists only so that the R1 defect
-    in ``noise_log_likelihood`` cannot destroy a completed sampler run. See the module docstring.
-    """
-
-    def noise_log_likelihood(self) -> float:
-        """Return NaN rather than raising ``IndexError``.
-
-        The real method is broken on this revision and is pinned by its own regression tests. NaN
-        propagates into ``log_noise_evidence`` and ``log_bayes_factor``, which the manifest marks
-        as unavailable; it does not touch the samples.
-        """
-        return float("nan")
-
-
 def build_prior() -> CalibrationPriorDict:
     """Calibration spline prior over the three ET detectors.
 
@@ -164,7 +149,7 @@ def build_prior() -> CalibrationPriorDict:
     return prior
 
 
-def build_likelihood() -> ReferenceLikelihood:
+def build_likelihood() -> RecalibrationLikelihood:
     """The reference likelihood, built through the frozen e2e construction path."""
     interferometers = pipeline.build_interferometers()
     waveform_generator = pipeline.build_waveform_generator()
@@ -176,7 +161,7 @@ def build_likelihood() -> ReferenceLikelihood:
 
     pd.DataFrame([config.SOURCE_PARAMETERS]).to_csv(parameter_file, index=False)
 
-    return ReferenceLikelihood(
+    return RecalibrationLikelihood(
         interferometers=interferometers,
         waveform_generator=waveform_generator,
         wavelet_transform_frequency_resolution=config.FREQUENCY_RESOLUTION,
@@ -186,7 +171,7 @@ def build_likelihood() -> ReferenceLikelihood:
     )
 
 
-def check_responds_to_parameters(likelihood: ReferenceLikelihood, prior: CalibrationPriorDict) -> None:
+def check_responds_to_parameters(likelihood: RecalibrationLikelihood, prior: CalibrationPriorDict) -> None:
     """Refuse to launch if the likelihood does not move with the parameters.
 
     A frozen likelihood produces a posterior that is exactly the prior, at full cost, and looks
@@ -368,13 +353,12 @@ def main() -> None:
             "frozen_reference_log_likelihood": -203.88870383371767,
         },
         "informativeness": informativeness,
-        "unavailable_at_this_revision": {
-            "log_noise_evidence": (
-                "NaN by construction: noise_log_likelihood() raises IndexError on this revision "
-                "(the R1 defect, fixed in R17), and bilby calls it unconditionally after sampling. "
-                "log_bayes_factor is NaN for the same reason. Neither is part of the anchor."
-            )
-        },
+        "noise_evidence_note": (
+            "Computed, not suppressed. Before R17 this script overrode noise_log_likelihood() to "
+            "return NaN because the real method raised IndexError; R17 fixed the method and the "
+            "override was removed, so log_noise_evidence and log_bayes_factor are real values. "
+            "Manifests generated before that carry an unavailable_at_this_revision block instead."
+        ),
         "parameters": free_parameters,
         "posterior_sha256": sha256_of_array(posterior),
         "posterior_shape": list(posterior.shape),
