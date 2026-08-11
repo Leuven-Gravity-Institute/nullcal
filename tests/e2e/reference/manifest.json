@@ -25,6 +25,11 @@
             "sha256": "26d1611a38a4153092768f2f28d04e286d78b656ad0a4a1a6d7fe4401f62b0fc",
             "shape": []
         },
+        "noise_log_likelihood": {
+            "dtype": "float64",
+            "sha256": "f6c23818c60fcf0fe6888afdc20a31649dfb13b4bb0e8ee943d190c0e60329d6",
+            "shape": []
+        },
         "projector": {
             "dtype": "float64",
             "sha256": "f9a66325147f79f5fbe4ec1d0707ca69617669da4d2e5c2b7d374920190e9161",
@@ -39,6 +44,11 @@
             "dtype": "complex128",
             "sha256": "7f7bb77e66ce1d5f688cbc712513efceafd68c7d1b57da508479ed65ff511848",
             "shape": [3, 8193]
+        },
+        "uncalibrated_time_frequency_domain_null_stream": {
+            "dtype": "float64",
+            "sha256": "8cdf11b9f4fcc15cb792d74bc1dce0390cab920d2e80c837ff8620cb1c98a7c0",
+            "shape": [3, 256, 64]
         },
         "wavelet_probe_output": {
             "dtype": "float64",
@@ -84,14 +94,14 @@
             "waveform_approximant": "IMRPhenomXPHM"
         }
     },
-    "git_revision": "9a3b557b44ebaf5842954ae094c17ff1a6ce6970",
-    "known_defects": {
-        "noise_log_likelihood": "RecalibrationLikelihood.noise_log_likelihood() raises IndexError on this revision: compute_uncalibrated_time_frequency_domain_null_stream applies the 2-D time-frequency filter to the 2-D frequency-domain array. No reference value exists for it; the behaviour is pinned by test_noise_log_likelihood_filter_domain."
+    "fixed_defects": {
+        "noise_log_likelihood": "Fixed in R17. Before that, RecalibrationLikelihood.noise_log_likelihood() raised IndexError, because compute_uncalibrated_time_frequency_domain_null_stream applied the 2-D time-frequency filter to the 2-D frequency-domain array it had already consumed and returned the time-frequency array unfiltered. The fix filters the array it returns, matching the calibrated path. noise_log_likelihood and uncalibrated_time_frequency_domain_null_stream are frozen artifacts from this revision onward; earlier manifests record them as absent under known_defects."
     },
+    "git_revision": "f809cfb53a59be86e43b47c6dfcdde5c27976d7c",
     "packages": {
         "bilby": "2.8.1",
         "lalsuite": "7.26.15",
-        "nullcal": "0.1.1.dev6+g9a3b557b4",
+        "nullcal": "0.1.2.dev1+gf809cfb53.d20260811",
         "numba": "0.66.0",
         "numpy": "1.26.4",
         "rocket-fft": "0.3.1",

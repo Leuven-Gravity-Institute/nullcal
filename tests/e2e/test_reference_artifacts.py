@@ -100,9 +100,11 @@ COMPARED_KEYS = (
     "calibration_factor",
     "uncalibrated_frequency_domain_null_stream",
     "calibrated_frequency_domain_null_stream",
+    "uncalibrated_time_frequency_domain_null_stream",
     "calibrated_time_frequency_domain_null_stream",
     "wavelet_probe_output",
     "log_likelihood",
+    "noise_log_likelihood",
 )
 
 

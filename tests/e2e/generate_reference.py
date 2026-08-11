@@ -93,13 +93,15 @@ def main() -> int:
             }
             for key, value in artifacts.items()
         },
-        "known_defects": {
+        "fixed_defects": {
             "noise_log_likelihood": (
-                "RecalibrationLikelihood.noise_log_likelihood() raises IndexError on this "
-                "revision: compute_uncalibrated_time_frequency_domain_null_stream applies the "
-                "2-D time-frequency filter to the 2-D frequency-domain array. No reference "
-                "value exists for it; the behaviour is pinned by "
-                "test_noise_log_likelihood_filter_domain."
+                "Fixed in R17. Before that, RecalibrationLikelihood.noise_log_likelihood() raised "
+                "IndexError, because compute_uncalibrated_time_frequency_domain_null_stream applied "
+                "the 2-D time-frequency filter to the 2-D frequency-domain array it had already "
+                "consumed and returned the time-frequency array unfiltered. The fix filters the "
+                "array it returns, matching the calibrated path. noise_log_likelihood and "
+                "uncalibrated_time_frequency_domain_null_stream are frozen artifacts from this "
+                "revision onward; earlier manifests record them as absent under known_defects."
             )
         },
     }

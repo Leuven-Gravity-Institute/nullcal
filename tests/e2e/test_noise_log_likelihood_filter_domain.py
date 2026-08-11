@@ -1,23 +1,28 @@
-"""Regression test for the noise-log-likelihood filter-domain defect.
+"""Regression test for the noise-log-likelihood filter-domain defect, now fixed.
 
-``NullStream.compute_uncalibrated_time_frequency_domain_null_stream`` applies
+``NullStream.compute_uncalibrated_time_frequency_domain_null_stream`` used to apply
 ``[:, ~time_frequency_filter] = 0.0`` to ``uncalibrated_frequency_domain_null_stream`` — the
 *frequency-domain* array of shape ``(detector, frequency)`` — using the *2-D* time-frequency
 filter of shape ``(n_t, n_f)``. Indexing a 2-D array with a slice plus a 2-D boolean mask
-addresses three dimensions, so the line raises ``IndexError``, and the time-frequency array it
-returns is never filtered at all.
+addresses three dimensions, so the line raised ``IndexError``, and the time-frequency array it
+returned was never filtered at all.
 
-Consequences, in order of severity:
+Consequences it had, in order of severity:
 
-1. ``RecalibrationLikelihood.noise_log_likelihood()`` cannot return. Anything that reaches it
-   fails, including bilby's ``log_likelihood_ratio``.
+1. ``RecalibrationLikelihood.noise_log_likelihood()`` could not return. Anything that reached it
+   failed, including bilby's ``log_likelihood_ratio``.
 2. Had it not raised, the uncalibrated branch would have summed residual energy over *every*
    time-frequency pixel while the calibrated branch sums over the filter only, so their
    difference would have been normalised against different domains.
 
-This test asserts the fixed behaviour. **Verified to fail on the unfixed code** with
-``IndexError: too many indices for array`` — a regression test that passes before the fix does
-not discriminate.
+The fix applies the filter to the time-frequency array that is returned, which is what the
+calibrated path does in its ``_from_parameters`` wrapper.
+
+These tests assert the fixed behaviour. They were committed alongside the characterisation
+harness carrying ``xfail(strict=True, raises=IndexError)``, verified failing on the unfixed code —
+a regression test that passes before the fix does not discriminate. The fix removed the markers,
+which ``strict=True`` forced: an unexpected pass is an error, so the markers could not be left
+behind.
 """
 
 from __future__ import annotations
@@ -30,21 +35,6 @@ from . import pipeline
 pytestmark = [
     pytest.mark.e2e,
     pytest.mark.slow,
-    pytest.mark.xfail(
-        strict=True,
-        # raises=IndexError is what makes the marker discriminate. Without it, strict xfail
-        # accepts *any* failure as the expected one, so an assertion failing for an unrelated
-        # reason would also report XFAIL and stay invisible until someone removed the marker.
-        # Pinning the exception type means only this defect is tolerated.
-        raises=IndexError,
-        reason=(
-            "Known defect: NullStream.compute_uncalibrated_time_frequency_domain_null_stream "
-            "indexes a 2-D frequency-domain array with the 2-D time-frequency filter, so "
-            "noise_log_likelihood() raises IndexError. Verified to fail on this revision. "
-            "strict=True means these turn into an ERROR the moment the defect is fixed, which "
-            "is the signal to delete this marker in the fixing commit."
-        ),
-    ),
 ]
 
 

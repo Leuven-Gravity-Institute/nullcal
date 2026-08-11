@@ -108,10 +108,12 @@ def build_likelihood(tmp_path: Path | None = None) -> RecalibrationLikelihood:
 def compute_artifacts(likelihood: RecalibrationLikelihood) -> dict[str, np.ndarray | float]:
     """Every quantity the reference freezes, computed from one likelihood instance.
 
-    ``noise_log_likelihood`` is deliberately absent: on the code this reference was taken
-    from it raises ``IndexError`` and cannot produce a value. That behaviour is pinned by
-    ``test_noise_log_likelihood_filter_domain`` instead, which is a regression test, not a
-    reference artifact.
+    ``noise_log_likelihood`` and the uncalibrated time-frequency null stream were absent from the
+    original reference because the code then raised ``IndexError`` and could produce no value. The
+    R17 fix makes them computable, and they are frozen here for the reason the harness exists: the
+    structural tests in ``test_noise_log_likelihood_filter_domain`` pin the repaired *shape* of the
+    result — confined to the filter, finite, sharing the calibrated branch's support — but nothing
+    pinned its *values*, so a later change to the uncalibrated branch alone would have passed.
     """
     null_stream = likelihood.null_stream_calculator
     calibration = likelihood.null_stream_calculator
@@ -133,11 +135,14 @@ def compute_artifacts(likelihood: RecalibrationLikelihood) -> dict[str, np.ndarr
         parameters=parameters
     )
 
+    uncalibrated_time_frequency = null_stream.compute_uncalibrated_time_frequency_domain_null_stream()
+
     probe = config.wavelet_probe_input(n_frequencies=uncalibrated_frequency_domain.shape[1])
     wavelet_probe_output = likelihood.time_frequency_transform.frequency_to_wavelet(frequency_domain_data=probe)
 
     likelihood.parameters = dict(parameters)
     log_likelihood = float(likelihood.log_likelihood())
+    noise_log_likelihood = float(likelihood.noise_log_likelihood())
 
     return {
         "frequency_mask": frequency_mask,
@@ -147,7 +152,9 @@ def compute_artifacts(likelihood: RecalibrationLikelihood) -> dict[str, np.ndarr
         "calibration_factor": calibration_factor,
         "uncalibrated_frequency_domain_null_stream": uncalibrated_frequency_domain,
         "calibrated_frequency_domain_null_stream": calibrated_frequency_domain,
+        "uncalibrated_time_frequency_domain_null_stream": uncalibrated_time_frequency,
         "calibrated_time_frequency_domain_null_stream": calibrated_time_frequency,
         "wavelet_probe_output": wavelet_probe_output,
         "log_likelihood": np.float64(log_likelihood),
+        "noise_log_likelihood": np.float64(noise_log_likelihood),
     }
