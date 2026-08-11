@@ -97,7 +97,8 @@
     "fixed_defects": {
         "noise_log_likelihood": "Fixed in R17. Before that, RecalibrationLikelihood.noise_log_likelihood() raised IndexError, because compute_uncalibrated_time_frequency_domain_null_stream applied the 2-D time-frequency filter to the 2-D frequency-domain array it had already consumed and returned the time-frequency array unfiltered. The fix filters the array it returns, matching the calibrated path. noise_log_likelihood and uncalibrated_time_frequency_domain_null_stream are frozen artifacts from this revision onward; earlier manifests record them as absent under known_defects."
     },
-    "git_revision": "f809cfb53a59be86e43b47c6dfcdde5c27976d7c",
+    "git_dirty": false,
+    "git_revision": "549a50ad86a3935d7c37abf24445ba78beb639e5",
     "packages": {
         "bilby": "2.8.1",
         "lalsuite": "7.26.15",
