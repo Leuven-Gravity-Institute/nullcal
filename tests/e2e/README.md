@@ -19,8 +19,8 @@ advance, is what makes a regression visible.
 | `pipeline.py`                                | Builds the interferometers, waveform generator and likelihood, and computes every frozen quantity. One construction path only. |
 | `generate_reference.py`                      | Writes `reference/artifacts.npz` and `reference/manifest.json`.                                                                |
 | `test_reference_artifacts.py`                | Compares current output against the frozen artifacts.                                                                          |
-| `test_noise_log_likelihood_filter_domain.py` | Regression test for a known defect (below).                                                                                    |
-| `reference/posterior_samples.npz`            | The frozen bilby reference posterior — the distributional anchor (below).                                                      |
+| `test_noise_log_likelihood_filter_domain.py` | Regression test for the defect below, now fixed.                                                                               |
+| `reference/posterior_samples.npz`            | A bilby posterior over the calibration parameters — **provisional, not the anchor** (below).                                   |
 | `test_reference_posterior.py`                | Integrity and informativeness checks on that posterior.                                                                        |
 
 ## Running
@@ -184,12 +184,19 @@ unrelated reason would still report `XFAIL` and hide real breakage.
 > distribution.
 
 `reference/posterior_samples.npz` (5937 samples x 60 calibration parameters) and
-`reference/posterior_manifest.json` are the _distributional_ anchor, alongside
-the fixed-parameter arrays. R5's test is that the ported sampler is
-statistically consistent with these samples on the same data and prior.
+`reference/posterior_manifest.json` hold a bilby posterior over the calibration
+parameters. The intent was that it become the _distributional_ anchor, with R5
+testing the ported sampler for statistical consistency against it — that is
+**not** its status; see the note above. R5's acceptance test is therefore not
+yet defined against these samples, and defining it waits on the number being
+anchored.
 
-This artifact **cannot be regenerated later**: bilby produces it, and the
-rewrite removes bilby.
+An earlier version of this file said the artifact **cannot be regenerated
+later**, because bilby produces it and the rewrite removes bilby. That is wrong
+as stated: it can be regenerated from any pre-migration revision, so what has to
+be preserved is that revision together with `generate_reference_posterior.py`,
+not these particular draws. The urgency it implied — generate before bilby goes,
+or lose the chance — does not hold.
 
 Only the calibration spline parameters are sampled — 60 free, plus 30
 `DeltaFunction` node frequencies. `RecalibrationLikelihood.log_likelihood` reads
