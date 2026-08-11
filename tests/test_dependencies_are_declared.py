@@ -10,10 +10,20 @@ CI cannot catch this on its own. The ``lowest-direct`` job lowers *declared* flo
 undeclared dependency has no floor to lower; a transitively-satisfied import looks identical to a
 declared one at runtime. So the check has to be static, and this is it.
 
-One dependency is invisible to this check by nature: ``rocket-fft`` is never imported in source.
-It teaches numba to compile ``np.fft`` through an entry-point plugin, so dropping it breaks the WDM
-kernels at compile time with no import to point at. Nothing here can guard that; it is noted so its
-absence from the import graph reads as a known fact rather than an oversight.
+Three limitations, stated so this is not read as "no undeclared import can exist".
+
+**Dynamic imports escape it.** ``importlib.import_module("pandas")`` and ``__import__("pandas")``
+are ``ast.Call`` nodes, not ``ast.Import``/``ast.ImportFrom``, so the walk never sees them. None
+exist in ``src/nullcal`` today, and any *static* addition is caught the moment it is committed, but
+a future dynamic import would pass unnoticed.
+
+**Only ``[project.dependencies]`` is read**, not ``[project.optional-dependencies]``. An import
+satisfied solely by an extra would be reported as undeclared — a false positive, so it fails loudly
+and in the safe direction, but it needs handling before any extra becomes importable from ``src/``.
+
+**``rocket-fft`` is invisible by nature**: it is never imported at all. It teaches numba to compile
+``np.fft`` through an entry-point plugin, so dropping it breaks the WDM kernels at compile time with
+no import to point at. No static check can catch that; the wavelet and e2e tests are its protection.
 
 Deliberately one-directional: it asserts imports are declared, not that declarations are imported.
 The package also declares several dependencies it never imports, which is a real but separate
