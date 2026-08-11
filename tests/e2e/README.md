@@ -183,7 +183,6 @@ unrelated reason would still report `XFAIL` and hide real breakage.
 > re-running the sampler. Until then, do not cite these numbers as the reference
 > distribution.
 
-
 `reference/posterior_samples.npz` (5937 samples x 60 calibration parameters) and
 `reference/posterior_manifest.json` are the _distributional_ anchor, alongside
 the fixed-parameter arrays. R5's test is that the ported sampler is
