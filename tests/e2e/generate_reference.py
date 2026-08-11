@@ -37,6 +37,25 @@ def _digest(array: np.ndarray) -> str:
     return hashlib.sha256(contiguous.tobytes()).hexdigest()
 
 
+def _git_is_dirty() -> bool:
+    """Whether tracked sources differ from HEAD, ignoring the reference artifacts being written.
+
+    Recorded because ``git_revision`` alone can lie. The R17 artifacts were first generated from a
+    working tree carrying an uncommitted fix, so the manifest named a revision that raises
+    ``IndexError`` and cannot produce them — provenance pointing at the opposite implementation
+    from the one that ran. A reviewer caught it; this makes it self-reporting.
+    """
+    try:
+        output = subprocess.check_output(
+            ["git", "status", "--porcelain", "--", "src", "tests"],  # noqa: S607
+            text=True,
+            stderr=subprocess.DEVNULL,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return False
+    return any(line.strip() and "tests/e2e/reference/" not in line for line in output.splitlines())
+
+
 def _git_revision() -> str:
     try:
         return subprocess.check_output(
@@ -69,6 +88,7 @@ def main() -> int:
 
     manifest = {
         "git_revision": _git_revision(),
+        "git_dirty": _git_is_dirty(),
         "python": sys.version.split()[0],
         "platform": platform.platform(),
         "packages": _package_versions(),

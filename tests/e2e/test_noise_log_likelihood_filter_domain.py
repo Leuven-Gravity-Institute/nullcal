@@ -59,6 +59,30 @@ def test_uncalibrated_time_frequency_null_stream_is_confined_to_the_filter(likel
     )
 
 
+def test_both_direct_methods_are_confined_to_the_filter(likelihood):
+    """Both public time-frequency methods must return filter-confined arrays, not just one.
+
+    The uncalibrated method was the one that was broken, but fixing only it would have left the
+    two similarly-named public methods with different contracts — and a caller using both directly
+    would then sum energies over different pixel domains, recreating this very defect with no
+    exception to announce it.
+    """
+    from . import config
+
+    null_stream = likelihood.null_stream_calculator
+    tf_filter = null_stream.time_frequency_filter
+    calibration_factor = null_stream.construct_calibration_factor_from_parameters(config.calibration_parameters())
+
+    uncalibrated = null_stream.compute_uncalibrated_time_frequency_domain_null_stream()
+    calibrated = null_stream.compute_calibrated_time_frequency_domain_null_stream(
+        calibration_factor=calibration_factor
+    )
+
+    for name, array in (("uncalibrated", uncalibrated), ("calibrated", calibrated)):
+        outside = int(np.count_nonzero(array[:, ~tf_filter]))
+        assert outside == 0, f"{name} direct method leaves {outside} non-zero pixels outside the filter"
+
+
 def test_noise_log_likelihood_returns_a_finite_value(likelihood):
     """The public bilby Likelihood method must return, not raise."""
     value = likelihood.noise_log_likelihood()
