@@ -54,12 +54,11 @@ import numpy as np
 sys.path.insert(0, "tests")
 sys.path.insert(0, ".")
 
-import bilby  # noqa: E402
+import bilby
 
-from tests.e2e import config, pipeline  # noqa: E402
-
-from nullcal.likelihood import RecalibrationLikelihood  # noqa: E402
-from nullcal.prior import CalibrationPriorDict  # noqa: E402
+from nullcal.likelihood import RecalibrationLikelihood
+from nullcal.prior import CalibrationPriorDict
+from tests.e2e import config, pipeline
 
 #: Prior widths. Fixed here; changing either invalidates the artifact.
 AMPLITUDE_SIGMA = 0.05
@@ -249,9 +248,7 @@ def main() -> None:
     likelihood.parameters = dict(config.calibration_parameters())
     log_likelihood_at_injection = float(likelihood.log_likelihood())
 
-    injection_parameters = {
-        key: value for key, value in config.calibration_parameters().items() if key in prior
-    }
+    injection_parameters = {key: value for key, value in config.calibration_parameters().items() if key in prior}
 
     # Seed the sampler LAST. bilby ignores run_sampler's `seed` kwarg when it builds `rstate`
     # (it warns "ignoring 'seed'") and derives the state from this global generator instead --
@@ -286,9 +283,7 @@ def main() -> None:
     # output said so, and it took a separate analysis to notice. A posterior equal to its prior is
     # reproduced equally well by a correct implementation and a broken one, so as an anchor for the
     # BlackJAX port it is worse than useless — it would pass anything.
-    prior_sigma = np.array(
-        [PHASE_SIGMA if "_phase_" in name else AMPLITUDE_SIGMA for name in free_parameters]
-    )
+    prior_sigma = np.array([PHASE_SIGMA if "_phase_" in name else AMPLITUDE_SIGMA for name in free_parameters])
     posterior_sigma = posterior.std(axis=0)
     shrinkage = posterior_sigma / prior_sigma
     truth = np.array([injection_parameters[name] for name in free_parameters])
