@@ -48,7 +48,7 @@ Tracker = "https://github.com/Leuven-Gravity-Institute/nullcal/issues"
 
 [dependency-groups]
 dev = [
-  "ruff>=0.16.2",
+  "ruff>=0.16.3",
   "prek>=0.4.13",
   "pytest-github-actions-annotate-failures>=0.4.2",
   "pytest-cov>=7.1.0",
@@ -56,7 +56,7 @@ dev = [
   "pytest>=9.1.1",
 ]
 
-docs = ["zensical>=0.0.53", "mkdocstrings-python>=2.0.5"]
+docs = ["zensical>=0.0.54", "mkdocstrings-python>=2.0.5"]
 build = ["hatch>=1.18.0"]
 release = ["git-cliff>=2.13.1"]
 
