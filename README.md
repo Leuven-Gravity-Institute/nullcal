@@ -73,9 +73,7 @@ from nullcal.time_frequency_transform.wavelet_transforms import WaveletTransform
 
 # Set up the Einstein Telescope interferometer triplet
 interferometers = InterferometerList(["ET"])
-interferometers.set_strain_data_from_power_spectral_densities(
-    sampling_frequency=4096, duration=4, start_time=0
-)
+interferometers.set_strain_data_from_power_spectral_densities(sampling_frequency=4096, duration=4, start_time=0)
 
 # Compute the null stream
 wavelet_transform = WaveletTransform(nx=4, frequency_resolution=4)

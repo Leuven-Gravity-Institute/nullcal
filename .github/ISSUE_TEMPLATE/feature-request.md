@@ -28,7 +28,6 @@ import nullcal
 
 # How you'd like to use the new feature
 result = nullcal.some_new_function(param="example")
-
 ```
 
 ## 🌈 Use Case & Benefits

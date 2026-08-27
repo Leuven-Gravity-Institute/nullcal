@@ -19,9 +19,7 @@ ET2, ET3):
 
 ```python
 interferometers = InterferometerList(["ET"])
-interferometers.set_strain_data_from_power_spectral_densities(
-    sampling_frequency=4096, duration=4, start_time=0
-)
+interferometers.set_strain_data_from_power_spectral_densities(sampling_frequency=4096, duration=4, start_time=0)
 ```
 
 ## 3. Compute the Null Stream
