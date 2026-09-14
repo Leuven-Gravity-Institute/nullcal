@@ -143,6 +143,9 @@ def build_likelihood_from_reference_inputs() -> RecalibrationLikelihood:
     with np.load(INPUT_ARTIFACT_PATH) as stored_inputs:
         reference_inputs = {key: stored_inputs[key] for key in stored_inputs.files}
     with np.load(OUTPUT_ARTIFACT_PATH) as stored_outputs:
+        # The filter is fed back to isolate the downstream numerical comparison from waveform
+        # generation. It is therefore an input to this path, not an independently reproduced
+        # output; a separate full-pipeline test anchors the InjectionClustering-derived value.
         time_frequency_filter = stored_outputs["time_frequency_filter"]
 
     interferometers = build_interferometers_from_reference_inputs(reference_inputs)

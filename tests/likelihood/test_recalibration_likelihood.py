@@ -676,3 +676,13 @@ def test_recalibration_likelihood_log_likelihood_is_a_thin_wrapper(monkeypatch, 
         "params": parameters,
         "static_data": recalibration_likelihood.null_stream_calculator,
     }
+
+
+def test_recalibration_likelihood_rejects_none_parameters(recalibration_likelihood):
+    """The thin wrapper retains the explicit guard on bilby's mutable parameter state."""
+    # Bilby's public setter normalises ``None`` to an empty dict, so establish the legacy state
+    # directly to exercise the guard that this wrapper deliberately preserves.
+    recalibration_likelihood._parameters = None
+
+    with pytest.raises(ValueError, match=r"self\.parameters is None"):
+        recalibration_likelihood.log_likelihood()

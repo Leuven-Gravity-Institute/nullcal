@@ -18,9 +18,18 @@
     }
   },
   "configuration": {
+    "clustering_threshold": 0.1,
+    "detector_names": [
+      "ET1",
+      "ET2",
+      "ET3"
+    ],
     "duration": 8,
+    "frequency_resolution": 16,
     "maximum_frequency": 1024.0,
     "minimum_frequency": 20.0,
+    "n_points": 10,
+    "nx": 4.0,
     "sampling_frequency": 2048,
     "seed": 20260810,
     "source_parameters": {
@@ -40,6 +49,8 @@
       "tilt_1": 0.0,
       "tilt_2": 0.0
     },
+    "start_time": 1126259458,
+    "wavelet_probe_seed": 20260811,
     "waveform_arguments": {
       "minimum_frequency": 20.0,
       "reference_frequency": 50.0,
