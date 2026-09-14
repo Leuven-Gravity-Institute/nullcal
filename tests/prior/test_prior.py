@@ -1,11 +1,9 @@
 """Tests for ``CalibrationPriorDict``.
 
-The class exists for one reason: to disable ``bilby_pipe``'s calibration-prior validation. That
-check asserts the spline prior is fine enough to resolve calibration structure across the analysis
-band, which is an assumption about *detector* calibration priors and not about the self-calibration
-priors this package samples. The override is therefore deliberate, and the tests below pin it as
-deliberate -- including the fact that ``validate_prior`` is an adapter method absent from the bilby
-base class, so a future reader can see which integration contract the subclass adds.
+Bilby's calibration prior dictionary has no ``validate_prior`` method in its MRO. This subclass
+adds a named adapter hook that always returns ``True``. That shape is compatible with
+``bilby_pipe``'s ``hasattr``-based validation dispatch, but it does not override or disable inherited
+validation. The tests pin both sides of that boundary and the adapter's unconditional behaviour.
 """
 
 from __future__ import annotations
@@ -31,7 +29,7 @@ def calibration_prior():
 
 @pytest.mark.unit
 def test_is_a_bilby_calibration_prior_dict(calibration_prior):
-    """``bilby_pipe`` dispatches on this type, so the inheritance is part of the contract."""
+    """The adapter retains Bilby's calibration-prior and prior-dictionary interfaces."""
     assert isinstance(calibration_prior, BilbyCalibrationPriorDict)
     assert isinstance(calibration_prior, bilby.core.prior.PriorDict)
 
@@ -47,11 +45,10 @@ def test_behaves_as_a_prior_dict(calibration_prior):
 
 @pytest.mark.unit
 def test_validate_prior_returns_true_without_inspecting_the_prior(calibration_prior):
-    """The override accepts anything, by design.
+    """The added hook accepts anything, by design.
 
-    Every argument is ignored, including ones that would make the base implementation reject the
-    prior. Asserting across a spread of arguments -- rather than one convenient set -- is what shows
-    the bypass is unconditional rather than accidentally passing for the values tried.
+    Every argument is ignored. Asserting across a spread of arguments -- rather than one convenient
+    set -- is what shows the result is unconditional rather than accidental for one input.
     """
     for duration, minimum_frequency in ((4.0, 20.0), (0.0, 0.0), (-1.0, 1e6)):
         assert calibration_prior.validate_prior(duration, minimum_frequency) is True
@@ -62,26 +59,26 @@ def test_validate_prior_returns_true_without_inspecting_the_prior(calibration_pr
 
 @pytest.mark.unit
 def test_validate_prior_is_an_adapter_method_absent_from_the_bilby_base(calibration_prior):
-    """The subclass adds the validation hook consumed by the surrounding pipeline.
+    """The subclass adds an optional validation hook that the Bilby base does not provide.
 
     Bilby's calibration prior dictionary does not define ``validate_prior``. Pinning both sides of
     that boundary prevents this adapter from being mistaken for an override of inherited validation
     logic, while the preceding test specifies the hook's unconditional-acceptance behaviour.
     """
-    assert "validate_prior" not in BilbyCalibrationPriorDict.__dict__
+    assert not hasattr(BilbyCalibrationPriorDict, "validate_prior")
     assert "validate_prior" in CalibrationPriorDict.__dict__
     assert calibration_prior.validate_prior(4.0, 20.0) is True
 
 
 @pytest.mark.unit
 def test_accepts_an_empty_construction():
-    """``bilby_pipe`` constructs the dictionary before filling it."""
+    """An empty prior dictionary remains a valid adapter construction."""
     assert len(CalibrationPriorDict()) == 0
 
 
 @pytest.mark.unit
 def test_round_trips_through_a_prior_file(tmp_path, calibration_prior):
-    """Construction from ``filename`` is the path ``bilby_pipe`` uses, so it is exercised here."""
+    """The inherited file-loading path preserves the adapter type and hook."""
     prior_file = tmp_path / "calibration.prior"
     calibration_prior.to_file(outdir=str(tmp_path), label="calibration")
 
