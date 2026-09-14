@@ -94,7 +94,11 @@ parallel = true
 source = ["src"]
 
 [tool.coverage.report]
-fail_under = 0 # Temporary: set non-zero threshold once coverage improves
+fail_under = 55
+omit = ["*/tests/*", "*/site-packages/*"]
+
+[tool.coverage.paths]
+source = ["src", "*/src"]
 
 [tool.pytest.ini_options]
 addopts = "--cov=nullcal --cov-report=xml --cov-report=term --cov-append -m 'not integration and not e2e'"
