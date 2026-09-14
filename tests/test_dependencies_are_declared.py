@@ -1,10 +1,11 @@
 """Every third-party package ``src/nullcal`` imports must be declared in ``pyproject.toml``.
 
 ``pandas`` and ``pyyaml`` were imported by ``result/``, ``clustering/`` and ``metadata/`` while
-appearing nowhere in the dependency list. They resolved anyway, transitively through bilby — so
-installs worked, CI passed, and nothing indicated a problem. Removing bilby would have turned that
-into an ``ImportError`` in a published package, and it would have surfaced inside the PR that
-removed bilby, reading as "the port broke it" rather than as a pre-existing gap.
+appearing nowhere in the dependency list. ``pandas`` resolved through the bilby stack: through
+bilby itself and through seaborn, required by bilby_pipe. Both bilby and bilby_pipe are being
+retired. ``pyyaml`` currently has several transitive suppliers: astropy via the declared healpy and
+pycbc dependencies, plus igwn-ligolw and pegasus-wms-common via pycbc. nullcal controls none of
+those dependency declarations.
 
 CI cannot catch this on its own. The ``lowest-direct`` job lowers *declared* floors, and an
 undeclared dependency has no floor to lower; a transitively-satisfied import looks identical to a
@@ -97,8 +98,8 @@ def test_every_third_party_import_is_declared():
 
     assert not undeclared, (
         f"imported by src/nullcal but not declared in pyproject.toml: {sorted(undeclared)}. "
-        "These resolve only through another dependency's requirements, so they break when that "
-        "dependency is removed or changes its own dependencies."
+        "These are currently satisfied only by transitive requirements outside nullcal's control; "
+        "upstream dependency changes can make the imports unavailable."
     )
 
 
