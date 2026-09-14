@@ -51,12 +51,23 @@ git checkout -b feature/your-feature-name
 
 #### 4. Commit Your Changes:
 
-- Commit your changes with a meaningful commit message:
+- Commit your changes with a meaningful commit message, using the
+  [Conventional Commits](https://www.conventionalcommits.org/) format:
 
 ```bash
 git add .
-git commit -m "Add a descriptive commit message"
+git commit -m "fix: correct the filter domain in the noise likelihood"
 ```
+
+**Your pull request title must use one of these prefixes**, because CI validates
+it and the build fails otherwise:
+
+`build` · `chore` · `ci` · `docs` · `feat` · `fix` · `perf` · `refactor` ·
+`revert` · `style` · `test`
+
+Note `docs`, not `doc` — the shortened form fails the check. A scope is
+optional: `fix(null_stream): ...`. The changelog is generated from these
+prefixes, so a mislabelled commit lands in the wrong section or is dropped.
 
 ### 3. Submitting Your Changes
 
