@@ -4,8 +4,8 @@ The class exists for one reason: to disable ``bilby_pipe``'s calibration-prior v
 check asserts the spline prior is fine enough to resolve calibration structure across the analysis
 band, which is an assumption about *detector* calibration priors and not about the self-calibration
 priors this package samples. The override is therefore deliberate, and the tests below pin it as
-deliberate -- including the fact that the base class's validation would otherwise be reached, so a
-future reader can see what is being bypassed rather than guessing.
+deliberate -- including the fact that ``validate_prior`` is an adapter method absent from the bilby
+base class, so a future reader can see which integration contract the subclass adds.
 """
 
 from __future__ import annotations
@@ -61,23 +61,16 @@ def test_validate_prior_returns_true_without_inspecting_the_prior(calibration_pr
 
 
 @pytest.mark.unit
-def test_validate_prior_accepts_a_prior_the_base_class_would_reject(calibration_prior):
-    """The bypass is load-bearing: the inherited check does not pass on this prior.
+def test_validate_prior_is_an_adapter_method_absent_from_the_bilby_base(calibration_prior):
+    """The subclass adds the validation hook consumed by the surrounding pipeline.
 
-    Without this test the override could be a no-op wrapper around an already-passing check, and
-    removing it would look safe. Here the base implementation is called on the same object and is
-    required to disagree -- by raising, or by returning something other than ``True``.
-
-    ``prior/prior.py`` carries a T2 marker for exactly this reason: changing the override changes
-    whether an analysis can start, so the reason it exists needs to stay visible.
+    Bilby's calibration prior dictionary does not define ``validate_prior``. Pinning both sides of
+    that boundary prevents this adapter from being mistaken for an override of inherited validation
+    logic, while the preceding test specifies the hook's unconditional-acceptance behaviour.
     """
-    outcome = None
-    try:
-        outcome = BilbyCalibrationPriorDict.validate_prior(calibration_prior, 4.0, 20.0)
-    except Exception as error:  # noqa: BLE001 - the type is bilby's business, not this test's
-        outcome = error
-
-    assert outcome is not True
+    assert "validate_prior" not in BilbyCalibrationPriorDict.__dict__
+    assert "validate_prior" in CalibrationPriorDict.__dict__
+    assert calibration_prior.validate_prior(4.0, 20.0) is True
 
 
 @pytest.mark.unit
