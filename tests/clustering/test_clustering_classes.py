@@ -227,7 +227,7 @@ class TestInjectionClustering:
 
         The special case exists because bilby has no ``ET1`` interferometer to look up on its own --
         the triangle is only constructible as a unit. If the branch stopped matching, the rebuild
-        would raise rather than silently mis-cluster, but it would raise deep inside the property.
+        would raise rather than silently cluster incorrectly, but it would raise deep inside the property.
         """
         ifos = injection_setup["interferometers"]
         assert [ifo.name for ifo in ifos] == ["ET1", "ET2", "ET3"]

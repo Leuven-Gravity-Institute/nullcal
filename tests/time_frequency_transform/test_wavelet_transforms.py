@@ -12,7 +12,7 @@ References for the definition and its properties:
 * N. J. Cornish, "Time-frequency analysis of gravitational wave data",
   Phys. Rev. D **102**, 124038 (2020), arXiv:2009.00043.
 * V. Necula, S. Klimenko and G. Mitselmakher, "Transient analysis with fast Wilson-Daubechies
-  time-frequency transform", J. Phys. Conf. Ser. **363**, 012032 (2012).
+  time-frequency transform", Journal of Physics: Conference Series **363**, 012032 (2012).
 
 Tolerances. The transform is a sequence of FFTs in float64. The standard round-off bound for an
 FFT of length :math:`N` grows like :math:`\\varepsilon \\log_2 N` with

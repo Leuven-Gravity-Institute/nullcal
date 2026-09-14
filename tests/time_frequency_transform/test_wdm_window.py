@@ -12,7 +12,8 @@ this package):
   Phys. Rev. D **102**, 124038 (2020), arXiv:2009.00043 -- the formulation this implementation
   follows, including the incomplete-beta taper and the half-density time-frequency tiling.
 * V. Necula, S. Klimenko and G. Mitselmakher, "Transient analysis with fast Wilson-Daubechies
-  time-frequency transform", J. Phys. Conf. Ser. **363**, 012032 (2012) -- the original WDM
+  time-frequency transform", Journal of Physics: Conference Series **363**, 012032 (2012) -- the
+  original WDM
   transform for gravitational-wave burst analysis.
 
 The properties tested here are consequences of that definition that can be written down
@@ -158,7 +159,7 @@ def test_window_taper_decreases_monotonically(nx):
 
     :math:`\\cos(\\pi y / 2)` is decreasing on :math:`y \\in [0, 1]` and :math:`I_x(d, d)` is
     increasing in :math:`x`, so the composition must decrease. A non-monotone window would mean
-    the incomplete-beta taper had been mis-assembled while still hitting the endpoint values the
+    the incomplete-beta taper had been assembled incorrectly while still hitting the endpoint values the
     tests above pin.
     """
     n_f = 32

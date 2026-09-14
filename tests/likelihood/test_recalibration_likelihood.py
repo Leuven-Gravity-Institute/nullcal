@@ -404,12 +404,13 @@ NULL_MODE_INDEX = 2
 # deliberately labelled unanchored: they are regression values produced by this test setup, not
 # accuracy bounds or scientific results.  Pinning the statistic removes the old p-value threshold's
 # nominal 5% false-rejection rule from the suite while making a changed fixture or numerical path
-# visible.  The tolerance allows only final-digit floating-point variation on the reference arm64
-# platform; it was fixed before the assertions below were run as verification.
+# visible.  The relative tolerance spans the independently observed variation between the arm64
+# reference and Linux's lowest supported dependency set (8.8e-5 at most), with modest headroom.
+# These regression values and their tolerance remain unanchored; they are not accuracy claims.
 EXPECTED_UNCALIBRATED_KS_STATISTIC = 0.05839473550271149
 EXPECTED_CALIBRATED_KS_STATISTIC = 0.026624515456325715
 EXPECTED_WRONG_CALIBRATION_KS_STATISTIC = 0.23133906610701516
-KS_STATISTIC_ABS_TOL = 1e-12
+KS_STATISTIC_REL_TOL = 2e-4
 
 
 def svd_rotated_null_mode(recalibration_likelihood, time_frequency_transform, frequency_mask, calibration_factor=None):
@@ -542,7 +543,7 @@ def test_svd_rotated_null_mode_is_non_gaussian_without_calibration(
     sample = svd_rotated_null_mode(recalibration_likelihood, time_frequency_transform, frequency_mask)
 
     result = scipy.stats.kstest(sample, cdf="norm", args=(0.0, 1.0))
-    assert result.statistic == pytest.approx(EXPECTED_UNCALIBRATED_KS_STATISTIC, abs=KS_STATISTIC_ABS_TOL)
+    assert result.statistic == pytest.approx(EXPECTED_UNCALIBRATED_KS_STATISTIC, rel=KS_STATISTIC_REL_TOL, abs=0.0)
 
 
 def test_svd_rotated_null_mode_is_gaussian_with_correct_calibration(
@@ -569,7 +570,7 @@ def test_svd_rotated_null_mode_is_gaussian_with_correct_calibration(
     )
 
     result = scipy.stats.kstest(sample, cdf="norm", args=(0.0, 1.0))
-    assert result.statistic == pytest.approx(EXPECTED_CALIBRATED_KS_STATISTIC, abs=KS_STATISTIC_ABS_TOL)
+    assert result.statistic == pytest.approx(EXPECTED_CALIBRATED_KS_STATISTIC, rel=KS_STATISTIC_REL_TOL, abs=0.0)
 
 
 def test_svd_rotated_null_mode_is_non_gaussian_with_wrong_calibration(
@@ -598,7 +599,7 @@ def test_svd_rotated_null_mode_is_non_gaussian_with_wrong_calibration(
     )
 
     result = scipy.stats.kstest(sample, cdf="norm", args=(0.0, 1.0))
-    assert result.statistic == pytest.approx(EXPECTED_WRONG_CALIBRATION_KS_STATISTIC, abs=KS_STATISTIC_ABS_TOL)
+    assert result.statistic == pytest.approx(EXPECTED_WRONG_CALIBRATION_KS_STATISTIC, rel=KS_STATISTIC_REL_TOL, abs=0.0)
 
 
 def test_correct_calibration_brings_the_null_mode_closer_to_normal(
