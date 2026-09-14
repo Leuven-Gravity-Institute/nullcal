@@ -16,10 +16,13 @@ advance, is what makes a regression visible.
 | Path                                         | Role                                                                                                                           |
 | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | `config.py`                                  | The frozen configuration. Single source of truth, imported by both the generator and the tests so they cannot drift.           |
-| `pipeline.py`                                | Builds the interferometers, waveform generator and likelihood, and computes every frozen quantity. One construction path only. |
+| `pipeline.py`                                | Generates the original inputs, builds the comparison path from frozen inputs, and computes every frozen output.                |
 | `generate_reference.py`                      | Writes `reference/artifacts.npz` and `reference/manifest.json`.                                                                |
+| `generate_reference_inputs.py`               | Writes the frozen whitened strain and PSD plus their provenance and SHA-256 manifest.                                         |
 | `test_reference_artifacts.py`                | Compares current output against the frozen artifacts.                                                                          |
 | `test_noise_log_likelihood_filter_domain.py` | Regression test for the defect below, now fixed.                                                                               |
+| `reference/inputs.npz`                       | Architecture-sensitive whitened strain and PSD consumed by the comparison path.                                               |
+| `reference/inputs_manifest.json`             | Source revision, environment, shape, dtype and SHA-256 for every frozen input.                                                 |
 | `reference/posterior_samples.npz`            | A bilby posterior over the calibration parameters — **provisional, not the anchor** (below).                                   |
 | `test_reference_posterior.py`                | Integrity and informativeness checks on that posterior.                                                                        |
 
@@ -41,11 +44,19 @@ nothing.
 
 ```bash
 uv run python -m tests.e2e.generate_reference
+uv run python -m tests.e2e.generate_reference_inputs
 ```
 
 **Regenerate only with a reason, and commit the new artifacts in the same commit
 as the code change that justified them, with that reason in the message.** A
 reference regenerated to make a failing test pass is not a reference.
+
+The two generators have different roles. `generate_reference.py` rewrites the numerical outputs
+and is needed only when an intentional behaviour change requires a new anchor.
+`generate_reference_inputs.py` reproduces the inputs from bilby and lalsuite and refuses to run
+when production source is dirty. Regenerating the inputs does **not** rewrite the existing output
+archive. Normal comparisons call `build_likelihood_from_reference_inputs`, which consumes the
+frozen whitened strain, PSD and time-frequency filter without generating a waveform.
 
 `manifest.json` records the git revision, Python and platform, the versions of
 `nullcal`, `bilby`, `numpy`, `scipy`, `numba`, `lalsuite` and `rocket-fft`, the
@@ -55,13 +66,12 @@ so a hand-edited artifact fails rather than passing quietly, and
 `test_manifest_configuration_matches_the_live_config` checks the recorded
 configuration against `config.py` field by field, so a stale manifest fails too.
 
-It is **not** a complete description of the inputs: `DETECTOR_NAMES`, the
-derived segment `start_time()` and the wavelet probe's own seed (`SEED + 1`)
-live only in `config.py`. Reproducing from the manifest alone is therefore not
-possible — reproduce from `config.py` at the recorded revision. Recording those
-fields is folded into the follow-up that freezes the strain and PSD as inputs,
-because that change regenerates the manifest anyway; doing it here would rewrite
-the recorded provenance for a documentation-only gain.
+The output manifest is **not** a complete description of the inputs: `DETECTOR_NAMES`, the
+derived segment `start_time()` and the wavelet probe's own seed (`SEED + 1`) live only in
+`config.py`. Reproducing the original outputs from that manifest alone is therefore not possible
+— reproduce from `config.py` at the recorded revision. The separate input archive now makes
+output comparison independent of that regeneration path; its manifest records the source revision
+and environment that produced the whitened strain and PSD, and pins both arrays byte-for-byte.
 
 The provenance fields are asserted _present_, never compared against the running
 environment. They say where the artifacts were generated, which is deliberately

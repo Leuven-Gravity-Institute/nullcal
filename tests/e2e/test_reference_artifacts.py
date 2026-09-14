@@ -21,6 +21,8 @@ from . import pipeline
 REFERENCE_DIR = Path(__file__).parent / "reference"
 ARTIFACT_PATH = REFERENCE_DIR / "artifacts.npz"
 MANIFEST_PATH = REFERENCE_DIR / "manifest.json"
+INPUT_ARTIFACT_PATH = REFERENCE_DIR / "inputs.npz"
+INPUT_MANIFEST_PATH = REFERENCE_DIR / "inputs_manifest.json"
 
 pytestmark = [pytest.mark.e2e, pytest.mark.slow]
 
@@ -74,8 +76,23 @@ def manifest() -> dict:
 
 
 @pytest.fixture(scope="module")
-def computed(tmp_path_factory) -> dict[str, np.ndarray]:
-    likelihood = pipeline.build_likelihood(tmp_path_factory.mktemp("reference"))
+def reference_inputs() -> dict[str, np.ndarray]:
+    if not INPUT_ARTIFACT_PATH.exists():
+        pytest.fail(f"reference inputs absent: {INPUT_ARTIFACT_PATH} (run tests.e2e.generate_reference_inputs)")
+    with np.load(INPUT_ARTIFACT_PATH) as data:
+        return {key: data[key] for key in data.files}
+
+
+@pytest.fixture(scope="module")
+def input_manifest() -> dict:
+    if not INPUT_MANIFEST_PATH.exists():
+        pytest.fail(f"reference input manifest absent: {INPUT_MANIFEST_PATH} (run tests.e2e.generate_reference_inputs)")
+    return json.loads(INPUT_MANIFEST_PATH.read_text())
+
+
+@pytest.fixture(scope="module")
+def computed() -> dict[str, np.ndarray]:
+    likelihood = pipeline.build_likelihood_from_reference_inputs()
     return {key: np.asarray(value) for key, value in pipeline.compute_artifacts(likelihood).items()}
 
 
@@ -333,3 +350,62 @@ def test_manifest_matches_artifacts(reference, manifest):
         # deciding whether an artifact is the thing they think it is; an unchecked field drifts.
         assert list(raw.shape) == list(meta["shape"]), f"{key}: shape {raw.shape} != manifest {meta['shape']}"
         assert raw.dtype.name == meta["dtype"], f"{key}: dtype {raw.dtype.name} != manifest {meta['dtype']}"
+
+
+def test_input_manifest_matches_reference_inputs(reference_inputs, input_manifest):
+    """The input manifest describes every frozen input byte, shape, and dtype."""
+    import hashlib
+
+    expected_keys = {"whitened_frequency_domain_strain", "power_spectral_density"}
+    assert set(reference_inputs) == expected_keys
+    assert set(input_manifest["artifacts"]) == expected_keys
+
+    for key, meta in input_manifest["artifacts"].items():
+        raw = np.asarray(reference_inputs[key])
+        digest = hashlib.sha256(np.ascontiguousarray(raw).tobytes()).hexdigest()
+        assert digest == meta["sha256"], f"{key}: input manifest digest mismatch"
+        assert list(raw.shape) == meta["shape"], f"{key}: shape {raw.shape} != manifest {meta['shape']}"
+        assert raw.dtype.name == meta["dtype"], f"{key}: dtype {raw.dtype.name} != manifest {meta['dtype']}"
+
+
+def test_input_manifest_records_clean_source_provenance(input_manifest):
+    """Frozen inputs identify the clean production revision and environment that generated them."""
+    for field in ("source_git_revision", "platform", "python", "packages", "configuration"):
+        assert input_manifest.get(field), f"input manifest is missing the {field!r} provenance field"
+    assert input_manifest.get("source_git_dirty") is False
+
+
+def test_input_manifest_configuration_matches_the_live_config(input_manifest):
+    """The generator inputs recorded in the manifest have not drifted from config.py."""
+    from . import config
+
+    expected = {
+        "duration": config.DURATION,
+        "sampling_frequency": config.SAMPLING_FREQUENCY,
+        "minimum_frequency": config.MINIMUM_FREQUENCY,
+        "maximum_frequency": config.MAXIMUM_FREQUENCY,
+        "seed": config.SEED,
+        "source_parameters": dict(config.SOURCE_PARAMETERS),
+        "waveform_arguments": dict(config.WAVEFORM_ARGUMENTS),
+    }
+    assert input_manifest["configuration"] == expected
+
+
+def test_frozen_input_builder_does_not_generate_a_waveform(monkeypatch, reference_inputs):
+    """The comparison path consumes frozen inputs without entering lalsuite waveform generation."""
+
+    def fail_if_called():
+        pytest.fail("the frozen-input comparison path called the waveform generator")
+
+    monkeypatch.setattr(pipeline, "build_waveform_generator", fail_if_called)
+
+    likelihood = pipeline.build_likelihood_from_reference_inputs()
+
+    assert np.array_equal(
+        likelihood.null_stream_calculator._whitened_frequency_domain_strain_array,
+        reference_inputs["whitened_frequency_domain_strain"],
+    )
+    actual_psd = np.array(
+        [interferometer.power_spectral_density_array for interferometer in likelihood.interferometers]
+    )
+    assert np.array_equal(actual_psd, reference_inputs["power_spectral_density"])

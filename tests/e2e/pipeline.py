@@ -17,13 +17,17 @@ import bilby.core.utils.random
 import numpy as np
 import pandas as pd
 from bilby.gw.conversion import convert_to_lal_binary_black_hole_parameters
-from bilby.gw.detector import CubicSpline, InterferometerList
+from bilby.gw.detector import CubicSpline, InterferometerList, PowerSpectralDensity
 from bilby.gw.source import lal_binary_black_hole
 from bilby.gw.waveform_generator import WaveformGenerator
 
 from nullcal.likelihood import RecalibrationLikelihood
 
 from . import config
+
+REFERENCE_DIR = Path(__file__).parent / "reference"
+OUTPUT_ARTIFACT_PATH = REFERENCE_DIR / "artifacts.npz"
+INPUT_ARTIFACT_PATH = REFERENCE_DIR / "inputs.npz"
 
 
 @contextlib.contextmanager
@@ -85,6 +89,35 @@ def build_interferometers() -> InterferometerList:
         return interferometers
 
 
+def build_interferometers_from_reference_inputs(reference_inputs: dict[str, np.ndarray]) -> InterferometerList:
+    """ET triangle carrying the frozen PSD and metadata, without generating strain."""
+    power_spectral_density = reference_inputs["power_spectral_density"]
+    whitened_strain = reference_inputs["whitened_frequency_domain_strain"]
+    interferometers = InterferometerList(["ET"])
+
+    for index, interferometer in enumerate(interferometers):
+        interferometer.minimum_frequency = config.MINIMUM_FREQUENCY
+        interferometer.maximum_frequency = config.MAXIMUM_FREQUENCY
+        interferometer.calibration_model = CubicSpline(
+            prefix=f"recalib_{interferometer.name}_",
+            minimum_frequency=config.MINIMUM_FREQUENCY,
+            maximum_frequency=config.MAXIMUM_FREQUENCY,
+            n_points=config.N_POINTS,
+        )
+        interferometer.strain_data.set_from_frequency_domain_strain(
+            frequency_domain_strain=np.zeros_like(whitened_strain[index]),
+            sampling_frequency=config.SAMPLING_FREQUENCY,
+            duration=config.DURATION,
+            start_time=config.start_time(),
+        )
+        interferometer.power_spectral_density = PowerSpectralDensity.from_power_spectral_density_array(
+            frequency_array=interferometer.frequency_array,
+            psd_array=power_spectral_density[index],
+        )
+
+    return interferometers
+
+
 def build_likelihood(tmp_path: Path | None = None) -> RecalibrationLikelihood:
     """The full recalibration likelihood, with an injection-clustering time-frequency filter."""
     interferometers = build_interferometers()
@@ -103,6 +136,32 @@ def build_likelihood(tmp_path: Path | None = None) -> RecalibrationLikelihood:
             clustering_parameter_file=str(parameter_file),
             clustering_threshold=config.CLUSTERING_THRESHOLD,
         )
+
+
+def build_likelihood_from_reference_inputs() -> RecalibrationLikelihood:
+    """Build the comparison pipeline from frozen inputs, without waveform generation."""
+    with np.load(INPUT_ARTIFACT_PATH) as stored_inputs:
+        reference_inputs = {key: stored_inputs[key] for key in stored_inputs.files}
+    with np.load(OUTPUT_ARTIFACT_PATH) as stored_outputs:
+        time_frequency_filter = stored_outputs["time_frequency_filter"]
+
+    interferometers = build_interferometers_from_reference_inputs(reference_inputs)
+    with quiet_loggers():
+        likelihood = RecalibrationLikelihood(
+            interferometers=interferometers,
+            waveform_generator=None,
+            wavelet_transform_frequency_resolution=config.FREQUENCY_RESOLUTION,
+            wavelet_transform_nx=config.NX,
+            time_frequency_filter=time_frequency_filter,
+        )
+
+    # ``NullStream`` computes and caches this input during construction. The frozen-input path
+    # replaces that cache directly because the archived quantity is already whitened; round-tripping
+    # through an unwhitened strain would add arithmetic and weaken the reference comparison.
+    likelihood.null_stream_calculator._whitened_frequency_domain_strain_array = np.array(
+        reference_inputs["whitened_frequency_domain_strain"], copy=True
+    )
+    return likelihood
 
 
 def compute_artifacts(likelihood: RecalibrationLikelihood) -> dict[str, np.ndarray | float]:
