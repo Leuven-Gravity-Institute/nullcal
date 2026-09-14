@@ -98,8 +98,9 @@ def test_frames_are_transformed_independently(rectangular_window):
     result = stft(data, SAMPLING_FREQUENCY, FREQUENCY_RESOLUTION, rectangular_window)
 
     energy_per_frame = np.sum(np.abs(result) ** 2, axis=1)
+    energy_outside_active_frame = np.max(np.delete(energy_per_frame, 1))
     assert int(np.argmax(energy_per_frame)) == 1
-    assert np.max(np.delete(energy_per_frame, 1)) == 0.0
+    assert energy_outside_active_frame == 0.0
 
 
 @pytest.mark.unit
