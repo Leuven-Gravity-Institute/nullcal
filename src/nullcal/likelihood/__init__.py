@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from .recalibration_likelihood import RecalibrationLikelihood
+from .recalibration_likelihood import RecalibrationLikelihood, log_likelihood
 
 __all__ = [
     "RecalibrationLikelihood",
+    "log_likelihood",
 ]

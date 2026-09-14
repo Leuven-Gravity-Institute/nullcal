@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import tempfile
+from importlib import import_module
 
 import bilby.core.utils.random
 import numpy as np
@@ -16,7 +17,7 @@ from bilby.gw.waveform_generator import WaveformGenerator
 
 from nullcal.clustering.base import Clustering
 from nullcal.clustering.single import single_clustering_by_threshold
-from nullcal.likelihood import RecalibrationLikelihood
+from nullcal.likelihood import RecalibrationLikelihood, log_likelihood
 from nullcal.null_stream.calibration import compute_calibrated_whitened_antenna_response
 from nullcal.null_stream.null_stream import NullStream
 from nullcal.time_frequency_transform.wavelet_transforms import WaveletTransform
@@ -631,3 +632,57 @@ def test_correct_calibration_brings_the_null_mode_closer_to_normal(
     )
 
     assert calibrated.statistic < uncalibrated.statistic / 1.5
+
+
+def test_free_log_likelihood_uses_supplied_parameters_and_static_data():
+    """The free function has no dependency on bilby's mutable likelihood state."""
+
+    class StaticData:
+        def __init__(self):
+            self.received_parameters = None
+
+        def compute_calibrated_time_frequency_domain_null_stream_from_parameters(self, parameters):
+            self.received_parameters = parameters
+            return np.array([[1.0 + 2.0j, -3.0j]])
+
+    parameters = {"recalib_ET1_amplitude_0": 0.125}
+    static_data = StaticData()
+
+    result = log_likelihood(parameters, static_data)
+
+    assert static_data.received_parameters is parameters
+    assert result == -7.0
+    assert isinstance(result, float)
+
+
+def test_recalibration_likelihood_log_likelihood_is_a_thin_wrapper(monkeypatch, recalibration_likelihood):
+    """The bilby method delegates its current parameters and precomputed calculator unchanged."""
+    module = import_module("nullcal.likelihood.recalibration_likelihood")
+    parameters = {"sentinel": object()}
+    received = {}
+
+    def fake_log_likelihood(params, static_data):
+        received["params"] = params
+        received["static_data"] = static_data
+        return -123.0
+
+    monkeypatch.setattr(module, "log_likelihood", fake_log_likelihood)
+    recalibration_likelihood.parameters = parameters
+
+    result = recalibration_likelihood.log_likelihood()
+
+    assert result == -123.0
+    assert received == {
+        "params": parameters,
+        "static_data": recalibration_likelihood.null_stream_calculator,
+    }
+
+
+def test_recalibration_likelihood_rejects_none_parameters(recalibration_likelihood):
+    """The thin wrapper retains the explicit guard on bilby's mutable parameter state."""
+    # Bilby's public setter normalises ``None`` to an empty dict, so establish the legacy state
+    # directly to exercise the guard that this wrapper deliberately preserves.
+    recalibration_likelihood._parameters = None
+
+    with pytest.raises(ValueError, match=r"self\.parameters is None"):
+        recalibration_likelihood.log_likelihood()

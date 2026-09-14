@@ -16,11 +16,13 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from . import pipeline
+from . import generate_reference_inputs, pipeline
 
 REFERENCE_DIR = Path(__file__).parent / "reference"
 ARTIFACT_PATH = REFERENCE_DIR / "artifacts.npz"
 MANIFEST_PATH = REFERENCE_DIR / "manifest.json"
+INPUT_ARTIFACT_PATH = REFERENCE_DIR / "inputs.npz"
+INPUT_MANIFEST_PATH = REFERENCE_DIR / "inputs_manifest.json"
 
 pytestmark = [pytest.mark.e2e, pytest.mark.slow]
 
@@ -51,7 +53,7 @@ LOCAL_FLOOR = 1e-3
 
 #: Names whose reference is stored but which are compared exactly rather than approximately,
 #: because they are integer- or boolean-valued and any change is structural.
-EXACT_KEYS = frozenset({"frequency_mask", "time_frequency_filter"})
+EXACT_KEYS = frozenset({"frequency_mask"})
 
 
 @pytest.fixture(scope="module")
@@ -74,8 +76,23 @@ def manifest() -> dict:
 
 
 @pytest.fixture(scope="module")
-def computed(tmp_path_factory) -> dict[str, np.ndarray]:
-    likelihood = pipeline.build_likelihood(tmp_path_factory.mktemp("reference"))
+def reference_inputs() -> dict[str, np.ndarray]:
+    if not INPUT_ARTIFACT_PATH.exists():
+        pytest.fail(f"reference inputs absent: {INPUT_ARTIFACT_PATH} (run tests.e2e.generate_reference_inputs)")
+    with np.load(INPUT_ARTIFACT_PATH) as data:
+        return {key: data[key] for key in data.files}
+
+
+@pytest.fixture(scope="module")
+def input_manifest() -> dict:
+    if not INPUT_MANIFEST_PATH.exists():
+        pytest.fail(f"reference input manifest absent: {INPUT_MANIFEST_PATH} (run tests.e2e.generate_reference_inputs)")
+    return json.loads(INPUT_MANIFEST_PATH.read_text())
+
+
+@pytest.fixture(scope="module")
+def computed() -> dict[str, np.ndarray]:
+    likelihood = pipeline.build_likelihood_from_reference_inputs()
     return {key: np.asarray(value) for key, value in pipeline.compute_artifacts(likelihood).items()}
 
 
@@ -91,10 +108,14 @@ def test_reference_covers_every_computed_artifact(reference, computed):
 #: collection time on purpose: parametrising over the file's keys would mean a missing or
 #: truncated artifact file silently collects fewer tests — the same "compares nothing quietly"
 #: failure the fixtures were changed to prevent, arriving from the other direction.
-#: ``test_compared_keys_cover_every_artifact`` is what stops this list drifting from reality.
+#: ``time_frequency_filter`` is deliberately absent: the frozen-input builder feeds that archived
+#: output back into the likelihood, so comparing it here would compare the file with itself and
+#: could not detect a source regression. ``FED_BACK_INPUT_KEYS`` classifies it explicitly, and
+#: ``test_clustering_derived_filter_matches_reference`` anchors its derivation through the full
+#: waveform-generating pipeline instead.
+#: ``test_classified_keys_cover_every_artifact`` stops either list drifting from reality.
 COMPARED_KEYS = (
     "frequency_mask",
-    "time_frequency_filter",
     "whitened_antenna_response",
     "projector",
     "calibration_factor",
@@ -107,22 +128,27 @@ COMPARED_KEYS = (
     "noise_log_likelihood",
 )
 
+FED_BACK_INPUT_KEYS = frozenset({"time_frequency_filter"})
 
-def test_compared_keys_cover_every_artifact(reference, computed):
-    """Every frozen and every computed artifact must be in the value-comparison list.
+
+def test_classified_keys_cover_every_artifact(reference, computed):
+    """Every artifact is either independently compared or explicitly fed back as an input.
 
     Without this, adding a quantity to ``compute_artifacts`` and regenerating the reference
     leaves it frozen, digested and set-equal — but never value-compared, so a later change to
-    that quantity alone passes the whole suite.
+    that quantity alone passes the whole suite. Fed-back inputs are kept disjoint because their
+    value comparison would be an identity rather than evidence.
     """
     compared = set(COMPARED_KEYS)
-    assert compared == set(reference), (
-        f"frozen but not compared: {sorted(set(reference) - compared)}; "
-        f"compared but not frozen: {sorted(compared - set(reference))}"
+    classified = compared | FED_BACK_INPUT_KEYS
+    assert compared.isdisjoint(FED_BACK_INPUT_KEYS)
+    assert classified == set(reference), (
+        f"frozen but not classified: {sorted(set(reference) - classified)}; "
+        f"classified but not frozen: {sorted(classified - set(reference))}"
     )
-    assert compared == set(computed), (
-        f"computed but not compared: {sorted(set(computed) - compared)}; "
-        f"compared but not computed: {sorted(compared - set(computed))}"
+    assert classified == set(computed), (
+        f"computed but not classified: {sorted(set(computed) - classified)}; "
+        f"classified but not computed: {sorted(classified - set(computed))}"
     )
 
 
@@ -333,3 +359,97 @@ def test_manifest_matches_artifacts(reference, manifest):
         # deciding whether an artifact is the thing they think it is; an unchecked field drifts.
         assert list(raw.shape) == list(meta["shape"]), f"{key}: shape {raw.shape} != manifest {meta['shape']}"
         assert raw.dtype.name == meta["dtype"], f"{key}: dtype {raw.dtype.name} != manifest {meta['dtype']}"
+
+
+def test_input_manifest_matches_reference_inputs(reference_inputs, input_manifest):
+    """The input manifest describes every frozen input byte, shape, and dtype."""
+    import hashlib
+
+    expected_keys = {"whitened_frequency_domain_strain", "power_spectral_density"}
+    assert set(reference_inputs) == expected_keys
+    assert set(input_manifest["artifacts"]) == expected_keys
+
+    for key, meta in input_manifest["artifacts"].items():
+        raw = np.asarray(reference_inputs[key])
+        digest = hashlib.sha256(np.ascontiguousarray(raw).tobytes()).hexdigest()
+        assert digest == meta["sha256"], f"{key}: input manifest digest mismatch"
+        assert list(raw.shape) == meta["shape"], f"{key}: shape {raw.shape} != manifest {meta['shape']}"
+        assert raw.dtype.name == meta["dtype"], f"{key}: dtype {raw.dtype.name} != manifest {meta['dtype']}"
+
+
+def test_input_manifest_records_clean_source_provenance(input_manifest):
+    """Frozen inputs identify the clean production revision and environment that generated them."""
+    for field in ("source_git_revision", "platform", "python", "packages", "configuration"):
+        assert input_manifest.get(field), f"input manifest is missing the {field!r} provenance field"
+    assert input_manifest.get("source_git_dirty") is False
+
+
+def test_input_manifest_configuration_matches_the_live_config(input_manifest):
+    """The generator inputs recorded in the manifest have not drifted from config.py."""
+    from . import config
+
+    expected = {
+        "duration": config.DURATION,
+        "sampling_frequency": config.SAMPLING_FREQUENCY,
+        "minimum_frequency": config.MINIMUM_FREQUENCY,
+        "maximum_frequency": config.MAXIMUM_FREQUENCY,
+        "detector_names": list(config.DETECTOR_NAMES),
+        "start_time": config.start_time(),
+        "n_points": config.N_POINTS,
+        "frequency_resolution": config.FREQUENCY_RESOLUTION,
+        "nx": config.NX,
+        "clustering_threshold": config.CLUSTERING_THRESHOLD,
+        "seed": config.SEED,
+        "wavelet_probe_seed": config.SEED + 1,
+        "source_parameters": dict(config.SOURCE_PARAMETERS),
+        "waveform_arguments": dict(config.WAVEFORM_ARGUMENTS),
+    }
+    assert input_manifest["configuration"] == expected
+
+
+def test_fed_back_filter_is_not_counted_as_a_reproduced_output():
+    """An output used to construct the comparison cannot also count as independently reproduced."""
+    assert "time_frequency_filter" not in COMPARED_KEYS
+
+
+def test_clustering_derived_filter_matches_reference(reference, tmp_path):
+    """The full generation path keeps the clustering-derived filter directly anchored."""
+    likelihood = pipeline.build_likelihood(tmp_path)
+    actual = likelihood.clustering.time_frequency_filter
+    expected = reference["time_frequency_filter"]
+    assert np.array_equal(actual, expected)
+
+
+def test_input_generator_dirty_check_covers_source_and_e2e_harness(monkeypatch):
+    """The clean-revision stamp covers both production source and the harness that creates inputs."""
+    received = {}
+
+    def fake_check_output(command, **kwargs):
+        received["command"] = command
+        received["kwargs"] = kwargs
+        return ""
+
+    monkeypatch.setattr(generate_reference_inputs.subprocess, "check_output", fake_check_output)
+
+    assert generate_reference_inputs._source_is_dirty() is False
+    assert received["command"] == ["git", "status", "--porcelain", "--", "src", "tests/e2e"]
+
+
+def test_frozen_input_builder_does_not_generate_a_waveform(monkeypatch, reference_inputs):
+    """The comparison path consumes frozen inputs without entering lalsuite waveform generation."""
+
+    def fail_if_called():
+        pytest.fail("the frozen-input comparison path called the waveform generator")
+
+    monkeypatch.setattr(pipeline, "build_waveform_generator", fail_if_called)
+
+    likelihood = pipeline.build_likelihood_from_reference_inputs()
+
+    assert np.array_equal(
+        likelihood.null_stream_calculator._whitened_frequency_domain_strain_array,
+        reference_inputs["whitened_frequency_domain_strain"],
+    )
+    actual_psd = np.array(
+        [interferometer.power_spectral_density_array for interferometer in likelihood.interferometers]
+    )
+    assert np.array_equal(actual_psd, reference_inputs["power_spectral_density"])

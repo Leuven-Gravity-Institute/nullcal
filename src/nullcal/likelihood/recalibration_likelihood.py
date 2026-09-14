@@ -17,6 +17,23 @@ from ..time_frequency_transform.wavelet_transforms import WaveletTransform
 logger = logging.getLogger("nullcal")
 
 
+def log_likelihood(params: dict, static_data: NullStream) -> float:
+    """Compute the log likelihood from parameters and precomputed static data.
+
+    Args:
+        params (dict): Calibration parameters.
+        static_data (NullStream): Precomputed null-stream data and transforms.
+
+    Returns:
+        float: Log likelihood.
+    """
+    calibrated_time_frequency_domain_null_stream = (
+        static_data.compute_calibrated_time_frequency_domain_null_stream_from_parameters(parameters=params)
+    )
+    residual_energy = float(np.sum(np.abs(calibrated_time_frequency_domain_null_stream) ** 2))
+    return -0.5 * residual_energy
+
+
 class RecalibrationLikelihood(Likelihood):
     """Time-frequency recalibration likelihood class."""
 
@@ -142,17 +159,7 @@ class RecalibrationLikelihood(Likelihood):
         if self.parameters is None:
             raise ValueError("self.parameters is None.")
 
-        calibrated_time_frequency_domain_null_stream = (
-            self.null_stream_calculator.compute_calibrated_time_frequency_domain_null_stream_from_parameters(
-                parameters=self.parameters
-            )
-        )
-
-        # Calculate the residual energy in the time-frequency filter
-        residual_energy = float(np.sum(np.abs(calibrated_time_frequency_domain_null_stream) ** 2))
-        # Return the log likelihood
-
-        return -0.5 * residual_energy
+        return log_likelihood(params=self.parameters, static_data=self.null_stream_calculator)
 
     def _calculate_noise_log_likelihood(self) -> float:
         """Calculate the noise log-likelihood.
