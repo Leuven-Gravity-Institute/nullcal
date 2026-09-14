@@ -13,18 +13,18 @@ advance, is what makes a regression visible.
 
 ## Layout
 
-| Path                                         | Role                                                                                                                           |
-| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `config.py`                                  | The frozen configuration. Single source of truth, imported by both the generator and the tests so they cannot drift.           |
-| `pipeline.py`                                | Generates the original inputs, builds the comparison path from frozen inputs, and computes every frozen output.                |
-| `generate_reference.py`                      | Writes `reference/artifacts.npz` and `reference/manifest.json`.                                                                |
-| `generate_reference_inputs.py`               | Writes the frozen whitened strain and PSD plus their provenance and SHA-256 manifest.                                         |
-| `test_reference_artifacts.py`                | Compares current output against the frozen artifacts.                                                                          |
-| `test_noise_log_likelihood_filter_domain.py` | Regression test for the defect below, now fixed.                                                                               |
-| `reference/inputs.npz`                       | Architecture-sensitive whitened strain and PSD consumed by the comparison path.                                               |
-| `reference/inputs_manifest.json`             | Source revision, environment, shape, dtype and SHA-256 for every frozen input.                                                 |
-| `reference/posterior_samples.npz`            | A bilby posterior over the calibration parameters — **provisional, not the anchor** (below).                                   |
-| `test_reference_posterior.py`                | Integrity and informativeness checks on that posterior.                                                                        |
+| Path                                         | Role                                                                                                                 |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `config.py`                                  | The frozen configuration. Single source of truth, imported by both the generator and the tests so they cannot drift. |
+| `pipeline.py`                                | Generates the original inputs, builds the comparison path from frozen inputs, and computes every frozen output.      |
+| `generate_reference.py`                      | Writes `reference/artifacts.npz` and `reference/manifest.json`.                                                      |
+| `generate_reference_inputs.py`               | Writes the frozen whitened strain and PSD plus their provenance and SHA-256 manifest.                                |
+| `test_reference_artifacts.py`                | Compares current output against the frozen artifacts.                                                                |
+| `test_noise_log_likelihood_filter_domain.py` | Regression test for the defect below, now fixed.                                                                     |
+| `reference/inputs.npz`                       | Architecture-sensitive whitened strain and PSD consumed by the comparison path.                                      |
+| `reference/inputs_manifest.json`             | Source revision, environment, shape, dtype and SHA-256 for every frozen input.                                       |
+| `reference/posterior_samples.npz`            | A bilby posterior over the calibration parameters — **provisional, not the anchor** (below).                         |
+| `test_reference_posterior.py`                | Integrity and informativeness checks on that posterior.                                                              |
 
 ## Running
 
@@ -51,20 +51,24 @@ uv run python -m tests.e2e.generate_reference_inputs
 as the code change that justified them, with that reason in the message.** A
 reference regenerated to make a failing test pass is not a reference.
 
-The two generators have different roles. `generate_reference.py` rewrites the numerical outputs
-and is needed only when an intentional behaviour change requires a new anchor.
-`generate_reference_inputs.py` reproduces the inputs from bilby and lalsuite and refuses to run
-when either production source or the e2e harness is dirty. Regenerating the inputs does **not**
-rewrite the existing output archive. Normal comparisons call
-`build_likelihood_from_reference_inputs`, which consumes the frozen whitened strain and PSD plus
-the archived time-frequency filter without generating a waveform.
+The two generators have different roles. `generate_reference.py` rewrites the
+numerical outputs and is needed only when an intentional behaviour change
+requires a new anchor. `generate_reference_inputs.py` reproduces the inputs from
+bilby and lalsuite and refuses to run when either production source or the e2e
+harness is dirty. Regenerating the inputs does **not** rewrite the existing
+output archive. Normal comparisons call
+`build_likelihood_from_reference_inputs`, which consumes the frozen whitened
+strain and PSD plus the archived time-frequency filter without generating a
+waveform.
 
-The time-frequency filter is fed back from `artifacts.npz` to isolate the downstream numerical
-comparison. It is therefore classified as an input to that path and is **not** counted as a
-reproduced output: comparing it there would compare the file with itself. A separate e2e test
-builds the full waveform and `InjectionClustering` path and compares its derived filter directly
-with the archived value. Thus the fast comparison covers the eleven genuinely recomputed outputs,
-while the slower test preserves the independent anchor on filter derivation.
+The time-frequency filter is fed back from `artifacts.npz` to isolate the
+downstream numerical comparison. It is therefore classified as an input to that
+path and is **not** counted as a reproduced output: comparing it there would
+compare the file with itself. A separate e2e test builds the full waveform and
+`InjectionClustering` path and compares its derived filter directly with the
+archived value. Thus the fast comparison covers the eleven genuinely recomputed
+outputs, while the slower test preserves the independent anchor on filter
+derivation.
 
 `manifest.json` records the git revision, Python and platform, the versions of
 `nullcal`, `bilby`, `numpy`, `scipy`, `numba`, `lalsuite` and `rocket-fft`, the
@@ -74,11 +78,13 @@ so a hand-edited artifact fails rather than passing quietly, and
 `test_manifest_configuration_matches_the_live_config` checks the recorded
 configuration against `config.py` field by field, so a stale manifest fails too.
 
-The output manifest is **not** a complete description of the inputs; reproduce the original
-outputs from `config.py` at its recorded revision. The separate input manifest records the fields
-previously missing there — detector names, derived segment start time and wavelet-probe seed — as
-well as the spline, wavelet and clustering configuration. Its configuration test checks those
-fields against `config.py`, while its SHA-256 entries pin the whitened strain and PSD byte-for-byte.
+The output manifest is **not** a complete description of the inputs; reproduce
+the original outputs from `config.py` at its recorded revision. The separate
+input manifest records the fields previously missing there — detector names,
+derived segment start time and wavelet-probe seed — as well as the spline,
+wavelet and clustering configuration. Its configuration test checks those fields
+against `config.py`, while its SHA-256 entries pin the whitened strain and PSD
+byte-for-byte.
 
 The provenance fields are asserted _present_, never compared against the running
 environment. They say where the artifacts were generated, which is deliberately
