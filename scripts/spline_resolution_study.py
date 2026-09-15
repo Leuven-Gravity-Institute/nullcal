@@ -33,7 +33,10 @@ EXTENDED_SPLINE_MAXIMUM_HZ = 2048.0
 INITIAL_FIT_GRID_SIZE = 2_501
 VALIDATION_GRID_SIZE = 200_001
 PHASE_BISECTION_STEPS = 22
-AMPLITUDE_REFINEMENT_TOLERANCE = 1e-4
+AMPLITUDE_REFINEMENT_TOLERANCE_FRACTION = 1e-5
+# Amplitude refinement is solved against a unit-peak shape, so convert the
+# physical fractional-amplitude tolerance back to that solver's units.
+UNIT_PEAK_AMPLITUDE_REFINEMENT_TOLERANCE = AMPLITUDE_REFINEMENT_TOLERANCE_FRACTION / abs(AMPLITUDE_PEAK)
 PHASE_REFINEMENT_TOLERANCE_RADIANS = 1e-5
 MAX_REFINEMENT_ITERATIONS = 15
 
@@ -184,7 +187,7 @@ def refined_fit(
         new_indices = np.setdiff1d(worst_extrema, fit_indices)
         fitted_maximum = float(np.max(absolute_residual[fit_indices]))
         validated_maximum = float(np.max(absolute_residual))
-        tolerance = PHASE_REFINEMENT_TOLERANCE_RADIANS if phase else AMPLITUDE_REFINEMENT_TOLERANCE
+        tolerance = PHASE_REFINEMENT_TOLERANCE_RADIANS if phase else UNIT_PEAK_AMPLITUDE_REFINEMENT_TOLERANCE
         if validated_maximum - fitted_maximum <= tolerance:
             return values, iteration, int(fit_indices.size)
         fit_indices = np.unique(np.concatenate([fit_indices, new_indices]))
@@ -262,8 +265,10 @@ Gaussian bump at 249.43 Hz, with `f_width = 50 Hz`, `sigma = f_width / 4 = 12.5 
 
 The submitted 10-knot, 8-512 Hz basis leaves **{submitted["max_amplitude_residual_percent"]:.3f}%**
 amplitude and **{submitted["max_phase_residual_degrees"]:.3f} degrees** phase residual over
-20-512 Hz. Its 119.352 Hz bracketing gap is 4.055 times the bump FWHM. It has no spline support
-above 512 Hz, so it cannot demonstrate the stated requirement over 512-2000 Hz.
+20-512 Hz. Its 119.352 Hz bracketing gap is 4.055 times the bump FWHM. Above 512 Hz, bilby's
+implementation continues the last cubic segment as uncontrolled extrapolation. This study does
+not constrain or assess that extrapolation, so the submitted basis has not demonstrated the
+stated requirement over 512-2000 Hz.
 
 ## Recommendation fixed for the calibration model and demonstration
 
@@ -292,9 +297,14 @@ detector relative to 21 knots.
   the 200,001-point validation maxima and worst frequencies; `run.json` contains every knot,
   solver tolerance, dependency version, and reproduction command.
 - The cubic basis is anchored against bilby's `CubicSpline` by
-  `tests/studies/test_spline_resolution.py`; the FWHM is independently anchored by the analytic
-  Gaussian identity. The new minimax residuals have no external published numerical reference;
-  they are computational results anchored only to this run and commit.
+  `tests/studies/test_spline_resolution.py`; the non-uniform extension is separately checked there
+  against an independent derivation from the cubic second-derivative continuity and not-a-knot
+  equations. The FWHM is independently anchored by the analytic Gaussian identity. The new
+  minimax residuals have no external published numerical reference; they are computational results
+  anchored only to this run and commit.
+- Refinement stops at `1e-5` in physical fractional amplitude and `1e-5` radians in physical phase
+  (0.001% and 0.000573 degrees). The amplitude LP fits a unit-peak shape, so the code divides the
+  physical tolerance by `abs(AMPLITUDE_PEAK) = 0.10`, yielding `1e-4` in its solver units.
 - The source requirement was derived for Cosmic Explorer and has no independent spectroscopy
   replication identified here. Applying the same threshold to ET remains an unanchored transfer
   assumption. This study measures only representation error and does not predict inference,
@@ -360,7 +370,8 @@ def main() -> None:
             "initial_fit_grid_size": INITIAL_FIT_GRID_SIZE,
             "validation_grid_size": VALIDATION_GRID_SIZE,
             "phase_bisection_steps": PHASE_BISECTION_STEPS,
-            "amplitude_refinement_tolerance": AMPLITUDE_REFINEMENT_TOLERANCE,
+            "amplitude_refinement_tolerance_fraction": AMPLITUDE_REFINEMENT_TOLERANCE_FRACTION,
+            "unit_peak_amplitude_refinement_tolerance": UNIT_PEAK_AMPLITUDE_REFINEMENT_TOLERANCE,
             "phase_refinement_tolerance_radians": PHASE_REFINEMENT_TOLERANCE_RADIANS,
             "max_refinement_iterations": MAX_REFINEMENT_ITERATIONS,
             "noise": False,
@@ -368,7 +379,7 @@ def main() -> None:
         },
         "results": results,
         "claims": {
-            "submitted_basis_misses_requirement": {"supported_by": "submitted-10"},
+            "submitted_basis_not_demonstrated_over_20_2000_hz": {"supported_by": "submitted-10"},
             "recommended_basis_resolves_bump_over_20_2000_hz": {"supported_by": "qnm-dense-19"},
         },
     }

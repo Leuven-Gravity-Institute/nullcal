@@ -69,8 +69,19 @@ def test_minimax_phase_mapping_matches_bilby_for_nonzero_nodes():
     bilby_phase = np.angle(model.get_calibration_factor(frequencies, **parameters))
 
     assert np.any(np.abs(fit.node_values) > 0.0)
+    assert np.rad2deg(fit.max_abs_residual) < 6e-5
+    assert fit.max_abs_residual == pytest.approx(np.max(np.abs(bilby_phase - target)), rel=1e-9)
     np.testing.assert_allclose(analytic_phase, bilby_phase, rtol=1e-12, atol=1e-14)
     np.testing.assert_allclose(fit.values, bilby_phase, rtol=1e-12, atol=1e-14)
+
+
+def test_minimax_phase_rejects_bisection_bounds_crossing_phase_branch():
+    knots = np.geomspace(20.0, 2000.0, 10)
+    frequencies = np.geomspace(20.0, 2000.0, 101)
+    target = np.full(frequencies.size, 0.6 * np.pi)
+
+    with pytest.raises(ValueError, match="bisection bounds"):
+        minimax_phase_spline_fit(frequencies, target, knots)
 
 
 def test_augmented_log_knots_preserves_broadband_grid_and_resolves_peak():
@@ -109,6 +120,68 @@ def test_uniform_log_design_matrix_matches_bilby_basis():
     np.testing.assert_allclose(actual, expected, rtol=1e-12, atol=1e-14)
 
 
+def _independent_not_a_knot_design(frequencies, knots):
+    """Derive the cubic basis from its second-derivative continuity equations."""
+    x = np.log10(knots)
+    sample_x = np.log10(frequencies)
+    intervals = np.searchsorted(x, sample_x, side="right") - 1
+    intervals = np.clip(intervals, 0, x.size - 2)
+    widths = np.diff(x)
+
+    # For identity-valued node data, solve for every basis function's second
+    # derivatives at once. Interior rows enforce C2 continuity. The endpoint
+    # rows equate the adjacent cubic third derivatives (the not-a-knot rule).
+    system = np.zeros((x.size, x.size))
+    right_hand_side = np.zeros((x.size, x.size))
+    system[0, :3] = (-widths[1], widths[0] + widths[1], -widths[0])
+    system[-1, -3:] = (widths[-1], -(widths[-2] + widths[-1]), widths[-2])
+    for index in range(1, x.size - 1):
+        left_width = widths[index - 1]
+        right_width = widths[index]
+        system[index, index - 1 : index + 2] = (
+            left_width,
+            2.0 * (left_width + right_width),
+            right_width,
+        )
+        right_hand_side[index, index - 1 : index + 2] = (
+            6.0 / left_width,
+            -6.0 * (1.0 / left_width + 1.0 / right_width),
+            6.0 / right_width,
+        )
+    second_derivatives = np.linalg.solve(system, right_hand_side)
+
+    design = np.zeros((frequencies.size, knots.size))
+    identity = np.eye(knots.size)
+    for row, (value, interval) in enumerate(zip(sample_x, intervals, strict=True)):
+        width = widths[interval]
+        left_distance = x[interval + 1] - value
+        right_distance = value - x[interval]
+        design[row] = (
+            second_derivatives[interval] * left_distance**3 / (6.0 * width)
+            + second_derivatives[interval + 1] * right_distance**3 / (6.0 * width)
+            + (identity[interval] - second_derivatives[interval] * width**2 / 6.0) * left_distance / width
+            + (identity[interval + 1] - second_derivatives[interval + 1] * width**2 / 6.0) * right_distance / width
+        )
+    return design
+
+
+def test_nonuniform_design_matrix_matches_independent_not_a_knot_derivation():
+    knots = augmented_log_knots(
+        minimum_frequency=8.0,
+        maximum_frequency=2048.0,
+        broadband_count=10,
+        peak_frequency=249.43,
+        local_half_width=50.0,
+        local_count=9,
+    )
+    frequencies = np.geomspace(8.0, 2048.0, 1001)
+
+    expected = _independent_not_a_knot_design(frequencies, knots)
+    actual = spline_design_matrix(frequencies, knots)
+
+    np.testing.assert_allclose(actual, expected, rtol=1e-12, atol=1e-13)
+
+
 @pytest.mark.parametrize(
     ("frequencies", "knots", "match"),
     [
@@ -124,7 +197,8 @@ def test_spline_design_matrix_rejects_invalid_domain(frequencies, knots, match):
 
 def test_study_driver_fixes_candidate_count_and_evaluation_bands():
     script = Path(__file__).parents[2] / "scripts" / "spline_resolution_study.py"
-    configurations = runpy.run_path(script)["configurations"]()
+    driver = runpy.run_path(script)
+    configurations = driver["configurations"]()
 
     assert [configuration.name for configuration in configurations] == [
         "submitted-10",
@@ -145,3 +219,39 @@ def test_study_driver_fixes_candidate_count_and_evaluation_bands():
     recommended = next(configuration for configuration in configurations if configuration.name == "qnm-dense-19")
     assert recommended.knots_hz.size == 19
     assert (recommended.knots_hz[0], recommended.knots_hz[-1]) == (8.0, 2048.0)
+    assert driver["AMPLITUDE_REFINEMENT_TOLERANCE_FRACTION"] == driver["PHASE_REFINEMENT_TOLERANCE_RADIANS"]
+    assert driver["UNIT_PEAK_AMPLITUDE_REFINEMENT_TOLERANCE"] == (
+        driver["AMPLITUDE_REFINEMENT_TOLERANCE_FRACTION"] / abs(driver["AMPLITUDE_PEAK"])
+    )
+
+
+def test_exchange_refinement_adds_missed_extrema_and_improves_validation_level(monkeypatch):
+    script = Path(__file__).parents[2] / "scripts" / "spline_resolution_study.py"
+    driver = runpy.run_path(script)
+    refined_fit = driver["refined_fit"]
+    monkeypatch.setitem(refined_fit.__globals__, "UNIT_PEAK_AMPLITUDE_REFINEMENT_TOLERANCE", 0.0)
+    frequencies = np.linspace(20.0, 512.0, 3001)
+    knots = np.geomspace(8.0, 512.0, 10)
+    target = gaussian_bump(
+        frequencies,
+        peak_value=1.0,
+        peak_frequency=driver["PEAK_FREQUENCY_HZ"],
+        frequency_width=driver["FREQUENCY_WIDTH_HZ"],
+    )
+    basis = spline_design_matrix(frequencies, knots)
+    initial_indices = np.unique(np.linspace(0, frequencies.size - 1, driver["INITIAL_FIT_GRID_SIZE"], dtype=int))
+    initial_fit = minimax_spline_fit(frequencies[initial_indices], target[initial_indices], knots)
+    initial_values = np.einsum("ij,j->i", basis, initial_fit.node_values)
+
+    refined_values, iterations, fit_points = refined_fit(
+        frequencies,
+        target,
+        knots,
+        basis,
+        phase=False,
+    )
+
+    assert frequencies.size > driver["INITIAL_FIT_GRID_SIZE"]
+    assert iterations > 1
+    assert fit_points > driver["INITIAL_FIT_GRID_SIZE"]
+    assert np.max(np.abs(refined_values - target)) < np.max(np.abs(initial_values - target)) - 1e-4

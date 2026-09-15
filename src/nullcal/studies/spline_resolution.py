@@ -114,11 +114,11 @@ def minimax_phase_spline_fit(
     design = spline_design_matrix(frequencies, knots)
     if target_phase.shape != (design.shape[0],) or np.any(~np.isfinite(target_phase)):
         raise ValueError("target_phase must be finite and have one value per frequency")
-    if np.any(np.abs(target_phase) >= np.pi):
-        raise ValueError("target_phase must lie strictly between -pi and pi")
 
     lower_error = 0.0
     upper_error = float(np.max(np.abs(target_phase)))
+    if np.any(np.abs(target_phase) + upper_error >= np.pi):
+        raise ValueError("target_phase +/- bisection bounds must lie strictly between -pi and pi")
     node_values = np.zeros(design.shape[1])
     for _ in range(bisection_steps):
         trial_error = (lower_error + upper_error) / 2.0
