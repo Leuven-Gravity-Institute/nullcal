@@ -141,6 +141,7 @@ def test_classified_keys_cover_every_artifact(reference, computed):
     """
     compared = set(COMPARED_KEYS)
     classified = compared | FED_BACK_INPUT_KEYS
+    assert {"time_frequency_filter"} == FED_BACK_INPUT_KEYS
     assert compared.isdisjoint(FED_BACK_INPUT_KEYS)
     assert classified == set(reference), (
         f"frozen but not classified: {sorted(set(reference) - classified)}; "
@@ -433,6 +434,31 @@ def test_input_generator_dirty_check_covers_source_and_e2e_harness(monkeypatch):
 
     assert generate_reference_inputs._source_is_dirty() is False
     assert received["command"] == ["git", "status", "--porcelain", "--", "src", "tests/e2e"]
+
+
+def test_input_generator_refuses_dirty_source(monkeypatch, tmp_path):
+    """Frozen inputs cannot be generated from modified source or harness code."""
+    artifact_path = tmp_path / "inputs.npz"
+    manifest_path = tmp_path / "inputs_manifest.json"
+    real_check_output = generate_reference_inputs.subprocess.check_output
+
+    def fake_check_output(command, **kwargs):
+        if command[:3] == ["git", "status", "--porcelain"]:
+            return " M tests/e2e/config.py\n"
+        if command[:3] == ["git", "rev-parse", "HEAD"]:
+            return "deadbeef\n"
+        return real_check_output(command, **kwargs)
+
+    monkeypatch.setattr(generate_reference_inputs.subprocess, "check_output", fake_check_output)
+    monkeypatch.setattr(generate_reference_inputs, "REFERENCE_DIR", tmp_path)
+    monkeypatch.setattr(generate_reference_inputs, "INPUT_ARTIFACT_PATH", artifact_path)
+    monkeypatch.setattr(generate_reference_inputs, "INPUT_MANIFEST_PATH", manifest_path)
+
+    with pytest.raises(RuntimeError, match="source or the e2e harness is dirty"):
+        generate_reference_inputs.main()
+
+    assert not artifact_path.exists()
+    assert not manifest_path.exists()
 
 
 def test_frozen_input_builder_does_not_generate_a_waveform(monkeypatch, reference_inputs):

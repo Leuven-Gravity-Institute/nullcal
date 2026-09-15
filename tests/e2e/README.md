@@ -84,7 +84,9 @@ input manifest records the fields previously missing there — detector names,
 derived segment start time and wavelet-probe seed — as well as the spline,
 wavelet and clustering configuration. Its configuration test checks those fields
 against `config.py`, while its SHA-256 entries pin the whitened strain and PSD
-byte-for-byte.
+byte-for-byte. The committed input manifest is not byte-for-byte generator
+output at this revision: its `configuration` block was extended by hand, and its
+layout was formatted separately.
 
 The provenance fields are asserted _present_, never compared against the running
 environment. They say where the artifacts were generated, which is deliberately
