@@ -28,6 +28,12 @@ def _float64(values):
     return jnp.asarray(values, dtype=jnp.float64)
 
 
+def _validate_prior_shapes(values, mean, sigma, parameter):
+    """Require array hyperparameters to match their knot-value shape."""
+    if (mean.ndim != 0 and mean.shape != values.shape) or (sigma.ndim != 0 and sigma.shape != values.shape):
+        raise ValueError(f"{parameter} mean and sigma must be scalar or match the value shape")
+
+
 def _not_a_knot_second_derivatives(log_knots, node_values):
     """Solve the nonuniform not-a-knot cubic-spline continuity equations."""
     knot_count = log_knots.shape[0]
@@ -118,6 +124,8 @@ def calibration_log_prior(
     amplitude_sigma = _float64(amplitude_sigma)
     phase_mean = _float64(phase_mean)
     phase_sigma = _float64(phase_sigma)
+    _validate_prior_shapes(amplitude, amplitude_mean, amplitude_sigma, "amplitude")
+    _validate_prior_shapes(phase, phase_mean, phase_sigma, "phase")
 
     def gaussian_log_prob(values, means, sigmas):
         return -0.5 * jnp.sum(((values - means) / sigmas) ** 2 + jnp.log(2.0 * jnp.pi * sigmas**2))
@@ -138,9 +146,15 @@ def calibration_parameters_to_unconstrained(
     """Map physical Gaussian knot values to standard-normal coordinates."""
     amplitude = _float64(amplitude)
     phase = _float64(phase)
+    amplitude_mean = _float64(amplitude_mean)
+    amplitude_sigma = _float64(amplitude_sigma)
+    phase_mean = _float64(phase_mean)
+    phase_sigma = _float64(phase_sigma)
+    _validate_prior_shapes(amplitude, amplitude_mean, amplitude_sigma, "amplitude")
+    _validate_prior_shapes(phase, phase_mean, phase_sigma, "phase")
     return (
-        (amplitude - _float64(amplitude_mean)) / _float64(amplitude_sigma),
-        (phase - _float64(phase_mean)) / _float64(phase_sigma),
+        (amplitude - amplitude_mean) / amplitude_sigma,
+        (phase - phase_mean) / phase_sigma,
     )
 
 
@@ -153,9 +167,17 @@ def unconstrained_to_calibration_parameters(
     phase_sigma,
 ):
     """Map standard-normal coordinates to physical Gaussian knot values."""
+    unconstrained_amplitude = _float64(unconstrained_amplitude)
+    unconstrained_phase = _float64(unconstrained_phase)
+    amplitude_mean = _float64(amplitude_mean)
+    amplitude_sigma = _float64(amplitude_sigma)
+    phase_mean = _float64(phase_mean)
+    phase_sigma = _float64(phase_sigma)
+    _validate_prior_shapes(unconstrained_amplitude, amplitude_mean, amplitude_sigma, "amplitude")
+    _validate_prior_shapes(unconstrained_phase, phase_mean, phase_sigma, "phase")
     return (
-        _float64(amplitude_mean) + _float64(amplitude_sigma) * _float64(unconstrained_amplitude),
-        _float64(phase_mean) + _float64(phase_sigma) * _float64(unconstrained_phase),
+        amplitude_mean + amplitude_sigma * unconstrained_amplitude,
+        phase_mean + phase_sigma * unconstrained_phase,
     )
 
 

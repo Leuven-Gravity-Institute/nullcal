@@ -200,6 +200,41 @@ def test_log_prior_matches_bilby_gaussian_prior_dict_surface():
     np.testing.assert_allclose(float(actual), expected, rtol=2e-15, atol=0.0)
 
 
+@pytest.mark.parametrize(
+    "function",
+    [
+        calibration_log_prior,
+        calibration_parameters_to_unconstrained,
+        unconstrained_to_calibration_parameters,
+    ],
+)
+def test_prior_helpers_reject_non_scalar_broadcast_hyperparameters(function):
+    """Hyperparameter arrays must not create unintended cross-knot pairings."""
+    values = jnp.array([0.1, 0.2])
+    broadcast_means = jnp.array([[0.0], [0.1]])
+
+    with pytest.raises(ValueError, match="amplitude mean and sigma must be scalar or match the value shape"):
+        function(values, values, broadcast_means, 1.0, 0.0, 1.0)
+
+
+@pytest.mark.parametrize(
+    "function",
+    [
+        calibration_log_prior,
+        calibration_parameters_to_unconstrained,
+        unconstrained_to_calibration_parameters,
+    ],
+)
+def test_prior_helpers_accept_scalar_hyperparameters(function):
+    """Scalar prior hyperparameters may broadcast across all knot values."""
+    values = jnp.array([0.1, 0.2])
+
+    result = jax.jit(function)(values, values, 0.0, 1.0, 0.0, 1.0)
+
+    leaves = jax.tree.leaves(result)
+    assert all(leaf.shape in [(), values.shape] for leaf in leaves)
+
+
 def test_prior_unconstraining_transform_is_invertible_and_jittable():
     """Physical Gaussian knot values must round-trip through standard-normal space."""
     amplitude = jnp.array([-0.03, 0.04])
