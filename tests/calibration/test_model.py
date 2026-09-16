@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-# These imports intentionally fail in the red phase: R13 adds both JAX and the
-# public calibration functions that the tests specify.
 import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
 from bilby.core.prior import Gaussian
 from bilby.gw.detector.calibration import CubicSpline
+from scipy.interpolate import CubicSpline as ScipyCubicSpline
 
 from nullcal.calibration import (
     calibration_factor,
@@ -23,6 +22,11 @@ from nullcal.calibration import (
 # different LAPACK/XLA reduction paths. 1e-11 peak-relative is over 100 times
 # n**2 * float64 epsilon at n=19 while remaining far below any physical scale.
 ANCHOR_PEAK_RELATIVE_TOLERANCE = 1e-11
+
+# Fixed before the first nonuniform comparison. SciPy uses the same not-a-knot
+# definition that is transitively validated against bilby on uniform log grids;
+# the float64 solve has the same at-most-19-dimensional round-off basis above.
+NONUNIFORM_PEAK_RELATIVE_TOLERANCE = 1e-11
 
 # Fixed before the first gradient comparison is run. A centred finite difference
 # with a 1e-6 step has O(h**2) truncation and O(eps/h) round-off; these tolerances
@@ -64,8 +68,8 @@ def test_uniform_log_spline_matches_bilby_over_knot_grid(minimum, maximum, count
     assert peak_relative < ANCHOR_PEAK_RELATIVE_TOLERANCE
 
 
-def test_nonuniform_recommended_knots_are_parameters_and_interpolate_node_values():
-    """The M2 knot placement must be accepted as data, not compiled-in constants."""
+def test_nonuniform_not_a_knot_spline_matches_scipy_off_knots():
+    """The nonuniform spectroscopy grid must match an independent off-knot reference."""
     knots = np.array(
         [
             8.000,
@@ -91,17 +95,18 @@ def test_nonuniform_recommended_knots_are_parameters_and_interpolate_node_values
     )
     amplitude = 0.03 * np.sin(np.linspace(0.0, 2.0 * np.pi, knots.size))
     phase = 0.05 * np.cos(np.linspace(0.0, 2.0 * np.pi, knots.size))
+    frequencies = np.geomspace(20.0, 2000.0, 1001)
+    assert not np.any(np.isclose(frequencies[:, None], knots[None, :], rtol=0.0, atol=1e-12))
 
-    factor = np.asarray(calibration_factor(knots, knots, amplitude, phase))
+    log_knots = np.log10(knots)
+    log_frequencies = np.log10(frequencies)
+    expected_amplitude = ScipyCubicSpline(log_knots, amplitude, bc_type="not-a-knot")(log_frequencies)
+    expected_phase = ScipyCubicSpline(log_knots, phase, bc_type="not-a-knot")(log_frequencies)
+    expected = (1.0 + expected_amplitude) * (2.0 + 1j * expected_phase) / (2.0 - 1j * expected_phase)
+    actual = np.asarray(calibration_factor(frequencies, knots, amplitude, phase))
+    peak_relative = np.max(np.abs(actual - expected)) / np.max(np.abs(expected))
 
-    roundoff = 2.0 * np.finfo(np.float64).eps
-    np.testing.assert_allclose(np.abs(factor) - 1.0, amplitude, rtol=2e-14, atol=roundoff)
-    np.testing.assert_allclose(
-        np.angle(factor),
-        2.0 * np.arctan(phase / 2.0),
-        rtol=2e-14,
-        atol=roundoff,
-    )
+    assert peak_relative < NONUNIFORM_PEAK_RELATIVE_TOLERANCE
 
 
 def test_calibration_factor_is_jitted_and_explicitly_float64_complex128():

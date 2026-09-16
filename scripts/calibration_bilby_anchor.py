@@ -1,4 +1,4 @@
-"""Print the R13 calibration-factor and gradient anchor table."""
+"""Print the bilby calibration-factor and gradient anchor table."""
 
 from __future__ import annotations
 
@@ -9,21 +9,46 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 from bilby.gw.detector.calibration import CubicSpline
+from scipy.interpolate import CubicSpline as ScipyCubicSpline
 
 from nullcal.calibration import calibration_factor
 
 ANCHOR_PEAK_RELATIVE_TOLERANCE = 1e-11
+NONUNIFORM_PEAK_RELATIVE_TOLERANCE = 1e-11
 FINITE_DIFFERENCE_STEP = 1e-6
 GRADIENT_RTOL = 5e-7
 GRADIENT_ATOL = 5e-9
 
 CONFIGURATIONS = (
-    ("compact", 8.0, 512.0, 4),
-    ("requirement", 20.0, 2000.0, 7),
-    ("broadband", 8.0, 2048.0, 10),
-    ("dense", 8.0, 2048.0, 19),
+    (8.0, 512.0, 4),
+    (20.0, 2000.0, 7),
+    (8.0, 2048.0, 10),
+    (8.0, 2048.0, 19),
 )
 NODE_SCALES = (0.0, 0.01, 0.2)
+NONUNIFORM_KNOTS = np.array(
+    [
+        8.000,
+        14.814,
+        27.432,
+        50.797,
+        94.063,
+        174.181,
+        199.430,
+        211.930,
+        224.430,
+        236.930,
+        249.430,
+        261.930,
+        274.430,
+        286.930,
+        299.430,
+        322.540,
+        597.263,
+        1105.981,
+        2048.000,
+    ]
+)
 
 
 def bilby_factor(frequencies, knots, amplitude, phase):
@@ -40,8 +65,8 @@ def bilby_factor(frequencies, knots, amplitude, phase):
 
 
 def factor_rows():
-    """Yield bilby/JAX comparison rows over placements, counts, and values."""
-    for placement, minimum, maximum, count in CONFIGURATIONS:
+    """Yield bilby/JAX rows over uniform-log bands, counts, and values."""
+    for minimum, maximum, count in CONFIGURATIONS:
         knots = np.geomspace(minimum, maximum, count)
         frequencies = np.geomspace(minimum, maximum, 257)
         coordinate = np.linspace(-1.0, 1.0, count)
@@ -52,8 +77,52 @@ def factor_rows():
             actual = np.asarray(calibration_factor(frequencies, knots, amplitude, phase))
             deviation = float(np.max(np.abs(actual - expected)) / np.max(np.abs(expected)))
             if deviation >= ANCHOR_PEAK_RELATIVE_TOLERANCE:
-                raise AssertionError(f"bilby anchor failed for {placement}/{count}/{node_scale}: {deviation}")
-            yield placement, minimum, maximum, count, node_scale, deviation
+                raise AssertionError(f"bilby anchor failed for {minimum}-{maximum}/{count}/{node_scale}: {deviation}")
+            yield minimum, maximum, count, node_scale, deviation
+
+
+def extrapolation_deviation():
+    """Compare bilby and JAX below and above a uniform-log knot band."""
+    minimum, maximum, count = 20.0, 2000.0, 7
+    knots = np.geomspace(minimum, maximum, count)
+    coordinate = np.linspace(-1.0, 1.0, count)
+    amplitude = 0.2 * (coordinate**3 - 0.2 * coordinate)
+    phase = 0.2 * (coordinate**2 - 0.4)
+    frequencies = np.concatenate([np.geomspace(10.0, 19.9, 200), np.geomspace(2000.1, 4000.0, 200)])
+    expected = bilby_factor(frequencies, knots, amplitude, phase)
+    actual = np.asarray(calibration_factor(frequencies, knots, amplitude, phase))
+    deviation = float(np.max(np.abs(actual - expected)) / np.max(np.abs(expected)))
+    if deviation >= ANCHOR_PEAK_RELATIVE_TOLERANCE:
+        raise AssertionError(f"bilby extrapolation anchor failed: {deviation}")
+    return deviation
+
+
+def nonuniform_scipy_deviations():
+    """Compare the nonuniform model to SciPy and transitively validate SciPy."""
+    frequencies = np.geomspace(20.0, 2000.0, 1001)
+    amplitude = 0.03 * np.sin(np.linspace(0.0, 2.0 * np.pi, NONUNIFORM_KNOTS.size))
+    phase = 0.05 * np.cos(np.linspace(0.0, 2.0 * np.pi, NONUNIFORM_KNOTS.size))
+
+    def scipy_factor(knots, node_amplitude, node_phase):
+        log_knots = np.log10(knots)
+        log_frequencies = np.log10(frequencies)
+        interpolated_amplitude = ScipyCubicSpline(log_knots, node_amplitude, bc_type="not-a-knot")(log_frequencies)
+        interpolated_phase = ScipyCubicSpline(log_knots, node_phase, bc_type="not-a-knot")(log_frequencies)
+        return (1.0 + interpolated_amplitude) * (2.0 + 1j * interpolated_phase) / (2.0 - 1j * interpolated_phase)
+
+    scipy_nonuniform = scipy_factor(NONUNIFORM_KNOTS, amplitude, phase)
+    jax_nonuniform = np.asarray(calibration_factor(frequencies, NONUNIFORM_KNOTS, amplitude, phase))
+    nonuniform_deviation = float(np.max(np.abs(jax_nonuniform - scipy_nonuniform)) / np.max(np.abs(scipy_nonuniform)))
+
+    uniform_knots = np.geomspace(20.0, 2000.0, 19)
+    scipy_uniform = scipy_factor(uniform_knots, amplitude, phase)
+    bilby_uniform = bilby_factor(frequencies, uniform_knots, amplitude, phase)
+    transitive_deviation = float(np.max(np.abs(bilby_uniform - scipy_uniform)) / np.max(np.abs(bilby_uniform)))
+    if max(nonuniform_deviation, transitive_deviation) >= NONUNIFORM_PEAK_RELATIVE_TOLERANCE:
+        raise AssertionError(
+            f"SciPy not-a-knot anchor failed: nonuniform={nonuniform_deviation}, transitive={transitive_deviation}"
+        )
+    return nonuniform_deviation, transitive_deviation
 
 
 def gradient_rows():
@@ -100,6 +169,8 @@ def main():
     parser.add_argument("--commit", required=True, help="commit that produced the measurements")
     commit = parser.parse_args().commit
     rows = list(factor_rows())
+    extrapolation = extrapolation_deviation()
+    nonuniform, scipy_to_bilby = nonuniform_scipy_deviations()
     gradients = list(gradient_rows())
     print("# Bilby calibration-model anchor")
     print()
@@ -113,14 +184,38 @@ def main():
         "LAPACK/XLA reductions while remaining negligible on the physical scale."
     )
     print()
-    print("| Placement | Band (Hz) | Knots | Node scale | Peak-relative deviation |")
-    print("| --- | ---: | ---: | ---: | ---: |")
-    for placement, minimum, maximum, count, node_scale, deviation in rows:
-        print(f"| {placement} | {minimum:g}-{maximum:g} | {count} | {node_scale:g} | {deviation:.17g} |")
+    print(
+        "Bilby fixes knot placement to uniform spacing in log frequency. The table therefore "
+        "sweeps only band, knot count, and node scale; it does not sweep knot placement."
+    )
+    print()
+    print("| Band (Hz) | Knots | Node scale | Peak-relative deviation |")
+    print("| ---: | ---: | ---: | ---: |")
+    for minimum, maximum, count, node_scale, deviation in rows:
+        print(f"| {minimum:g}-{maximum:g} | {count} | {node_scale:g} | {deviation:.17g} |")
     print()
     print(
         f"Worst factor deviation: `{max(row[-1] for row in rows):.17g}` "
         f"(tolerance `{ANCHOR_PEAK_RELATIVE_TOLERANCE:.0e}`)."
+    )
+    print()
+    print("## Extrapolation")
+    print()
+    print(
+        "On the 7-knot 20-2000 Hz uniform-log model, 200 frequencies from 10-19.9 Hz and 200 "
+        "from 2000.1-4000 Hz give peak-relative bilby/JAX deviation "
+        f"`{extrapolation:.17g}` (tolerance `{ANCHOR_PEAK_RELATIVE_TOLERANCE:.0e}`)."
+    )
+    print()
+    print("## Nonuniform knot placement")
+    print()
+    print(
+        "The 19-knot nonuniform spectroscopy grid has no bilby anchor by construction because "
+        "bilby hard-codes uniform-log knots. SciPy's not-a-knot `CubicSpline` covers that "
+        "generalisation: SciPy agrees with bilby on the corresponding 19-knot uniform-log grid "
+        f"to `{scipy_to_bilby:.17g}`, and JAX agrees with SciPy on the nonuniform grid at 1001 "
+        f"off-knot frequencies over 20-2000 Hz to `{nonuniform:.17g}` (tolerance "
+        f"`{NONUNIFORM_PEAK_RELATIVE_TOLERANCE:.0e}`)."
     )
     print()
     print(
@@ -134,6 +229,11 @@ def main():
     print("| --- | ---: | ---: |")
     for name, absolute, peak_relative in gradients:
         print(f"| {name} | {absolute:.17g} | {peak_relative:.17g} |")
+    print()
+    print(
+        "This runner intentionally requires bilby. The checked-in table is the durable record for "
+        "use after bilby is removed from the runtime dependency set."
+    )
 
 
 if __name__ == "__main__":

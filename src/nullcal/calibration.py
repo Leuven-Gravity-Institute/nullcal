@@ -3,6 +3,10 @@
 The spline interpolates amplitude and latent phase in log10 frequency using
 not-a-knot boundary conditions.  This is bilby's ``CubicSpline`` model for a
 uniform log-frequency grid and also permits nonuniform knot placement.
+
+Importing this module enables JAX's process-wide ``jax_enable_x64`` setting.
+Calibration inference requires float64 precision, so this side effect is an
+intentional part of the module's public behavior.
 """
 
 from __future__ import annotations
