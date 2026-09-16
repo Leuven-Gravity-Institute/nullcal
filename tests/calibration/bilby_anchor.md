@@ -1,6 +1,6 @@
 # Bilby calibration-model anchor
 
-Producing commit: `4ea94524ee16b4b4e903671fed35799f7a0038bd`
+Producing commit: `21d6b8b91809bafbed35b2805ba52353fff8e3a4`
 Versions: bilby 2.8.2, JAX 0.11.1, NumPy 2.3.5.
 
 The factor tolerance was fixed before comparison at peak-relative `1e-11`. Both paths solve the same at-most-19-dimensional float64 system; the bound is over 100 times `n^2 * eps` at `n=19`, allowing different LAPACK/XLA reductions while remaining negligible on the physical scale.

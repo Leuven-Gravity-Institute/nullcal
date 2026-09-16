@@ -54,7 +54,7 @@ def _bilby_factor(frequencies, knots, amplitude, phase):
 )
 @pytest.mark.parametrize("node_scale", [0.0, 0.01, 0.2])
 def test_uniform_log_spline_matches_bilby_over_knot_grid(minimum, maximum, count, node_scale):
-    """Knot counts, placements, and node values must preserve bilby's model."""
+    """Knot counts, bands, and node values must match bilby, which cannot express nonuniform placement."""
     knots = np.geomspace(minimum, maximum, count)
     frequencies = np.geomspace(minimum, maximum, 257)
     coordinate = np.linspace(-1.0, 1.0, count)
