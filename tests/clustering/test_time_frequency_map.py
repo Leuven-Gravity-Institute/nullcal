@@ -13,6 +13,7 @@ import pytest
 from bilby.gw.detector import InterferometerList
 
 from nullcal.clustering.time_frequency_map import construct_time_frequency_map
+from nullcal.data import InterferometerData
 
 
 @pytest.mark.unit
@@ -61,7 +62,16 @@ def test_power_adds_over_detectors(interferometers, time_frequency_transform):
     axis is a multiplication by three -- arithmetic, not a measurement. A map that averaged instead
     of summing, or that dropped a detector, fails here and nowhere else in this file.
     """
-    single = InterferometerList([interferometers[0]])
+    single = InterferometerData(
+        psd=interferometers.psd[:1],
+        strain=interferometers.strain[:1],
+        mask=interferometers.mask[:1],
+        frequency_array=interferometers.frequency_array,
+        duration=interferometers.duration,
+        sampling_frequency=interferometers.sampling_frequency,
+        start_time=interferometers.start_time,
+        name=interferometers.name[:1],
+    )
 
     combined_map = construct_time_frequency_map(interferometers, time_frequency_transform)
     single_map = construct_time_frequency_map(single, time_frequency_transform)
@@ -81,7 +91,9 @@ def test_zero_strain_gives_a_zero_map(time_frequency_transform, burst_parameters
         start_time=0.0,
     )
 
-    time_frequency_map = construct_time_frequency_map(ifos, time_frequency_transform)
+    time_frequency_map = construct_time_frequency_map(
+        InterferometerData.from_interferometers(ifos), time_frequency_transform
+    )
 
     assert np.all(time_frequency_map == 0.0)
 
@@ -95,17 +107,16 @@ def test_map_scales_quadratically_with_strain_amplitude(interferometers, time_fr
     cover this.
     """
     reference = construct_time_frequency_map(interferometers, time_frequency_transform)
-    scaled = InterferometerList(["ET"])
-    sampling_frequency = burst_parameters["sampling_frequency"]
-    duration = burst_parameters["duration"]
-    scaled.set_strain_data_from_zero_noise(sampling_frequency=sampling_frequency, duration=duration, start_time=0.0)
-    for scaled_ifo, ifo in zip(scaled, interferometers, strict=True):
-        scaled_ifo.set_strain_data_from_frequency_domain_strain(
-            2.0 * ifo.frequency_domain_strain,
-            sampling_frequency=sampling_frequency,
-            duration=duration,
-            start_time=0.0,
-        )
+    scaled = InterferometerData(
+        psd=interferometers.psd,
+        strain=2.0 * interferometers.strain,
+        mask=interferometers.mask,
+        frequency_array=interferometers.frequency_array,
+        duration=interferometers.duration,
+        sampling_frequency=interferometers.sampling_frequency,
+        start_time=interferometers.start_time,
+        name=interferometers.name,
+    )
 
     doubled = construct_time_frequency_map(scaled, time_frequency_transform)
 

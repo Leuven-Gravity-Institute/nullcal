@@ -73,9 +73,9 @@ sys.path.insert(0, "tests")
 sys.path.insert(0, ".")
 
 import bilby
+from bilby.gw.prior import CalibrationPriorDict
 
 from nullcal.likelihood import RecalibrationLikelihood
-from nullcal.prior import CalibrationPriorDict
 from tests.e2e import config, pipeline
 
 #: Prior widths. Fixed here; changing either invalidates the artifact.
@@ -151,24 +151,7 @@ def build_prior() -> CalibrationPriorDict:
 
 def build_likelihood() -> RecalibrationLikelihood:
     """The reference likelihood, built through the frozen e2e construction path."""
-    interferometers = pipeline.build_interferometers()
-    waveform_generator = pipeline.build_waveform_generator()
-
-    directory = Path("scratchpad") / "clustering"
-    directory.mkdir(parents=True, exist_ok=True)
-    parameter_file = directory / "clustering_parameters.csv"
-    import pandas as pd
-
-    pd.DataFrame([config.SOURCE_PARAMETERS]).to_csv(parameter_file, index=False)
-
-    return RecalibrationLikelihood(
-        interferometers=interferometers,
-        waveform_generator=waveform_generator,
-        wavelet_transform_frequency_resolution=config.FREQUENCY_RESOLUTION,
-        wavelet_transform_nx=config.NX,
-        clustering_parameter_file=str(parameter_file),
-        clustering_threshold=config.CLUSTERING_THRESHOLD,
-    )
+    return pipeline.build_likelihood()
 
 
 def check_responds_to_parameters(likelihood: RecalibrationLikelihood, prior: CalibrationPriorDict) -> None:

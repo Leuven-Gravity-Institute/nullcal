@@ -475,7 +475,5 @@ def test_frozen_input_builder_does_not_generate_a_waveform(monkeypatch, referenc
         likelihood.null_stream_calculator._whitened_frequency_domain_strain_array,
         reference_inputs["whitened_frequency_domain_strain"],
     )
-    actual_psd = np.array(
-        [interferometer.power_spectral_density_array for interferometer in likelihood.interferometers]
-    )
+    actual_psd = likelihood.interferometers.psd
     assert np.array_equal(actual_psd, reference_inputs["power_spectral_density"])

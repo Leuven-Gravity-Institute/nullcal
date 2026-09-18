@@ -1,0 +1,3 @@
+# `nullcal.data`
+
+::: nullcal.data

@@ -6,11 +6,9 @@ import logging
 
 import numpy as np
 from bilby.core.likelihood import Likelihood
-from bilby.gw.detector import InterferometerList
-from bilby.gw.waveform_generator import WaveformGenerator
 
-from ..clustering.injection import InjectionClustering
 from ..clustering.precompute import PrecomputedClustering
+from ..data import InterferometerData
 from ..null_stream.null_stream import NullStream
 from ..time_frequency_transform.wavelet_transforms import WaveletTransform
 
@@ -39,38 +37,29 @@ class RecalibrationLikelihood(Likelihood):
 
     def __init__(
         self,
-        interferometers: InterferometerList,
-        waveform_generator: WaveformGenerator,
+        interferometers: InterferometerData,
         wavelet_transform_frequency_resolution: float = 4,
         wavelet_transform_nx: float = 4,
         time_frequency_filter: np.ndarray | None = None,
-        clustering_parameter_file: str | None = None,
-        clustering_threshold: float = 0.1,
-        enforce_signal_duration: bool = False,
     ):
         """Time-frequency likelihood.
 
         Args:
-            interferometers (InterferometerList): A list of interferometers.
-            waveform_generator (WaveformGenerator): Waveform generator.
+            interferometers (InterferometerData): Frozen detector arrays and metadata.
             wavelet_transform_frequency_resolution (float, optional): Frequency resolution of wavelet transform.
                 Defaults to 4.
             wavelet_transform_nx (float, optional): The sharpness of the wavelet.
                 Defaults to 4.
             time_frequency_filter (np.ndarray | None, optional): A time-frequency filter.
                 Defaults to None.
-            clustering_parameter_file (str | None, optional): A file to the parameters for clustering.
-                Defaults to None.
-            clustering_threshold (float, optional): The clustering threshold.
-                Defaults to 0.1.
-            enforce_signal_duration (bool, optional): Enforce signal duration to be smaller than that of data.
-                Defaults to False.
         """
         super().__init__({})
-        self.interferometers = InterferometerList(interferometers)
+        if not isinstance(interferometers, InterferometerData):
+            raise TypeError("interferometers must be an InterferometerData instance")
+        self.interferometers = interferometers
 
-        duration = self.interferometers[0].duration
-        sampling_frequency = self.interferometers[0].sampling_frequency
+        duration = self.interferometers.duration
+        sampling_frequency = self.interferometers.sampling_frequency
 
         # Construct the wavelet transform instance
         # for time-frequency transform.
@@ -82,24 +71,12 @@ class RecalibrationLikelihood(Likelihood):
         )
 
         # Construct the time-frequency filter.
-        if time_frequency_filter is not None:
-            self.clustering = PrecomputedClustering(
-                time_frequency_transform=self.time_frequency_transform, time_frequency_filter=time_frequency_filter
-            )
-            logger.info("Loaded a pre-computed time-frequency filter.")
-        elif clustering_parameter_file is not None:
-            self.clustering = InjectionClustering(
-                time_frequency_transform=self.time_frequency_transform,
-                interferometers=interferometers,
-                waveform_generator=waveform_generator,
-                parameter_file=clustering_parameter_file,
-                threshold=clustering_threshold,
-                enforce_signal_duration=enforce_signal_duration,
-            )
-            logger.info("Loaded a parameter file: %s", clustering_parameter_file)
-            logger.info("Injection clustering will be performed.")
-        else:
-            raise ValueError("Both time_frequency_filter and clustering_parameter_file are not provided.")
+        if time_frequency_filter is None:
+            raise ValueError("time_frequency_filter must be precomputed before likelihood construction")
+        self.clustering = PrecomputedClustering(
+            time_frequency_transform=self.time_frequency_transform, time_frequency_filter=time_frequency_filter
+        )
+        logger.info("Loaded a pre-computed time-frequency filter.")
         # Construct a null stream calculator.
         self.null_stream_calculator = NullStream(
             interferometers=interferometers,
@@ -110,44 +87,22 @@ class RecalibrationLikelihood(Likelihood):
         self._noise_log_likelihood = None
 
     @property
-    def interferometers(self) -> InterferometerList:
-        """A list of interferometers.
+    def interferometers(self) -> InterferometerData:
+        """Frozen detector arrays and metadata.
 
         Returns:
-            InterferometerList: A list of interferometers.
+            InterferometerData: Frozen detector arrays and metadata.
         """
 
         return self._interferometers
 
     @interferometers.setter
-    def interferometers(self, value: InterferometerList):
-        """Set the interferometers.
+    def interferometers(self, value: InterferometerData):
+        """Set the frozen detector data.
 
         Args:
-            value (InterferometerList): A list of interferometers.
-
-        Raises:
-            ValueError: The interferometers do not have the same sampling frequency.
-            ValueError: The interferometers do not have the same duration.
-            ValueError: The interferometers do not have the same start time.
+            value (InterferometerData): Frozen detector arrays and metadata.
         """
-        # Check whether the sampling frequencies are the same.
-        sampling_frequency_array = [ifo.sampling_frequency for ifo in value]
-
-        if not np.allclose(sampling_frequency_array, sampling_frequency_array[0]):
-            raise ValueError(
-                f"The interferometers do not have the same sampling frequency: {sampling_frequency_array}."
-            )
-        # Check whether the durations are the same.
-        duration_array = [ifo.duration for ifo in value]
-
-        if not np.allclose(duration_array, duration_array[0]):
-            raise ValueError(f"The interferometers do not have the same duration: {duration_array}.")
-        # Check whether the start times are the same.
-        start_time_array = [ifo.start_time for ifo in value]
-
-        if not np.allclose(start_time_array, start_time_array[0]):
-            raise ValueError(f"The interferometers do not have the same start time: {start_time_array}.")
         self._interferometers = value
 
     def log_likelihood(self) -> float:

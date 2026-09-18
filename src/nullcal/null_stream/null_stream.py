@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import numpy as np
-from bilby.gw.detector import InterferometerList
 
+from ..calibration import MINIMUM_CUBIC_SPLINE_KNOTS, calibration_factor
+from ..data import InterferometerData
 from ..time_frequency_transform.wavelet_transforms import WaveletTransform
 from .calibration import compute_calibrated_whitened_antenna_response
 from .projector import compute_projector
@@ -62,14 +63,14 @@ class NullStream:
 
     def __init__(
         self,
-        interferometers: InterferometerList,
+        interferometers: InterferometerData,
         time_frequency_transform: WaveletTransform,
         time_frequency_filter: np.ndarray,
     ):
         """A null stream calculator.
 
         Args:
-            interferometers (InterferometerList): An InterferometerList instance.
+            interferometers (InterferometerData): Frozen detector arrays and metadata.
             time_frequency_transform (WaveletTransform): A WaveletTransform instance.
             time_frequency_filter (np.ndarray): A time-frequency filter.
         """
@@ -78,25 +79,25 @@ class NullStream:
         self.time_frequency_filter = time_frequency_filter
 
         # Pre-compute the whitened quantities.
-        self.frequency_mask = np.all([ifo.frequency_mask for ifo in self.interferometers], axis=0)
-        self.masked_frequency_array = interferometers[0].frequency_array[self.frequency_mask]
+        self.frequency_mask = np.all(self.interferometers.mask, axis=0)
+        self.masked_frequency_array = self.interferometers.frequency_array[self.frequency_mask]
         # Construct the noise weighed antenna pattern
         # This is the orthogonalized beam pattern matrix, correct for ET only,
         # ignoring the small difference in location of the detectors.
         beam_pattern_matrix = np.array(
             [[-1.0 / np.sqrt(6), -1 / np.sqrt(2)], [np.sqrt(6) / 3, 0], [-1 / np.sqrt(6), 1 / np.sqrt(2)]]
         )
-        power_spectral_density_array = np.array([ifo.power_spectral_density_array.copy() for ifo in interferometers])
+        power_spectral_density_array = np.asarray(interferometers.psd)
         self._whitened_antenna_response = compute_whitened_antenna_response(
             beam_pattern_matrix,
             power_spectral_density_array,
-            1 / self.interferometers[0].duration,
+            1 / self.interferometers.duration,
             self.frequency_mask,
         )
         self._whitened_frequency_domain_strain_array = compute_whitened_frequency_domain_strain(
-            frequency_domain_strain_array=np.array([ifo.frequency_domain_strain for ifo in interferometers]),
+            frequency_domain_strain_array=np.asarray(interferometers.strain),
             power_spectral_density_array=power_spectral_density_array,
-            delta_f=1.0 / interferometers[0].duration,
+            delta_f=1.0 / interferometers.duration,
             frequency_mask=self.frequency_mask,
         )
 
@@ -122,7 +123,7 @@ class NullStream:
             np.ndarray: Calibrated frequency domain null stream. Dimensions: (detector, frequency).
         """
         calibrated_whitened_antenna_response = compute_calibrated_whitened_antenna_response(
-            self._whitened_antenna_response, calibration_factor, self.interferometers[0].frequency_mask
+            self._whitened_antenna_response, calibration_factor, self.frequency_mask
         )
         projector = compute_projector(calibrated_whitened_antenna_response, frequency_mask=self.frequency_mask)
         # Dimensions: (frequency, detector)
@@ -190,16 +191,49 @@ class NullStream:
         Returns:
             np.ndarray: Calibration factor.
         """
-        calibration_factor = np.array(
+        detector_nodes = []
+        expected_keys = set()
+        for name in self.interferometers.name:
+            prefix = f"recalib_{name}_"
+            frequency_indices = sorted(
+                int(key.removeprefix(f"{prefix}frequency_"))
+                for key in parameters
+                if key.startswith(f"{prefix}frequency_") and key.removeprefix(f"{prefix}frequency_").isdigit()
+            )
+            if (
+                frequency_indices != list(range(len(frequency_indices)))
+                or len(frequency_indices) < MINIMUM_CUBIC_SPLINE_KNOTS
+            ):
+                raise ValueError("calibration parameters do not match the required detector spline nodes")
+            keys = {
+                f"{prefix}{quantity}_{index}"
+                for quantity in ("frequency", "amplitude", "phase")
+                for index in frequency_indices
+            }
+            expected_keys.update(keys)
+            detector_nodes.append((prefix, frequency_indices))
+
+        supplied_keys = {key for key in parameters if key.startswith("recalib_")}
+        if supplied_keys != expected_keys:
+            missing = sorted(expected_keys - supplied_keys)
+            unexpected = sorted(supplied_keys - expected_keys)
+            raise ValueError(
+                f"calibration parameters do not match the required keys; missing={missing}, unexpected={unexpected}"
+            )
+
+        calibration_factor_array = np.asarray(
             [
-                ifo.calibration_model.get_calibration_factor(
-                    frequency_array=self.masked_frequency_array, prefix=f"recalib_{ifo.name}_", **parameters
+                calibration_factor(
+                    self.masked_frequency_array,
+                    [parameters[f"{prefix}frequency_{index}"] for index in indices],
+                    [parameters[f"{prefix}amplitude_{index}"] for index in indices],
+                    [parameters[f"{prefix}phase_{index}"] for index in indices],
                 )
-                for ifo in self.interferometers
+                for prefix, indices in detector_nodes
             ]
         )
         output = np.zeros_like(self._whitened_frequency_domain_strain_array)
-        output[:, self.frequency_mask] = calibration_factor
+        output[:, self.frequency_mask] = calibration_factor_array
 
         return output
 

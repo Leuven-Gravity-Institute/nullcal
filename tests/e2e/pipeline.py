@@ -9,19 +9,20 @@ from __future__ import annotations
 
 import contextlib
 import logging
-import tempfile
 from collections.abc import Iterator
 from pathlib import Path
 
 import bilby.core.utils.random
 import numpy as np
-import pandas as pd
 from bilby.gw.conversion import convert_to_lal_binary_black_hole_parameters
 from bilby.gw.detector import CubicSpline, InterferometerList, PowerSpectralDensity
 from bilby.gw.source import lal_binary_black_hole
 from bilby.gw.waveform_generator import WaveformGenerator
 
+from nullcal.clustering.injection import InjectionClustering
+from nullcal.data import InterferometerData
 from nullcal.likelihood import RecalibrationLikelihood
+from nullcal.time_frequency_transform.wavelet_transforms import WaveletTransform
 
 from . import config
 
@@ -122,23 +123,46 @@ def build_interferometers_from_reference_inputs(reference_inputs: dict[str, np.n
     return interferometers
 
 
+def build_injection_data(interferometers, waveform_generator, parameters) -> InterferometerData:
+    """Prepare one zero-noise injection outside the likelihood boundary."""
+    injected = InterferometerList(["ET"])
+    for index, interferometer in enumerate(injected):
+        interferometer.power_spectral_density = interferometers[index].power_spectral_density
+        interferometer.calibration_model = interferometers[index].calibration_model
+    injected.set_strain_data_from_zero_noise(
+        sampling_frequency=interferometers[0].sampling_frequency,
+        duration=interferometers[0].duration,
+        start_time=interferometers[0].start_time,
+    )
+    injected.inject_signal(waveform_generator=waveform_generator, parameters=parameters)
+    return InterferometerData.from_interferometers(injected)
+
+
 def build_likelihood(tmp_path: Path | None = None) -> RecalibrationLikelihood:
     """The full recalibration likelihood, with an injection-clustering time-frequency filter."""
     interferometers = build_interferometers()
     waveform_generator = build_waveform_generator()
 
-    directory = Path(tempfile.mkdtemp()) if tmp_path is None else tmp_path
-    parameter_file = directory / "clustering_parameters.csv"
-    pd.DataFrame([config.SOURCE_PARAMETERS]).to_csv(parameter_file, index=False)
+    transform = WaveletTransform(
+        duration=config.DURATION,
+        sampling_frequency=config.SAMPLING_FREQUENCY,
+        frequency_resolution=config.FREQUENCY_RESOLUTION,
+        nx=config.NX,
+    )
+    clustering = InjectionClustering(
+        time_frequency_transform=transform,
+        injections=[build_injection_data(interferometers, waveform_generator, config.SOURCE_PARAMETERS)],
+        threshold=config.CLUSTERING_THRESHOLD,
+        minimum_frequency=config.MINIMUM_FREQUENCY,
+        maximum_frequency=config.MAXIMUM_FREQUENCY,
+    )
 
     with quiet_loggers():
         return RecalibrationLikelihood(
-            interferometers=interferometers,
-            waveform_generator=waveform_generator,
+            interferometers=InterferometerData.from_interferometers(interferometers),
             wavelet_transform_frequency_resolution=config.FREQUENCY_RESOLUTION,
             wavelet_transform_nx=config.NX,
-            clustering_parameter_file=str(parameter_file),
-            clustering_threshold=config.CLUSTERING_THRESHOLD,
+            time_frequency_filter=clustering.time_frequency_filter,
         )
 
 
@@ -155,8 +179,7 @@ def build_likelihood_from_reference_inputs() -> RecalibrationLikelihood:
     interferometers = build_interferometers_from_reference_inputs(reference_inputs)
     with quiet_loggers():
         likelihood = RecalibrationLikelihood(
-            interferometers=interferometers,
-            waveform_generator=None,
+            interferometers=InterferometerData.from_interferometers(interferometers),
             wavelet_transform_frequency_resolution=config.FREQUENCY_RESOLUTION,
             wavelet_transform_nx=config.NX,
             time_frequency_filter=time_frequency_filter,

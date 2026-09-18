@@ -5,8 +5,8 @@ from __future__ import annotations
 import logging
 
 import numpy as np
-from bilby.gw.detector import InterferometerList
 
+from ..data import InterferometerData
 from ..time_frequency_transform.wavelet_transforms import WaveletTransform
 from .time_frequency_map import construct_time_frequency_map
 
@@ -103,7 +103,7 @@ def clustering(tf_filter: np.ndarray, dt: float, df: float, padding_time: float 
 
 
 def single_clustering_by_quantile(
-    interferometers: InterferometerList,
+    interferometers: InterferometerData,
     time_frequency_transform: WaveletTransform,
     quantile: float,
     padding_time: float = 0.05,
@@ -116,7 +116,7 @@ def single_clustering_by_quantile(
     This function only selects the largest cluster.
 
     Args:
-        interferometers (InterferometerList): A list of interferometers.
+        interferometers (InterferometerData): Frozen detector arrays and metadata.
         frequency_resolution (float): The frequency resolution in Hz.
         nx (float): The sharpness of wavelet.
         quantile (float): The quantile to define the threshold.
@@ -144,7 +144,7 @@ def single_clustering_by_quantile(
         time_frequency_map[:, freq_high_idx + 1 :] = 0.0
     threshold = np.quantile(time_frequency_map[time_frequency_map > 0.0], quantile)
     tf_filter = time_frequency_map > threshold
-    dt = interferometers[0].duration / time_frequency_transform.shape[0]
+    dt = interferometers.duration / time_frequency_transform.shape[0]
     output = clustering(
         tf_filter,
         dt,
@@ -156,7 +156,7 @@ def single_clustering_by_quantile(
 
 
 def single_clustering_by_threshold(
-    interferometers: InterferometerList,
+    interferometers: InterferometerData,
     time_frequency_transform: WaveletTransform,
     threshold: float,
     padding_time: float = 0.05,
@@ -169,7 +169,7 @@ def single_clustering_by_threshold(
     This function only selects the largest cluster.
 
     Args:
-        interferometers (InterferometerList): A list of interferometers.
+        interferometers (InterferometerData): Frozen detector arrays and metadata.
         time_frequency_transform (WaveletTransform): A WaveletTransform instance.
         threshold (float): The threshold to select time-frequency pixels.
         padding_time (float, optional): The time window to pad at both ends. Defaults to 0.05.
@@ -195,9 +195,9 @@ def single_clustering_by_threshold(
             logger.warning("freq_high_idx is set to %s.", freq_high_idx)
         time_frequency_map[:, freq_high_idx:] = 0.0
     tf_filter = time_frequency_map > threshold
-    n_f = int(interferometers[0].sampling_frequency / 2 / time_frequency_transform.frequency_resolution)
-    n_t = int(len(interferometers[0].time_array) / n_f)
-    dt = interferometers[0].duration / n_t
+    n_f = int(interferometers.sampling_frequency / 2 / time_frequency_transform.frequency_resolution)
+    n_t = int(interferometers.duration * interferometers.sampling_frequency / n_f)
+    dt = interferometers.duration / n_t
     output = clustering(
         tf_filter,
         dt,
