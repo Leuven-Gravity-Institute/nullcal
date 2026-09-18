@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import platform
 import subprocess
 import sys
 from pathlib import Path
@@ -28,6 +29,11 @@ TONE_LAYER = 10
 TONE_CONTAINMENT_MINIMUM = 0.999
 
 
+def report_identity(revision: str) -> str:
+    """Identify the code and host behind platform-sensitive last-bit values."""
+    return f"Revision: `{revision}`\nPlatform: `{platform.platform()}`"
+
+
 def peak_comparison(actual, reference):
     """Return maximum absolute and peak-relative errors with no absolute floor."""
     actual = np.asarray(actual)
@@ -42,13 +48,13 @@ def peak_comparison(actual, reference):
 
 
 def reference_table():
-    """Compare the live pipeline with every frozen artifact."""
+    """Compare independently reproduced outputs with their frozen artifacts."""
     with np.load(REFERENCE_PATH) as archive:
         reference = {name: archive[name] for name in archive.files}
     likelihood = pipeline.build_likelihood_from_reference_inputs()
     actual = pipeline.compute_artifacts(likelihood)
     rows = []
-    for name in sorted(reference):
+    for name in sorted(reference.keys() - pipeline.FED_BACK_INPUT_KEYS):
         difference, peak, relative = peak_comparison(actual[name], reference[name])
         rows.append((name, difference, peak, relative))
     return rows
@@ -146,7 +152,7 @@ def main():
     ).stdout
     if status:
         raise RuntimeError("verification must run from a clean tree so the revision identifies the measured code")
-    print(f"Revision: `{revision}`")
+    print(report_identity(revision))
     print(f"\nFrozen-reference tolerance: peak-relative <= {REFERENCE_TOLERANCE:.0e}, atol = 0.0\n")
     print("| artifact | max abs diff | reference peak | peak-relative | pass |")
     print("| --- | ---: | ---: | ---: | :---: |")

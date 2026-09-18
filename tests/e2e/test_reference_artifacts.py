@@ -128,7 +128,7 @@ COMPARED_KEYS = (
     "noise_log_likelihood",
 )
 
-FED_BACK_INPUT_KEYS = frozenset({"time_frequency_filter"})
+FED_BACK_INPUT_KEYS = pipeline.FED_BACK_INPUT_KEYS
 
 
 def test_classified_keys_cover_every_artifact(reference, computed):
