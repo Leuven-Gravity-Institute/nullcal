@@ -13,9 +13,17 @@ from .transform_freq_funcs import phitilde_vec  # noqa: E402
 
 
 def transform_wavelet_time_helper(data, n_f, n_t, phi, mult):
-    """Transform a time series into WDM coefficients with batched JAX FFTs."""
+    """Transform a time series into WDM coefficients with batched JAX FFTs.
+
+    Computation uses the common floating dtype of ``data`` and ``phi``: two
+    float32 inputs stay float32, while float64 or integer data paired with the
+    float64 window use float64.
+    """
     data = jnp.asarray(data)
-    phi = jnp.asarray(phi, dtype=data.dtype)
+    phi = jnp.asarray(phi)
+    working_dtype = jnp.result_type(data, phi)
+    data = data.astype(working_dtype)
+    phi = phi.astype(working_dtype)
     n_d = n_f * n_t
     n_k = mult * 2 * n_f
     rows = jnp.arange(n_t)[:, None]
@@ -28,7 +36,7 @@ def transform_wavelet_time_helper(data, n_f, n_t, phi, mult):
     selected = transformed[:, (jnp.arange(1, n_f) * mult)]
     interior = jnp.where((rows + modes) % 2 == 1, -jnp.imag(selected), jnp.real(selected))
 
-    wave = jnp.zeros((n_t, n_f), dtype=data.dtype)
+    wave = jnp.zeros((n_t, n_f), dtype=transformed.real.dtype)
     wave = wave.at[:, 1:].set(interior)
     wave = wave.at[::2, 0].set(jnp.real(transformed[::2, 0]) / jnp.sqrt(2.0))
     return wave.at[1::2, 0].set(jnp.real(transformed[::2, n_f * mult]) / jnp.sqrt(2.0))

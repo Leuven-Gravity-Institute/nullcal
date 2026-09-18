@@ -146,6 +146,20 @@ def test_transform_wavelet_time_is_callable(shape, noise):
 
 
 @pytest.mark.unit
+def test_transform_wavelet_time_promotes_integer_input_to_float():
+    """Integer samples use the same floating-point computation as their float64 values."""
+    n_t, n_f = 8, 4
+    integer_data = np.arange(n_t * n_f) % 7
+
+    integer_wave = np.asarray(transform_wavelet_time(integer_data, n_f=n_f, n_t=n_t, mult=4))
+    float_wave = np.asarray(transform_wavelet_time(integer_data.astype(np.float64), n_f=n_f, n_t=n_t, mult=4))
+
+    assert integer_wave.dtype == np.float64
+    assert np.count_nonzero(integer_wave) == integer_wave.size
+    np.testing.assert_array_equal(integer_wave, float_wave)
+
+
+@pytest.mark.unit
 def test_inverse_wavelet_time_is_callable(shape, noise):
     """``inverse_wavelet_time`` should invert the transform, as its signature advertises."""
     n_t, n_f = shape
