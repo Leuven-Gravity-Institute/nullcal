@@ -41,3 +41,10 @@ def test_reference_table_excludes_fed_back_inputs(monkeypatch):
     names = [row[0] for row in jax_wdm_verification.reference_table()]
 
     assert names == ["independent_output"]
+
+
+def test_report_identity_includes_the_platform(monkeypatch):
+    """Last-bit verification values identify the platform that produced them."""
+    monkeypatch.setattr(jax_wdm_verification.platform, "platform", lambda: "example-platform")
+
+    assert jax_wdm_verification.report_identity("abc123") == ("Revision: `abc123`\nPlatform: `example-platform`")
