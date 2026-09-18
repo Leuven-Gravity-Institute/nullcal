@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import jax
 import jax.numpy as jnp
 import numpy as np
 
@@ -16,7 +17,7 @@ from .transform_time_funcs import phi_vec, transform_wavelet_time_helper
 from .utils import get_shape_of_wavelet_transform
 
 
-def inverse_wavelet_time(wave_in, n_f, n_t, nx=4.0, mult=32):
+def inverse_wavelet_time(wave_in, n_f, n_t, nx=4.0, mult=32) -> jax.Array:
     """Fast inverse wavelet transform to time domain.
 
     Args:
@@ -27,7 +28,7 @@ def inverse_wavelet_time(wave_in, n_f, n_t, nx=4.0, mult=32):
         mult (int, optional): mult. Defaults to 32.
 
     Returns:
-        1D numpy array: Data in time domain.
+        jax.Array: Data in time domain.
     """
     mult = min(mult, n_t // 2)  # make sure K isn't bigger than n_d
     phi = phi_vec(n_f, nx=nx, mult=mult) / 2
@@ -35,7 +36,7 @@ def inverse_wavelet_time(wave_in, n_f, n_t, nx=4.0, mult=32):
     return output / jnp.sqrt(output.shape[0])
 
 
-def inverse_wavelet_freq_time(wave_in, n_f, n_t, nx=4.0):
+def inverse_wavelet_freq_time(wave_in, n_f, n_t, nx=4.0) -> jax.Array:
     """Inverse wavelet transform to time domain via Fourier transform of frequency domain.
 
     Args:
@@ -45,13 +46,13 @@ def inverse_wavelet_freq_time(wave_in, n_f, n_t, nx=4.0):
         nx (float, optional): Steepness of filter. Defaults to 4..
 
     Returns:
-        1D numpy array: Data in time domain.
+        jax.Array: Data in time domain.
     """
     res_f = inverse_wavelet_freq(wave_in, n_f, n_t, nx)
     return jnp.fft.irfft(res_f)
 
 
-def inverse_wavelet_freq(wave_in, n_f, n_t, nx=4.0):
+def inverse_wavelet_freq(wave_in, n_f, n_t, nx=4.0) -> jax.Array:
     """Inverse wavelet transform to frequency domain signal.
 
     Args:
@@ -61,14 +62,14 @@ def inverse_wavelet_freq(wave_in, n_f, n_t, nx=4.0):
         nx (float, optional): Steepness of filter. Defaults to 4..
 
     Returns:
-        1D numpy array: Data in time domain.
+        jax.Array: Data in frequency domain.
     """
     phif = phitilde_vec_norm(n_f, n_t, nx)
     output = inverse_wavelet_freq_helper_fast(wave_in, phif, n_f, n_t)
     return output / jnp.sqrt((output.shape[0] - 1) * 2)
 
 
-def transform_wavelet_time(data, n_f, n_t, nx=4.0, mult=32):
+def transform_wavelet_time(data, n_f, n_t, nx=4.0, mult=32) -> jax.Array:
     """Do the wavelet transform in the time domain,
     note there can be significant leakage if mult is too small and the
     transform is only approximately exact if mult=n_t/2.
@@ -81,7 +82,7 @@ def transform_wavelet_time(data, n_f, n_t, nx=4.0, mult=32):
         mult (int, optional): mult. Defaults to 32.
 
     Returns:
-        2D numpy array: Data in wavelet domain.
+        jax.Array: Data in wavelet domain.
     """
     mult = min(mult, n_t // 2)  # make sure K isn't bigger than n_d
     phi = phi_vec(n_f, nx, mult)
@@ -90,7 +91,7 @@ def transform_wavelet_time(data, n_f, n_t, nx=4.0, mult=32):
     return wave
 
 
-def transform_wavelet_freq_time(data, n_f, n_t, nx=4.0):
+def transform_wavelet_freq_time(data, n_f, n_t, nx=4.0) -> jax.Array:
     """Transform time domain data into wavelet domain via FFT and then frequency transform.
 
     Args:
@@ -100,14 +101,14 @@ def transform_wavelet_freq_time(data, n_f, n_t, nx=4.0):
         nx (float, optional): Steepness of filter. Defaults to 4..
 
     Returns:
-        2D numpy array: Data in wavelet domain.
+        jax.Array: Data in wavelet domain.
     """
     data_fft = jnp.fft.rfft(data)
 
     return transform_wavelet_freq(data_fft, n_f, n_t, nx)
 
 
-def transform_wavelet_freq_time_quadrature(data, n_f, n_t, nx=4.0):
+def transform_wavelet_freq_time_quadrature(data, n_f, n_t, nx=4.0) -> jax.Array:
     """Transform time domain data into wavelet quadrature domain via FFT and then frequency transform.
 
     Args:
@@ -117,14 +118,14 @@ def transform_wavelet_freq_time_quadrature(data, n_f, n_t, nx=4.0):
         nx (float, optional): Steepness of filter. Defaults to 4..
 
     Returns:
-        2D numpy array: Data in wavelet domain.
+        jax.Array: Data in wavelet domain.
     """
     data_fft = jnp.fft.rfft(data)
 
     return transform_wavelet_freq_quadrature(data_fft, n_f, n_t, nx)
 
 
-def transform_wavelet_freq_quadrature(data, n_f, n_t, nx=4.0):
+def transform_wavelet_freq_quadrature(data, n_f, n_t, nx=4.0) -> jax.Array:
     """Do the wavelet quadrature transform using the fast wavelet domain transform.
 
     Args:
@@ -134,13 +135,13 @@ def transform_wavelet_freq_quadrature(data, n_f, n_t, nx=4.0):
         nx (float, optional): Steepness of filter. Defaults to 4..
 
     Returns:
-        2D numpy array: Data in wavelet domain.
+        jax.Array: Data in wavelet domain.
     """
     phif = 2 / n_f * phitilde_vec_norm(n_f, n_t, nx)
     return transform_wavelet_freq_quadrature_helper(data, n_f, n_t, phif) * jnp.sqrt((data.shape[0] - 1) * 2)
 
 
-def transform_wavelet_freq(data, n_f, n_t, nx=4.0):
+def transform_wavelet_freq(data, n_f, n_t, nx=4.0) -> jax.Array:
     """Do the wavelet transform using the fast wavelet domain transform.
 
     Args:
@@ -150,7 +151,7 @@ def transform_wavelet_freq(data, n_f, n_t, nx=4.0):
         nx (float, optional): Steepness of filter. Defaults to 4..
 
     Returns:
-        2D numpy array: Data in wavelet domain.
+        jax.Array: Data in wavelet domain.
     """
     phif = 2 / n_f * phitilde_vec_norm(n_f, n_t, nx)
     return transform_wavelet_freq_helper(data, n_f, n_t, phif) * jnp.sqrt((data.shape[0] - 1) * 2)
@@ -181,7 +182,7 @@ class WaveletTransform:
             frequency_resolution=frequency_resolution,
         )
 
-    def frequency_to_wavelet(self, frequency_domain_data: np.ndarray) -> np.ndarray:
+    def frequency_to_wavelet(self, frequency_domain_data: np.ndarray) -> jax.Array:
         """Transform from frequency domain to wavelet domain.
 
         Args:
@@ -192,7 +193,7 @@ class WaveletTransform:
                 the expected length.
 
         Returns:
-            np.ndarray: Wavelet-domain data.
+            jax.Array: Wavelet-domain data.
         """
         # Check whether the length of frequency-domain data
         # matches the expected length.
@@ -203,7 +204,7 @@ class WaveletTransform:
             )
         return transform_wavelet_freq(data=frequency_domain_data, n_f=self.shape[1], n_t=self.shape[0])
 
-    def wavelet_to_frequency(self, wavelet_domain_data: np.ndarray) -> np.ndarray:
+    def wavelet_to_frequency(self, wavelet_domain_data: np.ndarray) -> jax.Array:
         """Transform from wavelet domain to frequency domain.
 
         Args:
@@ -214,7 +215,7 @@ class WaveletTransform:
                 the expected shape.
 
         Returns:
-            np.ndarray: Frequency-domain data.
+            jax.Array: Frequency-domain data.
         """
         # Check whether the shape of wavelet-domain strain
         # matches the expected shape.
@@ -225,7 +226,7 @@ class WaveletTransform:
             )
         return inverse_wavelet_freq(wave_in=wavelet_domain_data, n_f=self.shape[1], n_t=self.shape[0], nx=self.nx)
 
-    def frequency_to_wavelet_quadrature(self, frequency_domain_data: np.ndarray) -> np.ndarray:
+    def frequency_to_wavelet_quadrature(self, frequency_domain_data: np.ndarray) -> jax.Array:
         """Transform from frequency domain to wavelet quadrature domain.
 
         Args:
@@ -236,7 +237,7 @@ class WaveletTransform:
                 the expected length.
 
         Returns:
-            np.ndarray: Wavelet quadrature domain data.
+            jax.Array: Wavelet quadrature domain data.
         """
         # Check whether the length of frequency-domain data
         # matches the expected length.

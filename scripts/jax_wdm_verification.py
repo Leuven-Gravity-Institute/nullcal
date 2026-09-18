@@ -42,13 +42,13 @@ def peak_comparison(actual, reference):
 
 
 def reference_table():
-    """Compare the live pipeline with every frozen artifact."""
+    """Compare independently reproduced outputs with their frozen artifacts."""
     with np.load(REFERENCE_PATH) as archive:
         reference = {name: archive[name] for name in archive.files}
     likelihood = pipeline.build_likelihood_from_reference_inputs()
     actual = pipeline.compute_artifacts(likelihood)
     rows = []
-    for name in sorted(reference):
+    for name in sorted(reference.keys() - pipeline.FED_BACK_INPUT_KEYS):
         difference, peak, relative = peak_comparison(actual[name], reference[name])
         rows.append((name, difference, peak, relative))
     return rows

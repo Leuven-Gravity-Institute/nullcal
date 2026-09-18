@@ -9,14 +9,33 @@ import pytest
 
 from nullcal.time_frequency_transform import transform_wavelet_freq
 from nullcal.time_frequency_transform.wavelet_transforms import (
+    WaveletTransform,
     inverse_wavelet_freq,
+    inverse_wavelet_freq_time,
     inverse_wavelet_time,
+    transform_wavelet_freq_quadrature,
+    transform_wavelet_freq_time,
+    transform_wavelet_freq_time_quadrature,
     transform_wavelet_time,
 )
 
 REFERENCE_PEAK_RTOL = 1e-12
 GRADIENT_RTOL = 1e-9
 REFERENCE_SEED = 20260810
+
+PUBLIC_TRANSFORMS = (
+    inverse_wavelet_freq,
+    inverse_wavelet_freq_time,
+    inverse_wavelet_time,
+    transform_wavelet_freq,
+    transform_wavelet_freq_quadrature,
+    transform_wavelet_freq_time,
+    transform_wavelet_freq_time_quadrature,
+    transform_wavelet_time,
+    WaveletTransform.frequency_to_wavelet,
+    WaveletTransform.frequency_to_wavelet_quadrature,
+    WaveletTransform.wavelet_to_frequency,
+)
 
 
 def peak_relative_error(actual, reference):
@@ -32,6 +51,20 @@ def frozen_probe(n_frequencies):
     probe = (rng.normal(size=n_frequencies) + 1j * rng.normal(size=n_frequencies)) / np.sqrt(2.0)
     probe[0] = 0.0
     return probe
+
+
+@pytest.mark.unit
+def test_public_transforms_declare_and_return_jax_arrays():
+    """The public WDM boundary deliberately preserves JAX arrays for tracing."""
+    for transform in PUBLIC_TRANSFORMS:
+        assert transform.__annotations__["return"] == "jax.Array"
+
+    n_t, n_f = 32, 8
+    frequency_data = np.fft.rfft(np.random.default_rng(595).normal(size=n_t * n_f))
+    output = transform_wavelet_freq(frequency_data, n_f=n_f, n_t=n_t)
+
+    assert isinstance(output, jax.Array)
+    assert not isinstance(output, np.ndarray)
 
 
 @pytest.mark.unit

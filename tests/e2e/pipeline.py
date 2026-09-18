@@ -29,6 +29,10 @@ REFERENCE_DIR = Path(__file__).parent / "reference"
 OUTPUT_ARTIFACT_PATH = REFERENCE_DIR / "artifacts.npz"
 INPUT_ARTIFACT_PATH = REFERENCE_DIR / "inputs.npz"
 
+#: Stored outputs deliberately reused as inputs by the frozen-input comparison path. These
+#: values are anchored through the full pipeline instead of counted as reproduced here.
+FED_BACK_INPUT_KEYS = frozenset({"time_frequency_filter"})
+
 
 @contextlib.contextmanager
 def quiet_loggers() -> Iterator[None]:

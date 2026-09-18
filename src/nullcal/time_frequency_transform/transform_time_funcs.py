@@ -42,33 +42,6 @@ def transform_wavelet_time_helper(data, n_f, n_t, phi, mult):
     return wave.at[1::2, 0].set(jnp.real(transformed[::2, n_f * mult]) / jnp.sqrt(2.0))
 
 
-def assign_wdata(i, k_cutoff, n_d, n_f, wdata, data_pad, phi):
-    """Fill one legacy packet buffer, or return an immutable JAX packet."""
-    indices = (i * n_f - k_cutoff // 2 + jnp.arange(k_cutoff)) % n_d
-    result = jnp.asarray(data_pad[:n_d])[indices] * jnp.asarray(phi)
-    if isinstance(wdata, np.ndarray):
-        wdata[...] = np.asarray(result)
-        return None
-    return result
-
-
-def pack_wave(i, mult, n_f, wdata_trans, wave):
-    """Pack one transformed time packet into the WDM array."""
-    result = jnp.asarray(wave)
-    transformed = jnp.asarray(wdata_trans)
-    if i % 2 == 0 and i < wave.shape[0] - 1:
-        result = result.at[i, 0].set(jnp.real(transformed[0]) / jnp.sqrt(2.0))
-        result = result.at[i + 1, 0].set(jnp.real(transformed[n_f * mult]) / jnp.sqrt(2.0))
-    modes = jnp.arange(1, n_f)
-    selected = transformed[modes * mult]
-    values = jnp.where((i + modes) % 2 == 1, -jnp.imag(selected), jnp.real(selected))
-    result = result.at[i, 1:].set(values)
-    if isinstance(wave, np.ndarray):
-        wave[...] = np.asarray(result)
-        return None
-    return result
-
-
 def phi_vec(n_f, nx=4.0, mult=16):
     """Return the time-domain WDM window."""
     omega = np.pi
