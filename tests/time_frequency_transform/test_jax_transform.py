@@ -60,11 +60,43 @@ def test_public_transforms_declare_and_return_jax_arrays():
         assert transform.__annotations__["return"] == "jax.Array"
 
     n_t, n_f = 32, 8
-    frequency_data = np.fft.rfft(np.random.default_rng(595).normal(size=n_t * n_f))
-    output = transform_wavelet_freq(frequency_data, n_f=n_f, n_t=n_t)
+    time_data = np.random.default_rng(595).normal(size=n_t * n_f)
+    frequency_data = np.fft.rfft(time_data)
+    wavelet_data = transform_wavelet_freq(frequency_data, n_f=n_f, n_t=n_t)
+    transformer = WaveletTransform(
+        duration=1.0,
+        sampling_frequency=n_t * n_f,
+        frequency_resolution=n_t * n_f / (2 * n_f),
+    )
+    runtime_calls = (
+        (inverse_wavelet_freq, lambda: inverse_wavelet_freq(wavelet_data, n_f=n_f, n_t=n_t)),
+        (inverse_wavelet_freq_time, lambda: inverse_wavelet_freq_time(wavelet_data, n_f=n_f, n_t=n_t)),
+        (inverse_wavelet_time, lambda: inverse_wavelet_time(wavelet_data, n_f=n_f, n_t=n_t, mult=n_t // 2)),
+        (transform_wavelet_freq, lambda: transform_wavelet_freq(frequency_data, n_f=n_f, n_t=n_t)),
+        (
+            transform_wavelet_freq_quadrature,
+            lambda: transform_wavelet_freq_quadrature(frequency_data, n_f=n_f, n_t=n_t),
+        ),
+        (transform_wavelet_freq_time, lambda: transform_wavelet_freq_time(time_data, n_f=n_f, n_t=n_t)),
+        (
+            transform_wavelet_freq_time_quadrature,
+            lambda: transform_wavelet_freq_time_quadrature(time_data, n_f=n_f, n_t=n_t),
+        ),
+        (transform_wavelet_time, lambda: transform_wavelet_time(time_data, n_f=n_f, n_t=n_t, mult=n_t // 2)),
+        (WaveletTransform.frequency_to_wavelet, lambda: transformer.frequency_to_wavelet(frequency_data)),
+        (
+            WaveletTransform.frequency_to_wavelet_quadrature,
+            lambda: transformer.frequency_to_wavelet_quadrature(frequency_data),
+        ),
+        (WaveletTransform.wavelet_to_frequency, lambda: transformer.wavelet_to_frequency(wavelet_data)),
+    )
 
-    assert isinstance(output, jax.Array)
-    assert not isinstance(output, np.ndarray)
+    assert tuple(transform for transform, _call in runtime_calls) == PUBLIC_TRANSFORMS
+
+    for transform, call in runtime_calls:
+        output = call()
+        assert isinstance(output, jax.Array), transform.__qualname__
+        assert not isinstance(output, np.ndarray), transform.__qualname__
 
 
 @pytest.mark.unit
