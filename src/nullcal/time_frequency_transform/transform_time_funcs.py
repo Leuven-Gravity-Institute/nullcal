@@ -1,140 +1,87 @@
-"""helper functions for transform_time.py"""
+"""JAX kernels for the direct time-domain WDM transform."""
 
 from __future__ import annotations
 
-import numpy as np
-from numba import njit
+import jax
 
-from .transform_freq_funcs import phitilde_vec
+jax.config.update("jax_enable_x64", True)
+
+import jax.numpy as jnp  # noqa: E402
+import numpy as np  # noqa: E402
+
+from .transform_freq_funcs import phitilde_vec  # noqa: E402
 
 
-@njit
 def transform_wavelet_time_helper(data, n_f, n_t, phi, mult):
-    """Helper function to do the wavelet transform in the time domain.
+    """Transform a time series into WDM coefficients with batched JAX FFTs.
 
-    Args:
-        data (1D numpy array): Data.
-        n_f (int): Number of frequency bins.
-        n_t (int): Number of time bins.
-        phi (1D numpy array): Wavelet.
-        mult (int): mult
-
-    Returns:
-        2D numpy array: Data in wavelet domain.
+    Computation uses the common floating dtype of ``data`` and ``phi``: two
+    float32 inputs stay float32, while float64 or integer data paired with the
+    float64 window use float64.
     """
-    # the time domain data stream
+    data = jnp.asarray(data)
+    phi = jnp.asarray(phi)
+    working_dtype = jnp.result_type(data, phi)
+    data = data.astype(working_dtype)
+    phi = phi.astype(working_dtype)
     n_d = n_f * n_t
-
-    # mult, can cause bad leakage if it is too small but may be possible to mitigate
-    # Filter is mult times pixel with in time
-
     n_k = mult * 2 * n_f
+    rows = jnp.arange(n_t)[:, None]
+    offsets = jnp.arange(n_k)[None, :]
+    sample_indices = (rows * n_f - n_k // 2 + offsets) % n_d
+    packets = data[sample_indices] * phi[None, :]
+    transformed = jnp.fft.rfft(packets, axis=1)
 
-    # windowed data packets
-    wdata = np.zeros(n_k)
+    modes = jnp.arange(1, n_f)[None, :]
+    selected = transformed[:, (jnp.arange(1, n_f) * mult)]
+    interior = jnp.where((rows + modes) % 2 == 1, -jnp.imag(selected), jnp.real(selected))
 
-    wave = np.zeros((n_t, n_f))  # wavelet wavepacket transform of the signal
-    data_pad = np.zeros(n_d + n_k)
-    data_pad[:n_d] = data
-    data_pad[n_d : n_d + n_k] = data[:n_k]
-
-    for i in range(n_t):
-        assign_wdata(i, n_k, n_d, n_f, wdata, data_pad, phi)
-        wdata_trans = np.fft.rfft(wdata, n_k)
-        pack_wave(i, mult, n_f, wdata_trans, wave)
-
-    return wave
+    wave = jnp.zeros((n_t, n_f), dtype=transformed.real.dtype)
+    wave = wave.at[:, 1:].set(interior)
+    wave = wave.at[::2, 0].set(jnp.real(transformed[::2, 0]) / jnp.sqrt(2.0))
+    return wave.at[1::2, 0].set(jnp.real(transformed[::2, n_f * mult]) / jnp.sqrt(2.0))
 
 
-@njit
 def assign_wdata(i, k_cutoff, n_d, n_f, wdata, data_pad, phi):
-    """Assign wdata to be fftd in loop, data_pad needs K extra values on the right to loop.
-
-    Args:
-        i (int): Time index.
-        k_cutoff (int): Frequency cutoff.
-        n_d (int): n_d.
-        n_f (int): Number of frequency bins.
-        wdata (1D numpy array): wdata.
-        data_pad (1D numpy array): Padded data.
-        phi (1D numpy array): Wavelet.
-    """
-    # half_K = np.int64(K/2)
-    jj = i * n_f - k_cutoff // 2
-    if jj < 0:
-        jj += n_d  # periodically wrap the data
-    if jj >= n_d:
-        jj -= n_d  # periodically wrap the data
-    for j in range(k_cutoff):
-        # jj = i*n_f-half_K+j
-        wdata[j] = data_pad[jj] * phi[j]  # apply the window
-        jj += 1
-        # if jj==n_d:
-        #    jj -= n_d # periodically wrap the data
+    """Fill one legacy packet buffer, or return an immutable JAX packet."""
+    indices = (i * n_f - k_cutoff // 2 + jnp.arange(k_cutoff)) % n_d
+    result = jnp.asarray(data_pad[:n_d])[indices] * jnp.asarray(phi)
+    if isinstance(wdata, np.ndarray):
+        wdata[...] = np.asarray(result)
+        return None
+    return result
 
 
-@njit
 def pack_wave(i, mult, n_f, wdata_trans, wave):
-    """Pack fftd wdata into wave array.
-
-    Args:
-        i (int): Time index.
-        mult (int): mult.
-        n_f (int): Number of frequency bins.
-        wdata_trans (1D complex numpy array): wdata_trans.
-        wave (2D numpy array): wdata.
-    """
+    """Pack one transformed time packet into the WDM array."""
+    result = jnp.asarray(wave)
+    transformed = jnp.asarray(wdata_trans)
     if i % 2 == 0 and i < wave.shape[0] - 1:
-        # m=0 value at even n_t and
-        wave[i, 0] = np.real(wdata_trans[0]) / np.sqrt(2)
-        wave[i + 1, 0] = np.real(wdata_trans[n_f * mult]) / np.sqrt(2)
+        result = result.at[i, 0].set(jnp.real(transformed[0]) / jnp.sqrt(2.0))
+        result = result.at[i + 1, 0].set(jnp.real(transformed[n_f * mult]) / jnp.sqrt(2.0))
+    modes = jnp.arange(1, n_f)
+    selected = transformed[modes * mult]
+    values = jnp.where((i + modes) % 2 == 1, -jnp.imag(selected), jnp.real(selected))
+    result = result.at[i, 1:].set(values)
+    if isinstance(wave, np.ndarray):
+        wave[...] = np.asarray(result)
+        return None
+    return result
 
-    for j in range(1, n_f):
-        if (i + j) % 2:
-            wave[i, j] = -np.imag(wdata_trans[j * mult])
-        else:
-            wave[i, j] = np.real(wdata_trans[j * mult])
 
-
-@njit
 def phi_vec(n_f, nx=4.0, mult=16):
-    """Get time domain phi as Fourier transform of phitilde_vec.
-
-    Args:
-        n_f (int): Number of frequency bins.
-        nx (float, optional): Steepness of filter. Defaults to 4..
-        mult (int, optional): mult. Defaults to 16.
-
-    Returns:
-        1D numpy array: Time domain phi.
-    """
-
+    """Return the time-domain WDM window."""
     omega = np.pi
     d_omega = omega / n_f
-    ins_d_omega = 1.0 / np.sqrt(d_omega)
+    inverse_sqrt_d_omega = 1.0 / np.sqrt(d_omega)
     k_cutoff = mult * 2 * n_f
-    half_k_cutoff = mult * n_f  # np.int64(K/2)
+    half_k_cutoff = mult * n_f
+    dom = 2 * np.pi / k_cutoff
 
-    dom = 2 * np.pi / k_cutoff  # max frequency is K/2*dom = pi/dt = OM
-
-    dx = np.zeros(k_cutoff, dtype=np.complex128)
-
-    # zero frequency
-    dx[0] = ins_d_omega
-
-    dx = dx.copy()
-    # positive frequencies
-    dx[1 : half_k_cutoff + 1] = phitilde_vec(dom * np.arange(1, half_k_cutoff + 1), n_f, nx)
-    # negative frequencies
-    dx[half_k_cutoff + 1 :] = phitilde_vec(-dom * np.arange(half_k_cutoff - 1, 0, -1), n_f, nx)
-    dx = k_cutoff * np.fft.ifft(dx, k_cutoff)
-
-    phi = np.zeros(k_cutoff)
-    phi[0:half_k_cutoff] = np.real(dx[half_k_cutoff:k_cutoff])
-    phi[half_k_cutoff:] = np.real(dx[0:half_k_cutoff])
-
-    nrm = np.sqrt(k_cutoff / dom)  # *np.linalg.norm(phi)
-
-    fac = np.sqrt(2.0) / nrm
-    phi *= fac
-    return phi
+    spectrum = np.zeros(k_cutoff, dtype=np.complex128)
+    spectrum[0] = inverse_sqrt_d_omega
+    spectrum[1 : half_k_cutoff + 1] = phitilde_vec(dom * np.arange(1, half_k_cutoff + 1), n_f, nx)
+    spectrum[half_k_cutoff + 1 :] = phitilde_vec(-dom * np.arange(half_k_cutoff - 1, 0, -1), n_f, nx)
+    transformed = k_cutoff * jnp.fft.ifft(jnp.asarray(spectrum), k_cutoff)
+    phi = jnp.concatenate((jnp.real(transformed[half_k_cutoff:]), jnp.real(transformed[:half_k_cutoff])))
+    return phi * (jnp.sqrt(2.0) / jnp.sqrt(k_cutoff / dom))

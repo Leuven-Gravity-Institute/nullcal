@@ -5,11 +5,17 @@ the antenna response function.
 
 from __future__ import annotations
 
-import numpy as np
-from numba import njit
+import jax
+
+# Calibration inference is numerically unstable in JAX's default float32 mode.
+# Keep this kernel consistent with nullcal.calibration, which establishes x64 as
+# a process-wide requirement for the calibration path.
+jax.config.update("jax_enable_x64", True)
+
+import jax.numpy as jnp  # noqa: E402
+import numpy as np  # noqa: E402
 
 
-@njit
 def compute_calibrated_whitened_antenna_response(
     whitened_antenna_response: np.ndarray, calibration_factor: np.ndarray, frequency_mask: np.ndarray
 ) -> np.ndarray:
@@ -27,11 +33,8 @@ def compute_calibrated_whitened_antenna_response(
     Returns:
         np.ndarray: Calibrated antenna response function.
     """
-    output = np.zeros(whitened_antenna_response.shape, dtype=calibration_factor.dtype)
-    n_freq, n_det, n_mode = whitened_antenna_response.shape
-    for i in range(n_freq):
-        if frequency_mask[i]:
-            for j in range(n_det):
-                for k in range(n_mode):
-                    output[i, j, k] = whitened_antenna_response[i, j, k] * calibration_factor[j, i]
-    return output
+    calibration_factor = jnp.asarray(calibration_factor)
+    response = jnp.asarray(whitened_antenna_response, dtype=calibration_factor.dtype)
+    mask = jnp.asarray(frequency_mask, dtype=bool)[:, None, None]
+    calibrated = response * jnp.swapaxes(calibration_factor, 0, 1)[:, :, None]
+    return jnp.where(mask, calibrated, jnp.zeros((), dtype=calibrated.dtype))

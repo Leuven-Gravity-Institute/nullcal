@@ -1,9 +1,9 @@
 """End-to-end characterisation tests against frozen reference artifacts.
 
-These pin the *current* numerical behaviour of the numpy/numba pipeline so that the BlackJAX
-rewrite has something external to be checked against. Agreement between the JAX port and the
-numba implementation would bound neither; agreement with an artifact produced before the port
-started, at a stated tolerance, is what makes a regression visible.
+These pin the numerical behaviour of the pre-port numpy/numba pipeline so that the JAX rewrite has
+something external to be checked against. Agreement between two live implementations would bound
+neither; agreement with an artifact produced before the port started, at a stated tolerance, is
+what makes a regression visible.
 
 Regenerate with ``uv run python -m tests.e2e.generate_reference`` — deliberately not automatic.
 """

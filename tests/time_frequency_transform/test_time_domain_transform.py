@@ -1,22 +1,11 @@
-"""Tests for the time-domain WDM path, and for the defect that makes its public entry points unusable.
+"""Tests for the time-domain WDM path.
 
 There are two independent algorithms in this package for the same mathematical object. One works
 from the frequency-domain data (``transform_wavelet_freq``); the other windows the time series
 directly (``transform_wavelet_time``). This module tests the second.
 
-**A defect, recorded not fixed.** ``phi_vec`` carries ``@njit`` but calls ``phitilde_vec``, which is
-an ordinary Python function using ``scipy.special.betainc``. numba cannot type it, so *any* call to
-``phi_vec`` raises ``numba.core.errors.TypingError``. That makes ``transform_wavelet_time`` --
-exported in the package's ``__all__`` -- and ``inverse_wavelet_time`` raise on every input. The two
-``xfail(strict=True)`` tests at the end of this module hold the public contract those functions
-advertise; they will start passing, and so start failing the suite, the moment the decorator problem
-is fixed, which is the signal to delete them.
-
-The kernels underneath are *not* broken. The tests before those two reach them by calling
-``phi_vec.py_func`` -- numba's handle on the undecorated original -- and show that the time-domain
-algorithm satisfies the same external anchors as the frequency-domain one: Parseval, an exact
-round trip, and a tone in the analytically expected layer. This separates "the algorithm is wrong"
-from "the decorator is wrong", and it is the latter.
+The direct algorithm satisfies the same external anchors as the frequency-domain one: Parseval,
+an exact round trip, and a tone in the analytically expected layer.
 
 Note on the cross-path comparison in ``test_time_and_frequency_paths_agree``: the agreement between
 the two implementations is reported as a *consistency* check only. Two implementations agreeing
@@ -60,13 +49,9 @@ def shape():
 
 @pytest.fixture
 def phi(shape):
-    """The time-domain filter, built through numba's handle on the undecorated ``phi_vec``.
-
-    ``phi_vec.py_func`` is the original Python function. Using it is what lets the kernels below be
-    tested at all while the ``@njit`` defect stands.
-    """
+    """The time-domain filter used by the direct transform."""
     _, n_f = shape
-    return phi_vec.py_func(n_f, 4.0, MULT)
+    return phi_vec(n_f, 4.0, MULT)
 
 
 @pytest.fixture
@@ -78,8 +63,7 @@ def noise():
 def test_phi_vec_has_the_length_the_kernels_index(shape, phi):
     """The filter spans ``mult * 2 * n_f`` samples, the window length the kernels loop over.
 
-    A shorter filter would be read out of bounds inside the ``@njit`` kernels, where bounds are not
-    checked -- that reads adjacent memory rather than raising.
+    A shorter filter would leave the transform without one weight per indexed sample.
     """
     _, n_f = shape
 
@@ -152,17 +136,6 @@ def test_time_and_frequency_paths_agree(shape, phi, noise):
 
 
 @pytest.mark.unit
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Defect: phi_vec is decorated @njit but calls phitilde_vec, a Python function using "
-        "scipy.special.betainc, which numba cannot type. Every call raises "
-        "numba.core.errors.TypingError, so transform_wavelet_time -- a name in the package's "
-        "__all__ -- cannot be called at all. The kernel underneath is correct; the tests above "
-        "exercise it through phi_vec.py_func. Not fixed here: the transform kernels are "
-        "numerically load-bearing and changing them is a separate, reviewed decision."
-    ),
-)
 def test_transform_wavelet_time_is_callable(shape, noise):
     """``transform_wavelet_time`` should transform a time series, as its signature advertises."""
     n_t, n_f = shape
@@ -173,10 +146,20 @@ def test_transform_wavelet_time_is_callable(shape, noise):
 
 
 @pytest.mark.unit
-@pytest.mark.xfail(
-    strict=True,
-    reason="Defect: same unusable phi_vec as above, reached through inverse_wavelet_time.",
-)
+def test_transform_wavelet_time_promotes_integer_input_to_float():
+    """Integer samples use the same floating-point computation as their float64 values."""
+    n_t, n_f = 8, 4
+    integer_data = np.arange(n_t * n_f) % 7
+
+    integer_wave = np.asarray(transform_wavelet_time(integer_data, n_f=n_f, n_t=n_t, mult=4))
+    float_wave = np.asarray(transform_wavelet_time(integer_data.astype(np.float64), n_f=n_f, n_t=n_t, mult=4))
+
+    assert integer_wave.dtype == np.float64
+    assert np.count_nonzero(integer_wave) == integer_wave.size
+    np.testing.assert_array_equal(integer_wave, float_wave)
+
+
+@pytest.mark.unit
 def test_inverse_wavelet_time_is_callable(shape, noise):
     """``inverse_wavelet_time`` should invert the transform, as its signature advertises."""
     n_t, n_f = shape

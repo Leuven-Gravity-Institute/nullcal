@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import jax
 import numpy as np
 import scipy.special
-from numba import njit, prange
+
+jax.config.update("jax_enable_x64", True)
+
+import jax.numpy as jnp  # noqa: E402
 
 
 def phitilde_vec(om, n_f, nx=4.0):
@@ -56,7 +60,6 @@ def phitilde_vec_norm(n_f, n_t, nx):
     return phif
 
 
-@njit
 def tukey(data, alpha, n_sample):
     """Apply Tukey window function to data.
 
@@ -65,17 +68,67 @@ def tukey(data, alpha, n_sample):
         alpha (float): Rolling parameter.
         n_sample (int): Length of data
     """
-    imin = np.int64(alpha * (n_sample - 1) / 2)
-    imax = np.int64((n_sample - 1) * (1 - alpha / 2))
+    imin = int(alpha * (n_sample - 1) / 2)
+    imax = int((n_sample - 1) * (1 - alpha / 2))
     n_win = n_sample - imax
+    values = jnp.asarray(data)
+    indices = jnp.arange(n_sample)
+    safe_imin = max(imin, 1)
+    rising_values = 0.5 * (1.0 + jnp.cos(jnp.pi * (indices / safe_imin - 1.0)))
+    falling_values = 0.5 * (1.0 + jnp.cos(jnp.pi / n_win * (indices - imax)))
+    window = jnp.where(indices < imin, rising_values, 1.0)
+    window = jnp.where(indices > imax, falling_values, window)
+    result = values * window
+    if isinstance(data, np.ndarray):
+        data[...] = np.asarray(result)
+        return None
+    return result
 
-    for i in range(n_sample):
-        f_mult = 1.0
-        if i < imin:
-            f_mult = 0.5 * (1.0 + np.cos(np.pi * (i / imin - 1.0)))
-        if i > imax:
-            f_mult = 0.5 * (1.0 + np.cos(np.pi / n_win * (i - imax)))
-        data[i] *= f_mult
+
+def _frequency_packets(data, n_f, n_t, phif):
+    """Build every windowed frequency packet in one JAX gather."""
+    data = jnp.asarray(data)
+    phif = jnp.asarray(phif, dtype=data.real.dtype)
+    modes = jnp.arange(n_f + 1)[:, None]
+    offsets = jnp.arange(1 - n_t // 2, n_t // 2)[None, :]
+    frequency_indices = modes * (n_t // 2) + offsets
+    safe_indices = jnp.clip(frequency_indices, 0, data.size - 1)
+    valid = ~(((modes == 0) & (offsets < 0)) | ((modes == n_f) & (offsets > 0)))
+    values = phif[jnp.abs(offsets)] * data[safe_indices]
+
+    packets = jnp.zeros((n_f + 1, n_t), dtype=data.dtype)
+    packets = packets.at[:, 1:].set(jnp.where(valid, values, 0.0))
+    endpoint_scale = jnp.where((jnp.arange(n_f + 1) == 0) | (jnp.arange(n_f + 1) == n_f), 0.5, 1.0)
+    centres = phif[0] * data[jnp.arange(n_f + 1) * (n_t // 2)] * endpoint_scale
+    return packets.at[:, n_t // 2].set(centres)
+
+
+def _unpack_frequency_packets(transformed, n_f, n_t, *, quadrature=False, frequency_filter=None):
+    """Map packet FFT components to the real WDM coefficient array."""
+    rows = jnp.arange(n_t)[:, None]
+    modes = jnp.arange(1, n_f)[None, :]
+    interior = transformed[1:n_f].T
+    parity = (rows + modes) % 2 == 1
+    odd_mode = modes % 2 == 1
+    if quadrature:
+        values = jnp.where(parity, jnp.real(interior), jnp.where(odd_mode, -jnp.imag(interior), jnp.imag(interior)))
+    else:
+        values = jnp.where(parity, jnp.where(odd_mode, -jnp.imag(interior), jnp.imag(interior)), jnp.real(interior))
+
+    if frequency_filter is not None:
+        selected = jnp.asarray(frequency_filter, dtype=bool)
+        values = jnp.where(selected[None, 1:n_f], values, 0.0)
+    else:
+        selected = jnp.ones(n_f + 1, dtype=bool)
+
+    wave = jnp.zeros((n_t, n_f), dtype=transformed.real.dtype)
+    wave = wave.at[:, 1:].set(values)
+    packet_indices = jnp.arange(1 if quadrature else 0, n_t, 2)
+    wave = wave.at[::2, 0].set(jnp.where(selected[0], jnp.real(transformed[0, packet_indices]) * jnp.sqrt(2.0), 0.0))
+    wave = wave.at[1::2, 0].set(
+        jnp.where(selected[n_f], jnp.real(transformed[n_f, packet_indices]) * jnp.sqrt(2.0), 0.0)
+    )
+    return wave
 
 
 def transform_wavelet_freq_helper(data, n_f, n_t, phif):
@@ -90,15 +143,8 @@ def transform_wavelet_freq_helper(data, n_f, n_t, phif):
     Returns:
         2D numpy array: Data in wavelet domain.
     """
-    wave = np.zeros((n_t, n_f))  # wavelet wavepacket transform of the signal
-
-    # pylint: disable=not-an-iterable
-    for m in prange(0, n_f + 1):
-        dx = np.zeros(n_t, dtype=np.complex128)
-        dx_assign_loop(m, n_t, n_f, dx, data, phif)
-        dx_trans = np.fft.ifft(dx, n_t)
-        dx_unpack_loop(m, n_t, n_f, dx_trans, wave)
-    return wave
+    packets = _frequency_packets(data, n_f, n_t, phif)
+    return _unpack_frequency_packets(jnp.fft.ifft(packets, axis=1), n_f, n_t)
 
 
 def transform_wavelet_freq_partial_helper(data, n_f, n_t, phif, frequency_filter):
@@ -114,16 +160,8 @@ def transform_wavelet_freq_partial_helper(data, n_f, n_t, phif, frequency_filter
     Returns:
         2D numpy array: Data in wavelet domain.
     """
-    wave = np.zeros((n_t, n_f))  # wavelet wavepacket transform of the signal
-
-    # pylint: disable=not-an-iterable
-    for m in prange(0, n_f + 1):
-        if frequency_filter[m]:
-            dx = np.zeros(n_t, dtype=np.complex128)
-            dx_assign_loop(m, n_t, n_f, dx, data, phif)
-            dx_trans = np.fft.ifft(dx, n_t)
-            dx_unpack_loop(m, n_t, n_f, dx_trans, wave)
-    return wave
+    packets = _frequency_packets(data, n_f, n_t, phif)
+    return _unpack_frequency_packets(jnp.fft.ifft(packets, axis=1), n_f, n_t, frequency_filter=frequency_filter)
 
 
 def transform_wavelet_freq_quadrature_helper(data, n_f, n_t, phif):
@@ -138,17 +176,10 @@ def transform_wavelet_freq_quadrature_helper(data, n_f, n_t, phif):
     Returns:
         2D numpy array: Data in wavelet domain.
     """
-    wave = np.zeros((n_t, n_f))  # wavelet wavepacket transform of the signal
-
-    dx = np.zeros(n_t, dtype=np.complex128)
-    for m in range(n_f + 1):
-        dx_assign_loop(m, n_t, n_f, dx, data, phif)
-        dx_trans = np.fft.ifft(dx, n_t)
-        dx_unpack_loop_quadrature(m, n_t, n_f, dx_trans, wave)
-    return wave
+    packets = _frequency_packets(data, n_f, n_t, phif)
+    return _unpack_frequency_packets(jnp.fft.ifft(packets, axis=1), n_f, n_t, quadrature=True)
 
 
-@njit
 def dx_assign_loop(m, n_t, n_f, dx, data, phif):
     """Helper for assigning DX in the main loop.
 
@@ -160,29 +191,13 @@ def dx_assign_loop(m, n_t, n_f, dx, data, phif):
         data (1D complex numpy array): Input data.
         phif (1D numpy array): Wavelet.
     """
-    i_base = n_t // 2
-    jj_base = m * n_t // 2
-
-    if m in (0, n_f):
-        # NOTE this term appears to be needed to recover correct constant (at least for m=0), but was previously missing
-        dx[n_t // 2] = phif[0] * data[m * n_t // 2] / 2.0
-        dx[n_t // 2] = phif[0] * data[m * n_t // 2] / 2.0
-    else:
-        dx[n_t // 2] = phif[0] * data[m * n_t // 2]
-        dx[n_t // 2] = phif[0] * data[m * n_t // 2]
-
-    for jj in range(jj_base + 1 - n_t // 2, jj_base + n_t // 2):
-        j = np.abs(jj - jj_base)
-        i = i_base - jj_base + jj
-        if (m == n_f and jj > jj_base) or (m == 0 and jj < jj_base):
-            dx[i] = 0.0
-        elif j == 0:
-            continue
-        else:
-            dx[i] = phif[j] * data[jj]
+    updated = _frequency_packets(data, n_f, n_t, phif)[m]
+    if isinstance(dx, np.ndarray):
+        dx[...] = np.asarray(updated)
+        return None
+    return updated
 
 
-@njit
 def dx_unpack_loop(m, n_t, n_f, dx_trans, wave):
     """Helper for unpacking fftd DX in main loop.
 
@@ -193,28 +208,26 @@ def dx_unpack_loop(m, n_t, n_f, dx_trans, wave):
         dx_trans (1D complex numpy array): DX_trans.
         wave (2D numpy array): Data in wavelet domain.
     """
+    result = jnp.asarray(wave)
     if m == 0:
-        # half of lowest and highest frequency bin pixels are redundant,
-        # so store them in even and odd components of m=0 respectively
-        for n in range(0, n_t, 2):
-            wave[n, 0] = np.real(dx_trans[n] * np.sqrt(2))
+        result = result.at[::2, 0].set(jnp.real(dx_trans[::2]) * jnp.sqrt(2.0))
     elif m == n_f:
-        for n in range(0, n_t, 2):
-            wave[n + 1, 0] = np.real(dx_trans[n] * np.sqrt(2))
+        result = result.at[1::2, 0].set(jnp.real(dx_trans[::2]) * jnp.sqrt(2.0))
     else:
-        for n in range(n_t):
-            if m % 2:
-                if (n + m) % 2:
-                    wave[n, m] = -np.imag(dx_trans[n])
-                else:
-                    wave[n, m] = np.real(dx_trans[n])
-            elif (n + m) % 2:
-                wave[n, m] = np.imag(dx_trans[n])
-            else:
-                wave[n, m] = np.real(dx_trans[n])
+        rows = jnp.arange(n_t)
+        parity = (rows + m) % 2 == 1
+        values = jnp.where(
+            parity,
+            -jnp.imag(dx_trans) if m % 2 else jnp.imag(dx_trans),
+            jnp.real(dx_trans),
+        )
+        result = result.at[:, m].set(values)
+    if isinstance(wave, np.ndarray):
+        wave[...] = np.asarray(result)
+        return None
+    return result
 
 
-@njit
 def dx_unpack_loop_quadrature(m, n_t, n_f, dx_trans, wave):
     """Helper for unpacking fftd DX in main loop.
 
@@ -225,22 +238,17 @@ def dx_unpack_loop_quadrature(m, n_t, n_f, dx_trans, wave):
         dx_trans (1D complex numpy array): dx_trans.
         wave (2D numpy array): Data in wavelet domain.
     """
+    result = jnp.asarray(wave)
     if m == 0:
-        # half of lowest and highest frequency bin pixels are redundant,
-        # so store them in even and odd components of m=0 respectively
-        for n in range(0, n_t, 2):
-            wave[n, 0] = np.real(dx_trans[n + 1] * np.sqrt(2))
+        result = result.at[::2, 0].set(jnp.real(dx_trans[1::2]) * jnp.sqrt(2.0))
     elif m == n_f:
-        for n in range(0, n_t, 2):
-            wave[n + 1, 0] = np.real(dx_trans[n + 1] * np.sqrt(2))
+        result = result.at[1::2, 0].set(jnp.real(dx_trans[1::2]) * jnp.sqrt(2.0))
     else:
-        for n in range(n_t):
-            if m % 2:
-                if (n + m) % 2:
-                    wave[n, m] = np.real(dx_trans[n])
-                else:
-                    wave[n, m] = -np.imag(dx_trans[n])
-            elif (n + m) % 2:
-                wave[n, m] = np.real(dx_trans[n])
-            else:
-                wave[n, m] = np.imag(dx_trans[n])
+        rows = jnp.arange(n_t)
+        parity = (rows + m) % 2 == 1
+        values = jnp.where(parity, jnp.real(dx_trans), -jnp.imag(dx_trans) if m % 2 else jnp.imag(dx_trans))
+        result = result.at[:, m].set(values)
+    if isinstance(wave, np.ndarray):
+        wave[...] = np.asarray(result)
+        return None
+    return result

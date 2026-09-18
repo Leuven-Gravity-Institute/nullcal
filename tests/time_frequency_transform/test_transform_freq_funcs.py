@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import jax
+import jax.numpy as jnp
 import numpy as np
 import pytest
 import scipy.signal.windows
@@ -112,6 +114,17 @@ class TestTukey:
         tukey(data, alpha, data.size)
 
         assert 0.0 < np.sum(data**2) < 512
+
+    @pytest.mark.unit
+    def test_jax_input_is_jittable_and_returns_windowed_values(self):
+        """Immutable JAX inputs return the same taper that NumPy receives in place."""
+        data = np.linspace(-1.0, 1.0, 128)
+        expected = data.copy()
+        tukey(expected, 0.25, expected.size)
+
+        actual = jax.jit(lambda values: tukey(values, 0.25, values.size))(jnp.asarray(data))
+
+        np.testing.assert_allclose(actual, expected, rtol=1e-15, atol=0.0)
 
 
 class TestPartialTransform:
