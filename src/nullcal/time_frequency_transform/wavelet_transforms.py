@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import jax.numpy as jnp
 import numpy as np
 
 from .inverse_wavelet_freq_funcs import inverse_wavelet_freq_helper_fast
@@ -31,7 +32,7 @@ def inverse_wavelet_time(wave_in, n_f, n_t, nx=4.0, mult=32):
     mult = min(mult, n_t // 2)  # make sure K isn't bigger than n_d
     phi = phi_vec(n_f, nx=nx, mult=mult) / 2
     output = inverse_wavelet_time_helper_fast(wave_in, phi, n_f, n_t, mult)
-    return output / np.sqrt(output.shape[0])
+    return output / jnp.sqrt(output.shape[0])
 
 
 def inverse_wavelet_freq_time(wave_in, n_f, n_t, nx=4.0):
@@ -47,7 +48,7 @@ def inverse_wavelet_freq_time(wave_in, n_f, n_t, nx=4.0):
         1D numpy array: Data in time domain.
     """
     res_f = inverse_wavelet_freq(wave_in, n_f, n_t, nx)
-    return np.fft.irfft(res_f)
+    return jnp.fft.irfft(res_f)
 
 
 def inverse_wavelet_freq(wave_in, n_f, n_t, nx=4.0):
@@ -64,7 +65,7 @@ def inverse_wavelet_freq(wave_in, n_f, n_t, nx=4.0):
     """
     phif = phitilde_vec_norm(n_f, n_t, nx)
     output = inverse_wavelet_freq_helper_fast(wave_in, phif, n_f, n_t)
-    return output / np.sqrt((output.shape[0] - 1) * 2)
+    return output / jnp.sqrt((output.shape[0] - 1) * 2)
 
 
 def transform_wavelet_time(data, n_f, n_t, nx=4.0, mult=32):
@@ -84,7 +85,7 @@ def transform_wavelet_time(data, n_f, n_t, nx=4.0, mult=32):
     """
     mult = min(mult, n_t // 2)  # make sure K isn't bigger than n_d
     phi = phi_vec(n_f, nx, mult)
-    wave = transform_wavelet_time_helper(data, n_f, n_t, phi, mult) * np.sqrt(data.shape[0])
+    wave = transform_wavelet_time_helper(data, n_f, n_t, phi, mult) * jnp.sqrt(data.shape[0])
 
     return wave
 
@@ -101,7 +102,7 @@ def transform_wavelet_freq_time(data, n_f, n_t, nx=4.0):
     Returns:
         2D numpy array: Data in wavelet domain.
     """
-    data_fft = np.fft.rfft(data)
+    data_fft = jnp.fft.rfft(data)
 
     return transform_wavelet_freq(data_fft, n_f, n_t, nx)
 
@@ -118,7 +119,7 @@ def transform_wavelet_freq_time_quadrature(data, n_f, n_t, nx=4.0):
     Returns:
         2D numpy array: Data in wavelet domain.
     """
-    data_fft = np.fft.rfft(data)
+    data_fft = jnp.fft.rfft(data)
 
     return transform_wavelet_freq_quadrature(data_fft, n_f, n_t, nx)
 
@@ -136,7 +137,7 @@ def transform_wavelet_freq_quadrature(data, n_f, n_t, nx=4.0):
         2D numpy array: Data in wavelet domain.
     """
     phif = 2 / n_f * phitilde_vec_norm(n_f, n_t, nx)
-    return transform_wavelet_freq_quadrature_helper(data, n_f, n_t, phif) * np.sqrt((data.shape[0] - 1) * 2)
+    return transform_wavelet_freq_quadrature_helper(data, n_f, n_t, phif) * jnp.sqrt((data.shape[0] - 1) * 2)
 
 
 def transform_wavelet_freq(data, n_f, n_t, nx=4.0):
@@ -152,7 +153,7 @@ def transform_wavelet_freq(data, n_f, n_t, nx=4.0):
         2D numpy array: Data in wavelet domain.
     """
     phif = 2 / n_f * phitilde_vec_norm(n_f, n_t, nx)
-    return transform_wavelet_freq_helper(data, n_f, n_t, phif) * np.sqrt((data.shape[0] - 1) * 2)
+    return transform_wavelet_freq_helper(data, n_f, n_t, phif) * jnp.sqrt((data.shape[0] - 1) * 2)
 
 
 class WaveletTransform:
