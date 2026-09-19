@@ -50,9 +50,10 @@ src/nullcal/
 1. **Input**: Strain data from a closed-geometry detector network
 2. **Null Stream**: The `NullStreamComputer` constructs a data combination that
    cancels the gravitational-wave signal, leaving only noise
-3. **Calibration**: The `RecalibrationLikelihood` injects calibration parameters
-   to model deviations from perfect calibration
-4. **Output**: Calibration error constraints with associated likelihood values
+3. **Calibration**: `RecalibrationLikelihood.logdensity_fn(params)` evaluates
+   the JAX null-stream likelihood and Gaussian knot prior without mutable state
+4. **Sampling**: BlackJAX NUTS consumes the pure log density and returns the
+   package-owned result container with convergence diagnostics
 
 ## Extension Points
 

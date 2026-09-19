@@ -1,144 +1,227 @@
-"""Time-frequency recalibration likelihood class."""
+"""Pure JAX log density for null-stream recalibration inference."""
 
 from __future__ import annotations
 
-import logging
+from collections.abc import Mapping
 
-import numpy as np
-from bilby.core.likelihood import Likelihood
+import jax
 
-from ..clustering.precompute import PrecomputedClustering
-from ..data import InterferometerData
-from ..null_stream.null_stream import NullStream
-from ..time_frequency_transform.wavelet_transforms import WaveletTransform
+jax.config.update("jax_enable_x64", True)
 
-logger = logging.getLogger("nullcal")
+import jax.numpy as jnp  # noqa: E402
+import numpy as np  # noqa: E402
+
+from ..calibration import MINIMUM_CUBIC_SPLINE_KNOTS, calibration_factor, calibration_log_prior  # noqa: E402
+from ..data import InterferometerData  # noqa: E402
+from ..null_stream.whiten import (  # noqa: E402
+    compute_whitened_antenna_response,
+    compute_whitened_frequency_domain_strain,
+)
+from ..time_frequency_transform.transform_freq_funcs import (  # noqa: E402
+    phitilde_vec_norm,
+    transform_wavelet_freq_helper,
+)
+from ..time_frequency_transform.wavelet_transforms import WaveletTransform  # noqa: E402
+
+PARAMETER_NAMES = frozenset({"amplitude", "phase"})
+PARAMETER_ARRAY_NDIM = 2
+ET_BEAM_PATTERN = np.array(
+    [[-1.0 / np.sqrt(6.0), -1.0 / np.sqrt(2.0)], [np.sqrt(6.0) / 3.0, 0.0], [-1.0 / np.sqrt(6.0), 1.0 / np.sqrt(2.0)]]
+)
 
 
-def log_likelihood(params: dict, static_data: NullStream) -> float:
-    """Compute the log likelihood from parameters and precomputed static data.
+def _broadcast_prior(value, shape: tuple[int, int], name: str) -> jax.Array:
+    array = jnp.asarray(value, dtype=jnp.float64)
+    try:
+        return jnp.broadcast_to(array, shape)
+    except ValueError as error:
+        raise ValueError(f"{name} must be scalar or broadcast to detector-by-knot shape {shape}") from error
 
-    Args:
-        params (dict): Calibration parameters.
-        static_data (NullStream): Precomputed null-stream data and transforms.
 
-    Returns:
-        float: Log likelihood.
+def _validated_knots(knot_frequencies, detector_count: int) -> np.ndarray:
+    knots = np.asarray(knot_frequencies, dtype=np.float64)
+    if knots.ndim == 1:
+        knots = np.broadcast_to(knots, (detector_count, knots.size)).copy()
+    if knots.ndim != PARAMETER_ARRAY_NDIM or knots.shape[0] != detector_count:
+        raise ValueError("knot_frequencies must have shape (knot,) or (detector, knot)")
+    if knots.shape[1] < MINIMUM_CUBIC_SPLINE_KNOTS:
+        raise ValueError("a cubic spline requires at least four knots")
+    if np.any(knots <= 0.0) or np.any(np.diff(knots, axis=1) <= 0.0):
+        raise ValueError("knot_frequencies must be positive and strictly increasing")
+    return knots
+
+
+def _whitened_inputs(interferometers, shared_mask, supplied_whitened_strain):
+    delta_f = 1.0 / float(interferometers.duration)
+    psd = np.asarray(interferometers.psd)
+    whitened_response = compute_whitened_antenna_response(ET_BEAM_PATTERN, psd, delta_f, shared_mask)
+    if supplied_whitened_strain is None:
+        whitened_strain = compute_whitened_frequency_domain_strain(
+            np.asarray(interferometers.strain), psd, delta_f, shared_mask
+        )
+    else:
+        whitened_strain = np.asarray(supplied_whitened_strain)
+        if whitened_strain.shape != psd.shape:
+            raise ValueError("whitened_frequency_domain_strain must match the detector data shape")
+        if not np.all(whitened_strain[:, ~shared_mask] == 0.0):
+            raise ValueError("whitened_frequency_domain_strain must be zero outside the shared mask")
+    return psd, whitened_response, whitened_strain
+
+
+class RecalibrationLikelihood:
+    """Immutable-data recalibration posterior with a pure ``logdensity_fn``.
+
+    One instance represents one detector-network realization. Parameters are a
+    pytree with ``amplitude`` and ``phase`` arrays of shape ``(detector, knot)``.
+    Knot frequencies and Gaussian prior hyperparameters are fixed model data,
+    not sampled coordinates.
     """
-    calibrated_time_frequency_domain_null_stream = (
-        static_data.compute_calibrated_time_frequency_domain_null_stream_from_parameters(parameters=params)
-    )
-    residual_energy = float(np.sum(np.abs(calibrated_time_frequency_domain_null_stream) ** 2))
-    return -0.5 * residual_energy
-
-
-class RecalibrationLikelihood(Likelihood):
-    """Time-frequency recalibration likelihood class."""
 
     def __init__(
         self,
         interferometers: InterferometerData,
-        wavelet_transform_frequency_resolution: float = 4,
-        wavelet_transform_nx: float = 4,
-        time_frequency_filter: np.ndarray | None = None,
-    ):
-        """Time-frequency likelihood.
-
-        Args:
-            interferometers (InterferometerData): Frozen detector arrays and metadata.
-            wavelet_transform_frequency_resolution (float, optional): Frequency resolution of wavelet transform.
-                Defaults to 4.
-            wavelet_transform_nx (float, optional): The sharpness of the wavelet.
-                Defaults to 4.
-            time_frequency_filter (np.ndarray | None, optional): A time-frequency filter.
-                Defaults to None.
-        """
-        super().__init__({})
+        knot_frequencies,
+        *,
+        time_frequency_filter: np.ndarray,
+        wavelet_transform_frequency_resolution: float = 4.0,
+        wavelet_transform_nx: float = 4.0,
+        amplitude_prior_mean=0.0,
+        amplitude_prior_sigma=0.05,
+        phase_prior_mean=0.0,
+        phase_prior_sigma=0.05,
+        whitened_frequency_domain_strain=None,
+    ) -> None:
         if not isinstance(interferometers, InterferometerData):
             raise TypeError("interferometers must be an InterferometerData instance")
-        self.interferometers = interferometers
+        if len(interferometers) != ET_BEAM_PATTERN.shape[0]:
+            raise ValueError("the recalibration likelihood currently requires the three-detector ET triangle")
 
-        duration = self.interferometers.duration
-        sampling_frequency = self.interferometers.sampling_frequency
-
-        # Construct the wavelet transform instance
-        # for time-frequency transform.
-        self.time_frequency_transform = WaveletTransform(
-            duration=duration,
-            sampling_frequency=sampling_frequency,
+        transform = WaveletTransform(
+            duration=float(interferometers.duration),
+            sampling_frequency=float(interferometers.sampling_frequency),
             frequency_resolution=wavelet_transform_frequency_resolution,
             nx=wavelet_transform_nx,
         )
+        time_frequency_filter = np.asarray(time_frequency_filter, dtype=bool)
+        if time_frequency_filter.shape != transform.shape:
+            raise ValueError(
+                f"time_frequency_filter has shape {time_frequency_filter.shape}; expected {transform.shape}"
+            )
 
-        # Construct the time-frequency filter.
-        if time_frequency_filter is None:
-            raise ValueError("time_frequency_filter must be precomputed before likelihood construction")
-        self.clustering = PrecomputedClustering(
-            time_frequency_transform=self.time_frequency_transform, time_frequency_filter=time_frequency_filter
-        )
-        logger.info("Loaded a pre-computed time-frequency filter.")
-        # Construct a null stream calculator.
-        self.null_stream_calculator = NullStream(
-            interferometers=interferometers,
-            time_frequency_transform=self.time_frequency_transform,
-            time_frequency_filter=self.clustering.time_frequency_filter,
+        shared_mask = np.all(np.asarray(interferometers.mask, dtype=bool), axis=0)
+        frequency_indices = np.flatnonzero(shared_mask)
+        if frequency_indices.size == 0:
+            raise ValueError("the shared detector frequency mask must not be empty")
+        masked_frequencies = np.asarray(interferometers.frequency_array)[frequency_indices]
+        if np.any(masked_frequencies <= 0.0):
+            raise ValueError("calibration frequencies must be positive")
+
+        knots = _validated_knots(knot_frequencies, len(interferometers))
+        psd, whitened_response, whitened_strain = _whitened_inputs(
+            interferometers, shared_mask, whitened_frequency_domain_strain
         )
 
-        self._noise_log_likelihood = None
+        parameter_shape = knots.shape
+        self.interferometers = interferometers
+        self.knot_frequencies = jnp.asarray(knots)
+        self.time_frequency_filter = jnp.asarray(time_frequency_filter)
+        self.time_frequency_transform = transform
+        self.amplitude_prior_mean = _broadcast_prior(amplitude_prior_mean, parameter_shape, "amplitude_prior_mean")
+        self.amplitude_prior_sigma = _broadcast_prior(amplitude_prior_sigma, parameter_shape, "amplitude_prior_sigma")
+        self.phase_prior_mean = _broadcast_prior(phase_prior_mean, parameter_shape, "phase_prior_mean")
+        self.phase_prior_sigma = _broadcast_prior(phase_prior_sigma, parameter_shape, "phase_prior_sigma")
+        if np.any(np.asarray(self.amplitude_prior_sigma) <= 0.0) or np.any(np.asarray(self.phase_prior_sigma) <= 0.0):
+            raise ValueError("prior standard deviations must be positive")
+
+        self._frequency_indices = jnp.asarray(frequency_indices)
+        self._masked_frequencies = jnp.asarray(masked_frequencies)
+        self._whitened_antenna_response = jnp.asarray(whitened_response[frequency_indices])
+        self._whitened_frequency_domain_strain = jnp.asarray(whitened_strain[:, frequency_indices])
+        self._frequency_count = psd.shape[1]
+        n_time, n_frequency = transform.shape
+        self._wavelet_n_time = n_time
+        self._wavelet_n_frequency = n_frequency
+        self._wavelet_window = (2.0 / n_frequency) * phitilde_vec_norm(n_frequency, n_time, wavelet_transform_nx)
+        self._wavelet_scale = jnp.sqrt((self._frequency_count - 1) * 2.0)
 
     @property
-    def interferometers(self) -> InterferometerData:
-        """Frozen detector arrays and metadata.
+    def parameter_shape(self) -> tuple[int, int]:
+        """Required shape of each parameter array."""
+        return self.knot_frequencies.shape
 
-        Returns:
-            InterferometerData: Frozen detector arrays and metadata.
-        """
+    def _validated_parameters(self, params: Mapping[str, jax.Array]) -> tuple[jax.Array, jax.Array]:
+        if not isinstance(params, Mapping) or set(params) != PARAMETER_NAMES:
+            raise ValueError("params must contain exactly amplitude and phase")
+        amplitude = jnp.asarray(params["amplitude"], dtype=jnp.float64)
+        phase = jnp.asarray(params["phase"], dtype=jnp.float64)
+        if amplitude.shape != self.parameter_shape or phase.shape != self.parameter_shape:
+            raise ValueError(
+                f"amplitude and phase must each have shape {self.parameter_shape}; "
+                f"received {amplitude.shape} and {phase.shape}"
+            )
+        return amplitude, phase
 
-        return self._interferometers
-
-    @interferometers.setter
-    def interferometers(self, value: InterferometerData):
-        """Set the frozen detector data.
-
-        Args:
-            value (InterferometerData): Frozen detector arrays and metadata.
-        """
-        self._interferometers = value
-
-    def log_likelihood(self) -> float:
-        """Compute the log likelihood.
-
-        Returns:
-            float: Log likelihood.
-        """
-        if self.parameters is None:
-            raise ValueError("self.parameters is None.")
-
-        return log_likelihood(params=self.parameters, static_data=self.null_stream_calculator)
-
-    def _calculate_noise_log_likelihood(self) -> float:
-        """Calculate the noise log-likelihood.
-
-        Returns:
-            float: Noise log-likelihood.
-        """
-        uncalibrated_time_frequency_domain_null_stream = (
-            self.null_stream_calculator.compute_uncalibrated_time_frequency_domain_null_stream()
+    def _calibration_factor(self, amplitude: jax.Array, phase: jax.Array) -> jax.Array:
+        return jax.vmap(calibration_factor, in_axes=(None, 0, 0, 0))(
+            self._masked_frequencies,
+            self.knot_frequencies,
+            amplitude,
+            phase,
         )
-        # Calculate the residual energy in the time-frequency filter
-        residual_energy = float(np.sum(np.abs(uncalibrated_time_frequency_domain_null_stream) ** 2))
-        # Return the log likelihood
 
-        return -0.5 * residual_energy
+    def _frequency_domain_null_stream(self, amplitude: jax.Array, phase: jax.Array) -> jax.Array:
+        factors = self._calibration_factor(amplitude, phase)
+        response = self._whitened_antenna_response * jnp.swapaxes(factors, 0, 1)[:, :, None]
+        response_dagger = jnp.swapaxes(jnp.conj(response), 1, 2)
+        gram = response_dagger @ response
+        projected_response = response @ jnp.linalg.solve(gram, response_dagger)
+        projector = jnp.eye(response.shape[1], dtype=response.dtype)[None, :, :] - projected_response
+        masked_null_stream = jnp.einsum("fij,jf->if", projector, self._whitened_frequency_domain_strain)
+        return (
+            jnp.zeros((self.parameter_shape[0], self._frequency_count), dtype=masked_null_stream.dtype)
+            .at[:, self._frequency_indices]
+            .set(masked_null_stream)
+        )
 
-    def noise_log_likelihood(self) -> float:
-        """Get the noise log-likelihood.
+    def _time_frequency_null_stream(self, amplitude: jax.Array, phase: jax.Array) -> jax.Array:
+        frequency_domain = self._frequency_domain_null_stream(amplitude, phase)
 
-        Returns:
-            float: Noise log-likelihood.
-        """
+        def transform(detector_data):
+            return (
+                transform_wavelet_freq_helper(
+                    detector_data,
+                    self._wavelet_n_frequency,
+                    self._wavelet_n_time,
+                    self._wavelet_window,
+                )
+                * self._wavelet_scale
+            )
 
-        if self._noise_log_likelihood is None:
-            self._noise_log_likelihood = self._calculate_noise_log_likelihood()
+        time_frequency = jax.vmap(transform)(frequency_domain)
+        return jnp.where(self.time_frequency_filter[None, :, :], time_frequency, 0.0)
 
-        return self._noise_log_likelihood
+    def log_likelihood_fn(self, params: Mapping[str, jax.Array]) -> jax.Array:
+        """Return the pure JAX null-stream log likelihood for ``params``."""
+        amplitude, phase = self._validated_parameters(params)
+        null_stream = self._time_frequency_null_stream(amplitude, phase)
+        return -0.5 * jnp.sum(jnp.abs(null_stream) ** 2)
+
+    def logdensity_fn(self, params: Mapping[str, jax.Array]) -> jax.Array:
+        """Return normalized Gaussian log prior plus null-stream log likelihood."""
+        amplitude, phase = self._validated_parameters(params)
+        return self.log_likelihood_fn(params) + calibration_log_prior(
+            amplitude,
+            phase,
+            self.amplitude_prior_mean,
+            self.amplitude_prior_sigma,
+            self.phase_prior_mean,
+            self.phase_prior_sigma,
+        )
+
+    def noise_log_likelihood(self) -> jax.Array:
+        """Return the likelihood for an exactly uncalibrated response."""
+        zeros = jnp.zeros(self.parameter_shape, dtype=jnp.float64)
+        return self.log_likelihood_fn({"amplitude": zeros, "phase": zeros})
+
+
+__all__ = ["RecalibrationLikelihood"]

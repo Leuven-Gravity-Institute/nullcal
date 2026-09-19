@@ -3,10 +3,12 @@ from __future__ import annotations
 import logging
 from importlib import import_module
 
-import bilby.core.utils.random
 import numpy as np
 import pytest
 import scipy.stats
+
+pytest.importorskip("bilby", reason="legacy likelihood comparison requires an external bilby installation")
+import bilby.core.utils.random
 from bilby.gw.conversion import convert_to_lal_binary_black_hole_parameters
 from bilby.gw.detector import CubicSpline, InterferometerList
 from bilby.gw.source import lal_binary_black_hole

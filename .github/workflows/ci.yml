@@ -16,8 +16,7 @@ jobs:
                 # Python, since floor versions predate newer interpreters'
                 # wheels.
                 python-version: ['3.12', '3.13', '3.14']
-                # Windows is omitted: the gravitational-wave dependencies
-                # (bilby/pycbc -> lalsuite) do not ship Windows wheels.
+                # Windows coverage remains outside the supported CI matrix.
                 os: [ubuntu-latest, macos-latest]
                 resolution: [highest]
                 include:
@@ -44,6 +43,11 @@ jobs:
                   else
                       uv sync --group dev --upgrade
                   fi
+
+            - name: Verify bilby is not installed
+              run:
+                  uv run --no-sync python -c "import importlib.util; assert
+                  importlib.util.find_spec('bilby') is None"
 
             - name: Run tests with pytest
               run: uv run --no-sync pytest

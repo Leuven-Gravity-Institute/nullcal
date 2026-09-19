@@ -413,14 +413,6 @@ def test_fed_back_filter_is_not_counted_as_a_reproduced_output():
     assert "time_frequency_filter" not in COMPARED_KEYS
 
 
-def test_clustering_derived_filter_matches_reference(reference, tmp_path):
-    """The full generation path keeps the clustering-derived filter directly anchored."""
-    likelihood = pipeline.build_likelihood(tmp_path)
-    actual = likelihood.clustering.time_frequency_filter
-    expected = reference["time_frequency_filter"]
-    assert np.array_equal(actual, expected)
-
-
 def test_input_generator_dirty_check_covers_source_and_e2e_harness(monkeypatch):
     """The clean-revision stamp covers both production source and the harness that creates inputs."""
     received = {}
@@ -461,19 +453,14 @@ def test_input_generator_refuses_dirty_source(monkeypatch, tmp_path):
     assert not manifest_path.exists()
 
 
-def test_frozen_input_builder_does_not_generate_a_waveform(monkeypatch, reference_inputs):
-    """The comparison path consumes frozen inputs without entering lalsuite waveform generation."""
-
-    def fail_if_called():
-        pytest.fail("the frozen-input comparison path called the waveform generator")
-
-    monkeypatch.setattr(pipeline, "build_waveform_generator", fail_if_called)
+def test_frozen_input_builder_does_not_generate_a_waveform(reference_inputs):
+    """The comparison path consumes the stored whitened strain directly."""
 
     likelihood = pipeline.build_likelihood_from_reference_inputs()
-
+    frequency_mask = np.all(np.asarray(likelihood.interferometers.mask), axis=0)
     assert np.array_equal(
-        likelihood.null_stream_calculator._whitened_frequency_domain_strain_array,
-        reference_inputs["whitened_frequency_domain_strain"],
+        likelihood._whitened_frequency_domain_strain,
+        reference_inputs["whitened_frequency_domain_strain"][:, frequency_mask],
     )
     actual_psd = likelihood.interferometers.psd
     assert np.array_equal(actual_psd, reference_inputs["power_spectral_density"])

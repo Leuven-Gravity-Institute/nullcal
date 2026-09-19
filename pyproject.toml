@@ -25,19 +25,12 @@ requires-python = ">=3.12"
 dynamic = ["version"]
 dependencies = [
   "numpy>=1.26.4",
-  "bilby>=2.8.1",
-  "bilby_pipe>=1.9.0",
+  "blackjax>=1.6.2",
   "jax>=0.11.1",
   "numba>=0.65.1",
   "scipy>=1.16.3",
-  "ConfigArgParse>=1.7.5",
-  "pycbc>=2.11.0",
-  "healpy>=1.19.0",
   "rocket-fft>=0.3.1",
-  "tables>=3.11.1",
-  # PyYAML is imported directly by metadata/ but was previously undeclared. It currently has several
-  # transitive suppliers: astropy via healpy/pycbc, plus igwn-ligolw and pegasus-wms-common via
-  # pycbc. nullcal controls none of those dependency declarations.
+  # PyYAML is imported directly by metadata/ and must remain a direct dependency.
   #
   # Floors follow the SPEC 0 policy in [tool.dependency-support-policy], not the code's API needs.
   # pandas is no longer imported after result and clustering preprocessing were simplified; its
@@ -53,7 +46,8 @@ dependencies = [
 [project.scripts]
 
 [project.optional-dependencies]
-spark = ["pyspark>=4.2.0"]
+jax = ["jax>=0.11.1"]
+cuda = ["jax[cuda13]>=0.11.1; sys_platform == 'linux'"]
 
 [project.urls]
 Source = "https://github.com/Leuven-Gravity-Institute/nullcal"

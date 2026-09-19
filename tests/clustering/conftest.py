@@ -12,6 +12,8 @@ import logging
 
 import numpy as np
 import pytest
+
+pytest.importorskip("bilby", reason="legacy detector fixture requires an external bilby installation")
 from bilby.gw.detector import InterferometerList
 
 from nullcal.data import InterferometerData

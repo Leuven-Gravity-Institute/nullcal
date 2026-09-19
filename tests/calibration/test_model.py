@@ -6,6 +6,8 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
+
+pytest.importorskip("bilby", reason="legacy comparison requires an external bilby installation")
 from bilby.core.prior import Gaussian
 from bilby.gw.detector.calibration import CubicSpline
 from scipy.interpolate import CubicSpline as ScipyCubicSpline

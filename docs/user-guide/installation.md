@@ -13,6 +13,14 @@ Install the latest release:
 pip install nullcal
 ```
 
+Install the explicit CPU or NVIDIA accelerator extra when selecting a JAX
+backend:
+
+```console
+pip install "nullcal[jax]"       # CPU (Linux or macOS)
+pip install "nullcal[cuda]"      # NVIDIA CUDA 13 (Linux)
+```
+
 ## From Source
 
 Clone and install with `uv`:
@@ -20,7 +28,7 @@ Clone and install with `uv`:
 ```console
 git clone https://github.com/Leuven-Gravity-Institute/nullcal.git
 cd nullcal
-uv sync
+uv sync --extra jax
 ```
 
 ## Development Setup

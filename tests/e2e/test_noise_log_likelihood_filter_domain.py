@@ -39,15 +39,15 @@ pytestmark = [
 
 
 @pytest.fixture(scope="module")
-def likelihood(tmp_path_factory):
-    return pipeline.build_likelihood(tmp_path_factory.mktemp("noise_log_likelihood"))
+def likelihood():
+    return pipeline.build_likelihood_from_reference_inputs()
 
 
 def test_uncalibrated_time_frequency_null_stream_is_confined_to_the_filter(likelihood):
     """The uncalibrated branch must zero pixels outside the filter, as the calibrated one does."""
-    null_stream = likelihood.null_stream_calculator
-    uncalibrated = null_stream.compute_uncalibrated_time_frequency_domain_null_stream()
-    tf_filter = null_stream.time_frequency_filter
+    zeros = np.zeros(likelihood.parameter_shape)
+    uncalibrated = np.asarray(likelihood._time_frequency_null_stream(zeros, zeros))
+    tf_filter = np.asarray(likelihood.time_frequency_filter)
 
     assert uncalibrated.shape[1:] == tf_filter.shape, (
         f"time-frequency array {uncalibrated.shape} is not shaped by the filter {tf_filter.shape}"
@@ -67,14 +67,11 @@ def test_both_direct_methods_are_confined_to_the_filter(likelihood):
     would then sum energies over different pixel domains, recreating this very defect with no
     exception to announce it.
     """
-    from . import config
-
-    null_stream = likelihood.null_stream_calculator
-    tf_filter = null_stream.time_frequency_filter
-    calibration_factor = null_stream.construct_calibration_factor_from_parameters(config.calibration_parameters())
-
-    uncalibrated = null_stream.compute_uncalibrated_time_frequency_domain_null_stream()
-    calibrated = null_stream.compute_calibrated_time_frequency_domain_null_stream(calibration_factor=calibration_factor)
+    params = pipeline.parameter_arrays()
+    zeros = np.zeros(likelihood.parameter_shape)
+    tf_filter = np.asarray(likelihood.time_frequency_filter)
+    uncalibrated = np.asarray(likelihood._time_frequency_null_stream(zeros, zeros))
+    calibrated = np.asarray(likelihood._time_frequency_null_stream(params["amplitude"], params["phase"]))
 
     for name, array in (("uncalibrated", uncalibrated), ("calibrated", calibrated)):
         outside = int(np.count_nonzero(array[:, ~tf_filter]))
@@ -99,14 +96,11 @@ def test_noise_and_signal_log_likelihood_share_a_summation_domain(likelihood):
     statement that two disjoint pixel sets of the same size would also satisfy, so counting
     alone would let a genuinely mismatched domain through.
     """
-    null_stream = likelihood.null_stream_calculator
-    from . import config
-
-    parameters = config.calibration_parameters()
-
-    uncalibrated = null_stream.compute_uncalibrated_time_frequency_domain_null_stream()
-    calibrated = null_stream.compute_calibrated_time_frequency_domain_null_stream_from_parameters(parameters=parameters)
-    tf_filter = null_stream.time_frequency_filter
+    params = pipeline.parameter_arrays()
+    zeros = np.zeros(likelihood.parameter_shape)
+    uncalibrated = np.asarray(likelihood._time_frequency_null_stream(zeros, zeros))
+    calibrated = np.asarray(likelihood._time_frequency_null_stream(params["amplitude"], params["phase"]))
+    tf_filter = np.asarray(likelihood.time_frequency_filter)
 
     assert uncalibrated.shape == calibrated.shape, (
         f"uncalibrated {uncalibrated.shape} and calibrated {calibrated.shape} arrays are not comparable"
