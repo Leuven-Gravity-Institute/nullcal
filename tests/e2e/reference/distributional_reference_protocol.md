@@ -47,3 +47,18 @@ marginal standard deviation divided by the Laplace/Hessian marginal standard
 deviation must be close to one and clearly separated from the original frozen
 posterior's recorded ratio of 0.8048.  If this sanity check fails, generation
 stops rather than tuning or repeating the run.
+
+## Outcome
+
+The single predeclared run completed, but the candidate is rejected.  Dynesty
+returned 5,848 raw equal-weight draws and the declared retention step selected
+5,000.  Against the already-produced BlackJAX samples, only 15 of 60
+per-parameter KS statistics pass 0.10; the maximum is 0.2562 and the median is
+0.12373333333333333.
+
+The sampler-independent MAP/Hessian check explains the failure.  The median
+marginal widths divided by the Laplace widths are 0.7895997778166415 for this
+candidate, 0.9989992152024187 for BlackJAX, and 0.8048440226965192 for the
+original frozen reference.  The new candidate is therefore unsupported by the
+likelihood in the same direction as the original artifact.  No second run was
+attempted and the acceptance threshold was not changed.
