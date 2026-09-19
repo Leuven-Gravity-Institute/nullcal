@@ -51,6 +51,10 @@ def _git(root: Path, *arguments: str) -> str:
 
 def evaluate_r5(points: dict[str, np.ndarray]) -> tuple[dict[str, dict[str, float]], dict[str, float]]:
     """Evaluate R5 and return point values plus the permutation-sensitive probe."""
+    current_root = str(Path(__file__).resolve().parents[1])
+    if current_root not in sys.path:
+        sys.path.insert(0, current_root)
+
     import jax  # noqa: PLC0415
     import jax.numpy as jnp  # noqa: PLC0415
     from scipy.optimize import minimize  # noqa: PLC0415
