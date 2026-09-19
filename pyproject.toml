@@ -35,15 +35,13 @@ dependencies = [
   "healpy>=1.19.0",
   "rocket-fft>=0.3.1",
   "tables>=3.11.1",
-  # Imported directly by nullcal (result/, clustering/, metadata/) but previously undeclared.
-  # pandas resolved through the bilby stack: through bilby itself and through seaborn, required by
-  # bilby_pipe. Both bilby and bilby_pipe are being retired. PyYAML currently has several
+  # PyYAML is imported directly by metadata/ but was previously undeclared. It currently has several
   # transitive suppliers: astropy via healpy/pycbc, plus igwn-ligolw and pegasus-wms-common via
   # pycbc. nullcal controls none of those dependency declarations.
   #
-  # Floors follow the SPEC 0 policy in [tool.dependency-support-policy], not the code's API needs,
-  # which are ancient (read_csv/to_csv/DataFrame; safe_load/safe_dump). The lowest-direct CI job
-  # installs both floors and exercises pandas through clustering/injection.py. Installation alone
+  # Floors follow the SPEC 0 policy in [tool.dependency-support-policy], not the code's API needs.
+  # pandas is no longer imported after result and clustering preprocessing were simplified; its
+  # packaging removal remains part of the separate declared-dependency cleanup. Installation alone
   # does not make PyYAML's floor tested; that requires coverage of metadata/yaml.py.
   # support_floor_update.yml raises floors on a schedule anyway, so lower bounds would not survive.
   # The envelope spans two pandas generations - the lock resolves 3.0.5 below Python 3.14 and

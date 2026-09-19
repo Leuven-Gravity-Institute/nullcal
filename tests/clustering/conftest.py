@@ -14,6 +14,7 @@ import numpy as np
 import pytest
 from bilby.gw.detector import InterferometerList
 
+from nullcal.data import InterferometerData
 from nullcal.time_frequency_transform.wavelet_transforms import WaveletTransform
 
 logging.getLogger("bilby").setLevel(logging.WARNING)
@@ -65,7 +66,7 @@ def interferometers(burst_time_series):
             duration=DURATION,
             start_time=0.0,
         )
-    return ifos
+    return InterferometerData.from_interferometers(ifos)
 
 
 @pytest.fixture(scope="module")
@@ -87,7 +88,7 @@ def broadband_interferometers():
             duration=DURATION,
             start_time=0.0,
         )
-    return ifos
+    return InterferometerData.from_interferometers(ifos)
 
 
 @pytest.fixture(scope="module")

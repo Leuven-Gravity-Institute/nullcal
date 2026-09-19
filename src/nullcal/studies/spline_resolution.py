@@ -109,7 +109,7 @@ def minimax_phase_spline_fit(
     *,
     bisection_steps: int = 48,
 ) -> MinimaxSplineFit:
-    """Minimize physical phase residual for bilby's rational phase mapping."""
+    """Minimize physical phase residual for the rational phase mapping."""
     target_phase = np.asarray(target_phase, dtype=float)
     design = spline_design_matrix(frequencies, knots)
     if target_phase.shape != (design.shape[0],) or np.any(~np.isfinite(target_phase)):

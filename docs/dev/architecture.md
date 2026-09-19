@@ -3,7 +3,7 @@
 ## Design Principles
 
 - **Modular separation**: The package is organized into distinct layers — null
-  stream construction, calibration, likelihood, priors, and result analysis
+  stream construction, calibration, likelihood, immutable data, and results
 - **Scientific correctness**: All transforms preserve the physical meaning of
   gravitational-wave data
 - **Testability**: Each module has a corresponding test module under `tests/`
@@ -12,9 +12,10 @@
 
 ````text
 src/nullcal/
+├── data.py              # Frozen detector-array container and loader
 ├── clustering/          # Time-frequency clustering algorithms
 │   ├── base.py          # Base clustering interface
-│   ├── injection.py     # Signal injection and clustering
+│   ├── injection.py     # Clustering of externally prepared injections
 │   ├── precompute.py    # Precomputed clustering
 │   ├── single.py        # Single-detector clustering
 │   └── time_frequency_map.py  # Time-frequency map representation
@@ -27,8 +28,6 @@ src/nullcal/
 │   ├── null_stream.py   # Null stream computer
 │   ├── projector.py     # Null stream projector
 │   └── whiten.py        # Data whitening
-├── prior/               # Prior distributions
-│   └── prior.py         # Prior definitions
 ├── result/              # Result analysis
 │   ├── result.py        # Result container
 │   └── utils.py         # Result utilities

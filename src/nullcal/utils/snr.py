@@ -5,7 +5,6 @@ Helper functions to compute signal-to-noise ratio.
 from __future__ import annotations
 
 import numpy as np
-from bilby.gw.utils import noise_weighted_inner_product as noise_weighted_uncorrelated_inner_product
 
 
 def optimal_uncorrelated_null_stream_snr_squared(signals, power_spectral_densities, duration):
@@ -27,6 +26,4 @@ def optimal_uncorrelated_null_stream_snr_squared(signals, power_spectral_densiti
 
     # Power spectral density
     power_spectral_density = np.sum(power_spectral_densities, axis=0) / len(power_spectral_densities)
-    return noise_weighted_uncorrelated_inner_product(
-        aa=null_stream, bb=null_stream, power_spectral_density=power_spectral_density, duration=duration
-    )
+    return 4.0 / duration * np.sum(np.conj(null_stream) * null_stream / power_spectral_density)

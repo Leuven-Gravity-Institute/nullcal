@@ -1,12 +1,10 @@
 from __future__ import annotations
 
 import logging
-import tempfile
 from importlib import import_module
 
 import bilby.core.utils.random
 import numpy as np
-import pandas as pd
 import pytest
 import scipy.stats
 from bilby.gw.conversion import convert_to_lal_binary_black_hole_parameters
@@ -17,6 +15,7 @@ from bilby.gw.waveform_generator import WaveformGenerator
 
 from nullcal.clustering.base import Clustering
 from nullcal.clustering.single import single_clustering_by_threshold
+from nullcal.data import InterferometerData
 from nullcal.likelihood import RecalibrationLikelihood, log_likelihood
 from nullcal.null_stream.calibration import compute_calibrated_whitened_antenna_response
 from nullcal.null_stream.null_stream import NullStream
@@ -331,44 +330,39 @@ def time_frequency_transform(mock_data):
 def recalibration_likelihood(mock_data):
     """A RecalibrationLikelihood instance for testing."""
     interferometers = mock_data["interferometers"]
-    injection_parameters = mock_data["injection_parameters"]
-    duration = mock_data["duration"]
-    sampling_frequency = mock_data["sampling_frequency"]
-    start_time = mock_data["start_time"]
-    waveform_arguments = mock_data["waveform_arguments"]
     wavelet_transform_frequency_resolution = mock_data["wavelet_transform_frequency_resolution"]
     wavelet_transform_nx = mock_data["wavelet_transform_nx"]
     clustering_threshold = mock_data["clustering_threshold"]
-
-    waveform_generator = WaveformGenerator(
-        duration=duration,
-        sampling_frequency=sampling_frequency,
-        start_time=start_time,
-        frequency_domain_source_model=lal_binary_black_hole,
-        parameter_conversion=convert_to_lal_binary_black_hole_parameters,
-        waveform_arguments=waveform_arguments,
+    transform = WaveletTransform(
+        duration=mock_data["duration"],
+        sampling_frequency=mock_data["sampling_frequency"],
+        frequency_resolution=wavelet_transform_frequency_resolution,
+        nx=wavelet_transform_nx,
     )
-
-    with tempfile.NamedTemporaryFile(suffix=".csv", delete=True) as f:
-        clustering_parameter_file = f.name
-        parameters_df = pd.DataFrame.from_dict(injection_parameters)
-        # Save to file.
-        parameters_df.to_csv(clustering_parameter_file)
-        likelihood = RecalibrationLikelihood(
-            interferometers=interferometers,
-            waveform_generator=waveform_generator,
-            wavelet_transform_frequency_resolution=wavelet_transform_frequency_resolution,
-            wavelet_transform_nx=wavelet_transform_nx,
-            time_frequency_filter=None,
-            clustering_parameter_file=clustering_parameter_file,
-            clustering_threshold=clustering_threshold,
-        )
-
-    return likelihood
+    time_frequency_filter = np.logical_or.reduce(
+        [
+            single_clustering_by_threshold(
+                interferometers=InterferometerData.from_interferometers(noiseless),
+                time_frequency_transform=transform,
+                threshold=clustering_threshold,
+                padding_time=0.0,
+                padding_freq=0.0,
+                minimum_frequency=mock_data["minimum_frequency"],
+                maximum_frequency=mock_data["maximum_frequency"],
+            )
+            for noiseless in mock_data["noiseless_interferometers_list"]
+        ]
+    )
+    return RecalibrationLikelihood(
+        interferometers=InterferometerData.from_interferometers(interferometers),
+        wavelet_transform_frequency_resolution=wavelet_transform_frequency_resolution,
+        wavelet_transform_nx=wavelet_transform_nx,
+        time_frequency_filter=time_frequency_filter,
+    )
 
 
 def test_initialization(recalibration_likelihood):
-    assert isinstance(recalibration_likelihood.interferometers, InterferometerList)
+    assert isinstance(recalibration_likelihood.interferometers, InterferometerData)
     assert isinstance(recalibration_likelihood.time_frequency_transform, WaveletTransform)
     assert isinstance(recalibration_likelihood.clustering, Clustering)
     assert isinstance(recalibration_likelihood.null_stream_calculator, NullStream)
@@ -382,7 +376,7 @@ def test_clustering(mock_data, recalibration_likelihood, time_frequency_transfor
     expected_time_frequency_filter = np.logical_or.reduce(
         [
             single_clustering_by_threshold(
-                interferometers=noiseless_interferometers,
+                interferometers=InterferometerData.from_interferometers(noiseless_interferometers),
                 time_frequency_transform=time_frequency_transform,
                 threshold=clustering_threshold,
                 padding_time=0.0,
@@ -395,6 +389,23 @@ def test_clustering(mock_data, recalibration_likelihood, time_frequency_transfor
     )
 
     assert np.array_equal(expected_time_frequency_filter, recalibration_likelihood.clustering.time_frequency_filter)
+
+
+def test_calibration_parameter_contract_rejects_a_mistyped_prefix(recalibration_likelihood, mock_data):
+    """A malformed key must fail instead of reusing a detector model's previous values."""
+    parameters = dict(mock_data["calibration_parameters"])
+    parameters["recalib_recalib_ET1_amplitude_0"] = parameters.pop("recalib_ET1_amplitude_0")
+
+    with pytest.raises(ValueError, match="calibration parameters do not match"):
+        recalibration_likelihood.null_stream_calculator.construct_calibration_factor_from_parameters(parameters)
+
+
+def test_calibration_parameter_contract_rejects_an_extra_node(recalibration_likelihood, mock_data):
+    parameters = dict(mock_data["calibration_parameters"])
+    parameters["recalib_ET1_amplitude_10"] = 0.0
+
+    with pytest.raises(ValueError, match="calibration parameters do not match"):
+        recalibration_likelihood.null_stream_calculator.construct_calibration_factor_from_parameters(parameters)
 
 
 # Index of the null mode in the SVD-rotated basis. The whitened antenna response of the ET triangle

@@ -1,9 +1,7 @@
 """Every third-party package ``src/nullcal`` imports must be declared in ``pyproject.toml``.
 
-``pandas`` and ``pyyaml`` were imported by ``result/``, ``clustering/`` and ``metadata/`` while
-appearing nowhere in the dependency list. ``pandas`` resolved through the bilby stack: through
-bilby itself and through seaborn, required by bilby_pipe. Both bilby and bilby_pipe are being
-retired. ``pyyaml`` currently has several transitive suppliers: astropy via the declared healpy and
+``pyyaml`` was imported by ``metadata/`` while appearing nowhere in the dependency list. It
+currently has several transitive suppliers: astropy via the declared healpy and
 pycbc dependencies, plus igwn-ligolw and pegasus-wms-common via pycbc. nullcal controls none of
 those dependency declarations.
 

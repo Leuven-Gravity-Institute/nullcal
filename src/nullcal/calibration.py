@@ -1,7 +1,7 @@
 """Pure JAX calibration model and Gaussian knot-prior functions.
 
 The spline interpolates amplitude and latent phase in log10 frequency using
-not-a-knot boundary conditions.  This is bilby's ``CubicSpline`` model for a
+not-a-knot boundary conditions. It matches the archived reference model on a
 uniform log-frequency grid and also permits nonuniform knot placement.
 
 Importing this module enables JAX's process-wide ``jax_enable_x64`` setting.
@@ -79,7 +79,7 @@ def _evaluate_spline(frequencies, knot_frequencies, node_values):
 
 
 def calibration_factor(frequencies, knot_frequencies, amplitude, phase):
-    """Evaluate bilby's cubic-spline calibration factor in explicit float64.
+    """Evaluate the reference cubic-spline calibration factor in explicit float64.
 
     Args:
         frequencies: Positive frequencies at which to evaluate the factor.
@@ -87,7 +87,7 @@ def calibration_factor(frequencies, knot_frequencies, amplitude, phase):
             Knot placement and count are function parameters; nonuniform grids
             such as the 19-knot spectroscopy grid are supported.
         amplitude: Fractional amplitude error at each knot.
-        phase: Bilby's latent phase parameter at each knot, in radians.
+        phase: Latent phase parameter at each knot, in radians.
 
     Returns:
         A complex128 array equal to ``(1 + amplitude_spline) *
