@@ -1,24 +1,14 @@
-"""Checks on the reference posterior, which is **provisional and not the anchor**.
+"""Integrity checks on the immutable bilby posterior used for sampler comparison.
 
-Owner's decision, 2026-08-11: this posterior does *not* serve as the distributional anchor for the
-BlackJAX rebuild, and it does not block the migration. It is kept as a worked example and as a
-regression guard on ``generate_reference_posterior.py``. The samples are regenerable from the
-pre-migration revision, so what matters is that this revision and the generator survive — not these
-particular draws.
+The fixed-parameter artifacts remain the primary numerical anchor. This posterior is the secondary
+distributional acceptance input: BlackJAX must match its marginals, while the fixed artifacts guard
+against both samplers agreeing on a wrong likelihood. The historical manifest records unresolved
+interpretive caveats about conditional widths; those do not permit regenerating or modifying the
+5,937 by 60 sample array after bilby leaves the runtime.
 
-It is not the anchor because the number is not yet anchored. Marginal widths (median
-``sigma_post/sigma_prior`` 0.720) are explained by measured degeneracy, but the conditional widths
-recovered from the samples, 0.292 median, still disagree with the 0.41 that a sampler-independent
-per-parameter scan predicts, and one covariance direction comes out broader than the prior beyond
-finite-sample noise. Closing those is what "anchored" would mean.
-
-The tests below are therefore integrity and sanity checks on a provisional artifact, not acceptance
-criteria for a reference. They still earn their place: they are what would catch a regenerated
-posterior that had silently reverted to returning the prior.
-
-The tests here deliberately do **not** re-run the sampler — that is a 12-minute 32-core job. They
-check the shipped artifact's integrity, and they check the property that makes it worth having at
-all.
+These tests deliberately do not rerun the sampler. They check the shipped artifact's digest,
+shape, provenance, and informativeness; ``test_blackjax_posterior.py`` performs the cross-sampler
+comparison.
 
 **Why an informativeness test exists.** The first production run of this posterior converged on
 ``dlogz``, wrote a complete manifest, and returned the *prior*: median ``sigma_post/sigma_prior``

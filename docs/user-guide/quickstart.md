@@ -25,7 +25,7 @@ frequency_array = np.fft.rfftfreq(int(duration * sampling_frequency), 1 / sampli
 data = InterferometerData(
     psd=np.ones((3, frequency_array.size)),
     strain=np.zeros((3, frequency_array.size), dtype=complex),
-    mask=np.ones((3, frequency_array.size), dtype=bool),
+    mask=np.broadcast_to(frequency_array >= 4.0, (3, frequency_array.size)).copy(),
     frequency_array=frequency_array,
     duration=duration,
     sampling_frequency=sampling_frequency,
@@ -60,11 +60,22 @@ from nullcal.likelihood import RecalibrationLikelihood
 
 likelihood = RecalibrationLikelihood(
     interferometers=data,
+    knot_frequencies=np.geomspace(4.0, 2048.0, 10),
     time_frequency_filter=time_frequency_filter,
     wavelet_transform_frequency_resolution=4,
     wavelet_transform_nx=4,
 )
+
+params = {
+    "amplitude": np.zeros((3, 10)),
+    "phase": np.zeros((3, 10)),
+}
+log_posterior = likelihood.logdensity_fn(params)
 ```
+
+`logdensity_fn` is a pure JAX function and can be passed directly to BlackJAX.
+Use `nullcal.sampler.sample_nuts` when the standard window-adapted NUTS run and
+R-hat, ESS, and divergence diagnostics are desired together.
 
 ## Next Steps
 

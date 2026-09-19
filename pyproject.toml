@@ -25,7 +25,7 @@ requires-python = ">=3.12"
 dynamic = ["version"]
 dependencies = [
   "numpy>=1.26.4",
-  "bilby>=2.8.1",
+  "blackjax>=1.6.2",
   "jax>=0.11.1",
   "numba>=0.65.1",
   "scipy>=1.16.3",
@@ -44,6 +44,10 @@ dependencies = [
 ]
 
 [project.scripts]
+
+[project.optional-dependencies]
+jax = ["jax>=0.11.1"]
+cuda = ["jax[cuda13]>=0.11.1; sys_platform == 'linux'"]
 
 [project.urls]
 Source = "https://github.com/Leuven-Gravity-Institute/nullcal"

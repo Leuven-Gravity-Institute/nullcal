@@ -3,6 +3,8 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+
+pytest.importorskip("bilby", reason="legacy spline comparison requires an external bilby installation")
 from bilby.gw.detector import CubicSpline
 
 from nullcal.studies.spline_resolution import (

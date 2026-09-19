@@ -44,6 +44,9 @@ jobs:
                       uv sync --group dev --upgrade
                   fi
 
+            - name: Verify bilby is not installed
+              run: uv run --no-sync python -c "import importlib.util; assert importlib.util.find_spec('bilby') is None"
+
             - name: Run tests with pytest
               run: uv run --no-sync pytest
 

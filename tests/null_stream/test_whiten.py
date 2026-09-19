@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-import bilby.core.utils
 import numpy as np
 import pytest
 import scipy.stats
+
+pytest.importorskip("bilby", reason="legacy detector fixture requires an external bilby installation")
+import bilby.core.utils
 from bilby.gw.detector import InterferometerList
 
 from nullcal.null_stream.whiten import compute_whitened_antenna_response, compute_whitened_frequency_domain_strain

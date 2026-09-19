@@ -59,7 +59,7 @@ cd nullcal
 # Create a virtual environment (recommended with uv)
 uv venv --python 3.12
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-uv sync
+uv sync --extra jax
 ```
 
 ## Quick Start
@@ -79,7 +79,7 @@ frequency_array = np.fft.rfftfreq(int(duration * sampling_frequency), 1 / sampli
 data = InterferometerData(
     psd=np.ones((3, frequency_array.size)),
     strain=np.zeros((3, frequency_array.size), dtype=complex),
-    mask=np.ones((3, frequency_array.size), dtype=bool),
+    mask=np.broadcast_to(frequency_array >= 4.0, (3, frequency_array.size)).copy(),
     frequency_array=frequency_array,
     duration=duration,
     sampling_frequency=sampling_frequency,
@@ -102,10 +102,17 @@ null_data = null_stream.compute_calibrated_frequency_domain_null_stream(calibrat
 # Set up a recalibration likelihood for calibration error constraints
 likelihood = RecalibrationLikelihood(
     interferometers=data,
+    knot_frequencies=np.geomspace(4.0, 2048.0, 10),
     time_frequency_filter=time_frequency_filter,
     wavelet_transform_frequency_resolution=4,
     wavelet_transform_nx=4,
 )
+
+params = {
+    "amplitude": np.zeros((3, 10)),
+    "phase": np.zeros((3, 10)),
+}
+log_posterior = likelihood.logdensity_fn(params)
 ```
 
 ## Development
