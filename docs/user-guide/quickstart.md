@@ -15,8 +15,8 @@ from nullcal.time_frequency_transform.wavelet_transforms import WaveletTransform
 
 nullcal is designed for closed-geometry networks. Load detector data from your
 strain source into the immutable array container. The convenience loader
-`InterferometerData.from_interferometers(...)` accepts detector objects with
-the corresponding attributes.
+`InterferometerData.from_interferometers(...)` accepts detector objects with the
+corresponding attributes.
 
 ```python
 duration = 4.0
