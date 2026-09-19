@@ -113,7 +113,13 @@ SMOKE_SAMPLER_KWARGS = {
 
 #: Seeds the sampler. Distinct from config.SEED, which seeds the data, so the two cannot be
 #: confused when a difference has to be attributed to one or the other.
-SAMPLER_SEED = 20260810
+SAMPLER_SEED = 20260918
+
+# The nested run produces a variable-size equal-weight posterior.  Fix the acceptance artifact to
+# an exact number of draws before the run so its sample size cannot be chosen after inspecting the
+# comparison.  Selection is without replacement and uses an independent seed.
+RETAINED_DRAWS = 5_000
+SELECTION_SEED = 20260920
 
 
 def build_prior() -> CalibrationPriorDict:
@@ -150,8 +156,8 @@ def build_prior() -> CalibrationPriorDict:
 
 
 def build_likelihood() -> RecalibrationLikelihood:
-    """The reference likelihood, built through the frozen e2e construction path."""
-    return pipeline.build_likelihood()
+    """The reference likelihood conditioned directly on the immutable R1 arrays."""
+    return pipeline.build_likelihood_from_reference_inputs()
 
 
 def check_responds_to_parameters(likelihood: RecalibrationLikelihood, prior: CalibrationPriorDict) -> None:
@@ -188,6 +194,20 @@ def sha256_of_array(array: np.ndarray) -> str:
     return hashlib.sha256(np.ascontiguousarray(array).tobytes()).hexdigest()
 
 
+def retain_predeclared_draws(raw_posterior: np.ndarray, *, smoke: bool) -> np.ndarray:
+    """Apply the fixed-size retention rule declared before the production run."""
+    if smoke:
+        return raw_posterior
+    if raw_posterior.shape[0] < RETAINED_DRAWS:
+        raise RuntimeError(
+            f"dynesty returned {raw_posterior.shape[0]} equal-weight draws, fewer than the "
+            f"pre-declared {RETAINED_DRAWS}"
+        )
+    selection_rng = np.random.default_rng(SELECTION_SEED)
+    retained_indices = selection_rng.choice(raw_posterior.shape[0], size=RETAINED_DRAWS, replace=False)
+    return raw_posterior[retained_indices]
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--outdir", required=True, help="Output directory for the run.")
@@ -205,7 +225,7 @@ def main() -> None:
     outdir.mkdir(parents=True, exist_ok=True)
 
     sampler_kwargs = dict(SMOKE_SAMPLER_KWARGS if arguments.smoke else REFERENCE_SAMPLER_KWARGS)
-    label = "smoke_posterior" if arguments.smoke else "reference_posterior"
+    label = "smoke_posterior" if arguments.smoke else "distributional_reference_posterior"
 
     # Overrides exist because the first production run (job 96907/96939) converged on dlogz while
     # returning the *prior*: dynesty's rwalk hit its MCMC-step ceiling without meeting the
@@ -259,7 +279,8 @@ def main() -> None:
     wall_seconds = time.perf_counter() - start
 
     free_parameters = list(result.search_parameter_keys)
-    posterior = result.posterior[free_parameters].to_numpy()
+    raw_posterior = result.posterior[free_parameters].to_numpy()
+    posterior = retain_predeclared_draws(raw_posterior, smoke=arguments.smoke)
 
     # Did the sampler actually learn anything? Recorded in the manifest so the artifact carries its
     # own verdict. Job 96907/96939 converged on dlogz and returned marginals indistinguishable from
@@ -330,6 +351,7 @@ def main() -> None:
             "log_evidence": float(result.log_evidence),
             "log_evidence_err": float(result.log_evidence_err),
             "n_posterior_samples": int(posterior.shape[0]),
+            "n_raw_equal_weight_samples": int(raw_posterior.shape[0]),
             "sampling_time_seconds": float(result.sampling_time),
             "wall_seconds": round(wall_seconds, 1),
             "log_likelihood_at_injection": log_likelihood_at_injection,
@@ -343,6 +365,17 @@ def main() -> None:
             "Manifests generated before that carry an unavailable_at_this_revision block instead."
         ),
         "parameters": free_parameters,
+        "retention": {
+            "draws": int(posterior.shape[0]),
+            "selection_seed": None if arguments.smoke else SELECTION_SEED,
+            "method": (
+                "all smoke-run draws"
+                if arguments.smoke
+                else "uniform selection without replacement from bilby's equal-weight posterior"
+            ),
+            "mcmc_warmup": "not applicable to nested sampling",
+            "mcmc_thinning": "not applicable to nested sampling",
+        },
         "posterior_sha256": sha256_of_array(posterior),
         "posterior_shape": list(posterior.shape),
     }
