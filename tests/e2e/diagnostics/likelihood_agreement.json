@@ -1,0 +1,187 @@
+{
+  "criterion": {
+    "maximum_absolute_difference": 1e-09,
+    "permutation_minimum_absolute_separation": 1.0
+  },
+  "maximum_absolute_differences": {
+    "log_likelihood": 2.2737367544323206e-13,
+    "log_posterior": 2.2737367544323206e-13,
+    "log_prior": 1.1368683772161603e-13
+  },
+  "parameter_mapping": {
+    "canonical_order": "ET1/ET2/ET3; within each detector amplitude 0..9 then phase 0..9",
+    "premigration": "canonical names are assigned directly to bilby's recalib_<detector>_<kind>_<knot> keys",
+    "r5": "canonical names are gathered into amplitude[detector,knot] and phase[detector,knot]"
+  },
+  "permutation_check": {
+    "absolute_separation": 6.641330974624225,
+    "correct_log_posterior": -406.2299584433501,
+    "cyclically_permuted_log_posterior": -399.58862746872586,
+    "map": {
+      "gradient_infinity_norm": 4.3538719819102845e-05,
+      "iterations": 35,
+      "negative_log_posterior": 71.23001587973184
+    },
+    "passes_permutation_sensitivity": true
+  },
+  "points": {
+    "map": {
+      "premigration": {
+        "log_likelihood": -193.22528064740243,
+        "log_posterior": -71.23001587973187,
+        "log_prior": 121.99526476767056
+      },
+      "r5": {
+        "log_likelihood": -193.2252806474024,
+        "log_posterior": -71.23001587973184,
+        "log_prior": 121.99526476767056
+      },
+      "r5_minus_premigration": {
+        "log_likelihood": 2.842170943040401e-14,
+        "log_posterior": 2.842170943040401e-14,
+        "log_prior": 0.0
+      }
+    },
+    "ordering_probe": {
+      "premigration": {
+        "log_likelihood": -471.2850404914278,
+        "log_posterior": -406.2299584433501,
+        "log_prior": 65.05508204807775
+      },
+      "r5": {
+        "log_likelihood": -471.2850404914278,
+        "log_posterior": -406.2299584433501,
+        "log_prior": 65.05508204807774
+      },
+      "r5_minus_premigration": {
+        "log_likelihood": 0.0,
+        "log_posterior": 0.0,
+        "log_prior": -1.4210854715202004e-14
+      }
+    },
+    "prior_0": {
+      "premigration": {
+        "log_likelihood": -234.45680946712963,
+        "log_posterior": -136.72078926085095,
+        "log_prior": 97.73602020627867
+      },
+      "r5": {
+        "log_likelihood": -234.45680946712963,
+        "log_posterior": -136.72078926085098,
+        "log_prior": 97.73602020627865
+      },
+      "r5_minus_premigration": {
+        "log_likelihood": 0.0,
+        "log_posterior": -2.842170943040401e-14,
+        "log_prior": -1.4210854715202004e-14
+      }
+    },
+    "prior_1": {
+      "premigration": {
+        "log_likelihood": -381.2928715111403,
+        "log_posterior": -296.22722879396156,
+        "log_prior": 85.06564271717869
+      },
+      "r5": {
+        "log_likelihood": -381.2928715111403,
+        "log_posterior": -296.2272287939616,
+        "log_prior": 85.06564271717866
+      },
+      "r5_minus_premigration": {
+        "log_likelihood": 0.0,
+        "log_posterior": -5.684341886080802e-14,
+        "log_prior": -2.842170943040401e-14
+      }
+    },
+    "prior_2": {
+      "premigration": {
+        "log_likelihood": -311.15957297131615,
+        "log_posterior": -223.3600650943706,
+        "log_prior": 87.79950787694554
+      },
+      "r5": {
+        "log_likelihood": -311.1595729713162,
+        "log_posterior": -223.3600650943707,
+        "log_prior": 87.79950787694551
+      },
+      "r5_minus_premigration": {
+        "log_likelihood": -5.684341886080802e-14,
+        "log_posterior": -8.526512829121202e-14,
+        "log_prior": -2.842170943040401e-14
+      }
+    },
+    "tail_alternating_3sigma": {
+      "premigration": {
+        "log_likelihood": -235.79102371155506,
+        "log_posterior": -381.18339929059596,
+        "log_prior": -145.3923755790409
+      },
+      "r5": {
+        "log_likelihood": -235.791023711555,
+        "log_posterior": -381.183399290596,
+        "log_prior": -145.39237557904102
+      },
+      "r5_minus_premigration": {
+        "log_likelihood": 5.684341886080802e-14,
+        "log_posterior": -5.684341886080802e-14,
+        "log_prior": -1.1368683772161603e-13
+      }
+    },
+    "tail_ramp_3sigma": {
+      "premigration": {
+        "log_likelihood": -664.4511561141262,
+        "log_posterior": -632.8943791507943,
+        "log_prior": 31.55677696333197
+      },
+      "r5": {
+        "log_likelihood": -664.4511561141264,
+        "log_posterior": -632.8943791507945,
+        "log_prior": 31.556776963331913
+      },
+      "r5_minus_premigration": {
+        "log_likelihood": -2.2737367544323206e-13,
+        "log_posterior": -2.2737367544323206e-13,
+        "log_prior": -5.684341886080802e-14
+      }
+    },
+    "tail_single_positive_5sigma": {
+      "premigration": {
+        "log_likelihood": -248.88522292733,
+        "log_posterior": -136.777598506371,
+        "log_prior": 112.10762442095901
+      },
+      "r5": {
+        "log_likelihood": -248.88522292732995,
+        "log_posterior": -136.7775985063709,
+        "log_prior": 112.10762442095904
+      },
+      "r5_minus_premigration": {
+        "log_likelihood": 5.684341886080802e-14,
+        "log_posterior": 8.526512829121202e-14,
+        "log_prior": 2.842170943040401e-14
+      }
+    }
+  },
+  "premigration_prior": {
+    "boundary": "reflective",
+    "family": "Gaussian",
+    "maximum": "inf",
+    "mean": 0.0,
+    "minimum": "-inf",
+    "sigma": 0.05,
+    "transform_round_trip_max_abs": 2.6757770803763348e-17
+  },
+  "provenance": {
+    "diagnostic_commit": "ef9a8541b2a8bbc7a9a525a97d46c5aa4bc8f12b",
+    "premigration_base": "a02bd921f6c7834aa6e9d61227643cc32bcc4a98",
+    "r5_base": "3e5bf7a0cd8919fe160a4503ab3d89917e54770b"
+  },
+  "status": "pass",
+  "versions": {
+    "bilby": "2.8.2",
+    "jax": "0.11.1",
+    "nullcal": "0.1.7.dev17+ga02bd921f.d20260919",
+    "numpy": "2.3.5",
+    "r5_nullcal": "0.1.7.dev19+g3e5bf7a0c"
+  }
+}
