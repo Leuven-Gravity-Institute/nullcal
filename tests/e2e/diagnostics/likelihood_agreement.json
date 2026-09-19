@@ -669,7 +669,7 @@
   },
   "provenance": {
     "current_base": "3e5bf7a0cd8919fe160a4503ab3d89917e54770b",
-    "diagnostic_commit": "3e5bf7a0cd8919fe160a4503ab3d89917e54770b",
+    "diagnostic_commit": "1603d555f5e78fab7db99f361d0281363e81b721",
     "premigration_base": "a02bd921f6c7834aa6e9d61227643cc32bcc4a98"
   },
   "status": "pass",
