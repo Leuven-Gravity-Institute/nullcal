@@ -18,7 +18,7 @@ from pathlib import Path
 
 import numpy as np
 
-R5_BASE = "3e5bf7a0cd8919fe160a4503ab3d89917e54770b"
+PINNED_BASE = "3e5bf7a0cd8919fe160a4503ab3d89917e54770b"
 PREMIGRATION_BASE = "a02bd921f6c7834aa6e9d61227643cc32bcc4a98"
 DETECTORS = ("ET1", "ET2", "ET3")
 KINDS = ("amplitude", "phase")
@@ -200,11 +200,11 @@ def run_diagnosis(historical_root: Path, historical_python: Path, output_path: P
     """Run isolated evaluators and write their fixed-point comparison."""
     current_root = Path(__file__).resolve().parents[1]
     ancestor_check = subprocess.run(  # noqa: S603
-        ["git", "-C", str(current_root), "merge-base", "--is-ancestor", R5_BASE, "HEAD"],  # noqa: S607
+        ["git", "-C", str(current_root), "merge-base", "--is-ancestor", PINNED_BASE, "HEAD"],  # noqa: S607
         check=False,
     )
     if ancestor_check.returncode != 0:
-        raise RuntimeError("current branch does not descend from the pinned R5 head")
+        raise RuntimeError("current branch does not descend from the pinned base commit")
 
     points = build_fixed_points()
     current_values, mapping_check = evaluate_current(points)
@@ -255,8 +255,8 @@ def run_diagnosis(historical_root: Path, historical_python: Path, output_path: P
             "permutation_minimum_absolute_separation": 1.0,
         },
         "provenance": {
-            "diagnostic_commit": _git(current_root, "rev-parse", "HEAD"),
-            "current_base": R5_BASE,
+            "producer_commit": _git(current_root, "rev-parse", "HEAD"),
+            "current_base": PINNED_BASE,
             "premigration_base": PREMIGRATION_BASE,
         },
         "parameter_mapping": {
@@ -268,8 +268,7 @@ def run_diagnosis(historical_root: Path, historical_python: Path, output_path: P
         "maximum_absolute_differences": maxima,
         "permutation_check": mapping_check,
         "premigration_prior": historical["prior"],
-        "versions": historical["versions"]
-        | {"jax": package_version("jax"), "current_nullcal": package_version("nullcal")},
+        "versions": historical["versions"] | {"jax": package_version("jax")},
     }
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")

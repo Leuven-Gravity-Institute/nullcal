@@ -12,6 +12,7 @@ from pathlib import Path
 
 import jax.numpy as jnp
 import numpy as np
+from scipy.stats import ks_2samp
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -109,6 +110,17 @@ def main() -> None:
     posterior = _ordered_posterior({key: np.asarray(value) for key, value in result.samples.items()}, parameters)
     posterior_by_chain = posterior.reshape(NUM_CHAINS, NUM_SAMPLES, -1)
     is_divergent = np.asarray(result.info["is_divergent"]).reshape(NUM_CHAINS, NUM_SAMPLES)
+    historical_path = DEFAULT_OUTPUT_DIR / "posterior_samples.npz"
+    historical_manifest_path = DEFAULT_OUTPUT_DIR / "posterior_manifest.json"
+    with np.load(historical_path) as stored:
+        historical_posterior = stored["posterior"]
+        historical_parameters = stored["parameters"].tolist()
+    historical_manifest = json.loads(historical_manifest_path.read_text())
+    if parameters != historical_parameters:
+        raise RuntimeError("current and historical posterior parameter orders differ")
+    ks_statistics = np.array(
+        [ks_2samp(posterior[:, index], historical_posterior[:, index]).statistic for index in range(posterior.shape[1])]
+    )
 
     arguments.output_dir.mkdir(parents=True, exist_ok=True)
     output_path = arguments.output_dir / "blackjax_posterior_samples.npz"
@@ -156,12 +168,15 @@ def main() -> None:
             "wall_seconds": wall_seconds,
         },
         "anchors": {
-            "fixed_log_likelihood": -203.88870383371767,
+            "fixed_log_likelihood": historical_manifest["results"]["frozen_reference_log_likelihood"],
             "likelihood_agreement": "tests/e2e/diagnostics/likelihood_agreement.json",
         },
         "legacy_diagnostic": {
+            "bilby_posterior_sha256": historical_manifest["posterior_sha256"],
             "ks_threshold": MAX_KS_STATISTIC,
             "is_acceptance_reference": False,
+            "observed_max_ks_statistic": float(np.max(ks_statistics)),
+            "observed_median_ks_statistic": float(np.median(ks_statistics)),
             "reason": "the historical dynesty protocol undercovers an exact correlated-Gaussian target",
         },
     }

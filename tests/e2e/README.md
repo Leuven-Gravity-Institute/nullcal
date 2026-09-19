@@ -43,7 +43,7 @@ The historical dynesty posterior was removed from acceptance after an exact
 correlated-Gaussian diagnosis found marginal width ratios with minimum
 `0.8165`, median `0.8873`, and maximum `0.9538`; 37 of 60 marginals fell below
 the acceptance band. The producing diagnostic commit is
-`3a9d1c31b8330c445006605d517fa56d5b3e33be`. The legacy KS threshold remains
+`3a9d1c31bc45fe460c9ed20e0e6a529e77951545`. The legacy KS threshold remains
 `0.10` in the manifest solely as provenance; it is not changed or enforced.
 
 The curvature gate is a local Gaussian consistency check. It does not anchor
@@ -62,15 +62,20 @@ The `e2e` and `slow` markers are deselected by default.
 
 `scripts/run_reference_blackjax.py` consumes the immutable likelihood inputs,
 runs four independent BlackJAX NUTS chains, and writes only the distinct
-`blackjax_posterior_*` files. It refuses to run from dirty source or a dirty
-harness so every reported number names the exact producing commit. The
-parameter order is derived directly from the fixed detector, quantity and knot
-layout rather than from the historical posterior.
+`blackjax_posterior_*` files. It reads the frozen posterior after sampling only
+to reproduce the explicitly non-acceptance legacy KS diagnostics and their
+provenance. It refuses to run from dirty source or a dirty harness so every
+reported number names the exact producing commit. The parameter order is
+derived directly from the fixed detector, quantity and knot layout and checked
+against the historical order.
 
 `scripts/diagnose_likelihood_agreement.py` regenerates the fixed-point density
 comparison from a historical tree pinned to the commit declared in that script
 and an independent historical Python environment. Its committed output is
-`diagnostics/likelihood_agreement.json`.
+`diagnostics/likelihood_agreement.json`. The output's `producer_commit` names
+the clean source revision used to generate it; reproduce the artifact by
+checking out that revision and running the script with the same pinned
+historical environment.
 
 The original reference generators remain historical utilities for the
 fixed-value arrays, but must not be run as part of this migration. In
