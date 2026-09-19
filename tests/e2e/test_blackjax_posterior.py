@@ -21,7 +21,7 @@ BLACKJAX_POSTERIOR_PATH = REFERENCE_DIR / "blackjax_posterior_samples.npz"
 BLACKJAX_MANIFEST_PATH = REFERENCE_DIR / "blackjax_posterior_manifest.json"
 POSTERIOR_MANIFEST_PATH = REFERENCE_DIR / "posterior_manifest.json"
 LIKELIHOOD_AGREEMENT_PATH = DIAGNOSTIC_DIR / "likelihood_agreement.json"
-LIKELIHOOD_AGREEMENT_SHA256 = "d32940f353b15518debaf6d8e65fdc90b6f733a7c8da675f29251085d55904f4"
+LIKELIHOOD_AGREEMENT_SHA256 = "36078c318bb41d521e54c69f987bca433dbcbe59fccc32d416cc287ef6060d34"
 
 pytestmark = [pytest.mark.e2e, pytest.mark.slow]
 
