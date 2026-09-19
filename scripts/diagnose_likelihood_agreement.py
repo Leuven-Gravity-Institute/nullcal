@@ -34,15 +34,10 @@ def canonical_names() -> list[str]:
     return [f"recalib_{detector}_{kind}_{knot}" for detector in DETECTORS for kind in KINDS for knot in range(KNOTS)]
 
 
-def vector_to_arrays(vector: np.ndarray) -> dict[str, np.ndarray]:
+def vector_to_arrays(vector):
     """Map the canonical vector to R5's quantity-keyed detector-by-knot arrays."""
-    values = dict(zip(canonical_names(), np.asarray(vector), strict=True))
-    return {
-        kind: np.asarray(
-            [[values[f"recalib_{detector}_{kind}_{knot}"] for knot in range(KNOTS)] for detector in DETECTORS]
-        )
-        for kind in KINDS
-    }
+    detector_kind_knot = vector.reshape((len(DETECTORS), len(KINDS), KNOTS))
+    return {kind: detector_kind_knot[:, kind_index, :] for kind_index, kind in enumerate(KINDS)}
 
 
 def _git(root: Path, *arguments: str) -> str:
