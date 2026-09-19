@@ -16,8 +16,7 @@ jobs:
                 # Python, since floor versions predate newer interpreters'
                 # wheels.
                 python-version: ['3.12', '3.13', '3.14']
-                # Windows is omitted: the gravitational-wave dependencies
-                # (bilby/pycbc -> lalsuite) do not ship Windows wheels.
+                # Windows coverage remains outside the supported CI matrix.
                 os: [ubuntu-latest, macos-latest]
                 resolution: [highest]
                 include:

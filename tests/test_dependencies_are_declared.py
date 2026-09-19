@@ -1,9 +1,7 @@
 """Every third-party package ``src/nullcal`` imports must be declared in ``pyproject.toml``.
 
-``pyyaml`` was imported by ``metadata/`` while appearing nowhere in the dependency list. It
-currently has several transitive suppliers: astropy via the declared healpy and
-pycbc dependencies, plus igwn-ligolw and pegasus-wms-common via pycbc. nullcal controls none of
-those dependency declarations.
+``pyyaml`` was imported by ``metadata/`` while appearing nowhere in the dependency list. It was
+previously supplied by unrelated transitive dependencies that nullcal did not control.
 
 CI cannot catch this on its own. The ``lowest-direct`` job lowers *declared* floors, and an
 undeclared dependency has no floor to lower; a transitively-satisfied import looks identical to a
@@ -24,10 +22,8 @@ and in the safe direction, but it needs handling before any extra becomes import
 set as numba's FFT entry-point plugin and remains declared during the staged backend migration.
 No static import check can decide when that transitional dependency is safe to remove.
 
-Deliberately one-directional: it asserts imports are declared, not that declarations are imported.
-The package also declares several dependencies it never imports, which is a real but separate
-problem — removing one is a packaging decision about downstream consumers, whereas an undeclared
-import is unambiguously a bug.
+The import check is deliberately one-directional. A separate packaging regression below pins the
+reviewed removal of dependencies that have no package imports, entry points, or retained scripts.
 """
 
 from __future__ import annotations
@@ -54,6 +50,16 @@ IMPORT_TO_DISTRIBUTION = {
     "yaml": "pyyaml",
 }
 
+REMOVED_UNUSED_DISTRIBUTIONS = {
+    "bilby-pipe",
+    "configargparse",
+    "healpy",
+    "nptyping",
+    "pycbc",
+    "pyspark",
+    "tables",
+}
+
 
 def _declared_distributions() -> set[str]:
     data = tomllib.loads(PYPROJECT.read_text())
@@ -61,6 +67,22 @@ def _declared_distributions() -> set[str]:
     names = set()
     for requirement in requirements:
         # "package>=1.2.3" / "package[extra]>=1" / "package"
+        name = requirement.split(";")[0].strip()
+        for separator in (">=", "==", "<=", "~=", ">", "<", "!=", "["):
+            name = name.split(separator)[0]
+        names.add(name.strip().lower().replace("_", "-"))
+    return names
+
+
+def _all_declared_distributions() -> set[str]:
+    """Return runtime and optional distributions from published package metadata."""
+    data = tomllib.loads(PYPROJECT.read_text())
+    requirements = list(data["project"]["dependencies"])
+    for extra_requirements in data["project"].get("optional-dependencies", {}).values():
+        requirements.extend(extra_requirements)
+
+    names = set()
+    for requirement in requirements:
         name = requirement.split(";")[0].strip()
         for separator in (">=", "==", "<=", "~=", ">", "<", "!=", "["):
             name = name.split(separator)[0]
@@ -111,3 +133,9 @@ def test_the_import_to_distribution_map_has_no_stale_entries():
     imported = _top_level_imports()
     stale = {module for module in IMPORT_TO_DISTRIBUTION if module not in imported}
     assert not stale, f"IMPORT_TO_DISTRIBUTION maps modules that src/nullcal no longer imports: {sorted(stale)}"
+
+
+def test_reviewed_unused_dependencies_stay_removed():
+    """Dependencies removed after a history and entry-point audit must not drift back in."""
+    unexpectedly_declared = REMOVED_UNUSED_DISTRIBUTIONS & _all_declared_distributions()
+    assert not unexpectedly_declared, f"reviewed unused dependencies were reintroduced: {sorted(unexpectedly_declared)}"
