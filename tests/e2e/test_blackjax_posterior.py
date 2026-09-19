@@ -19,7 +19,9 @@ REFERENCE_DIR = Path(__file__).parent / "reference"
 DIAGNOSTIC_DIR = Path(__file__).parent / "diagnostics"
 BLACKJAX_POSTERIOR_PATH = REFERENCE_DIR / "blackjax_posterior_samples.npz"
 BLACKJAX_MANIFEST_PATH = REFERENCE_DIR / "blackjax_posterior_manifest.json"
+POSTERIOR_MANIFEST_PATH = REFERENCE_DIR / "posterior_manifest.json"
 LIKELIHOOD_AGREEMENT_PATH = DIAGNOSTIC_DIR / "likelihood_agreement.json"
+LIKELIHOOD_AGREEMENT_SHA256 = "d32940f353b15518debaf6d8e65fdc90b6f733a7c8da675f29251085d55904f4"
 
 pytestmark = [pytest.mark.e2e, pytest.mark.slow]
 
@@ -60,11 +62,14 @@ def blackjax_artifact():
 def likelihood_agreement_artifact():
     if not LIKELIHOOD_AGREEMENT_PATH.exists():
         pytest.fail("the adopted historical likelihood-agreement artifact is absent")
-    return json.loads(LIKELIHOOD_AGREEMENT_PATH.read_text())
+    encoded = LIKELIHOOD_AGREEMENT_PATH.read_bytes()
+    assert hashlib.sha256(encoded).hexdigest() == LIKELIHOOD_AGREEMENT_SHA256
+    return json.loads(encoded)
 
 
 def test_blackjax_artifact_integrity_and_provenance(blackjax_artifact):
     arrays, manifest = blackjax_artifact
+    historical_manifest = json.loads(POSTERIOR_MANIFEST_PATH.read_text())
     digest = hashlib.sha256(np.ascontiguousarray(arrays["posterior_by_chain"]).tobytes()).hexdigest()
 
     assert digest == manifest["posterior_sha256"]
@@ -74,6 +79,10 @@ def test_blackjax_artifact_integrity_and_provenance(blackjax_artifact):
     assert len(manifest["source_git_revision"]) == 40
     assert manifest["legacy_diagnostic"]["ks_threshold"] == MAX_KS_STATISTIC
     assert manifest["legacy_diagnostic"]["is_acceptance_reference"] is False
+    assert manifest["legacy_diagnostic"]["bilby_posterior_sha256"] == historical_manifest["posterior_sha256"]
+    assert manifest["anchors"]["fixed_log_likelihood"] == historical_manifest["results"][
+        "frozen_reference_log_likelihood"
+    ]
     assert manifest["acceptance"]["historical_density"] == {
         "max_abs_difference": MAX_LOGDENSITY_ABS_DIFF,
         "min_permutation_separation": MIN_PERMUTATION_SEPARATION,
@@ -89,6 +98,10 @@ def test_current_density_matches_historical_fixed_points(likelihood_agreement_ar
         "maximum_absolute_difference": MAX_LOGDENSITY_ABS_DIFF,
         "permutation_minimum_absolute_separation": MIN_PERMUTATION_SEPARATION,
     }
+    assert len(likelihood_agreement_artifact["points"]) == 8
+    assert len(likelihood_agreement_artifact["provenance"]["producer_commit"]) == 40
+    assert "diagnostic_commit" not in likelihood_agreement_artifact["provenance"]
+    assert "current_nullcal" not in likelihood_agreement_artifact["versions"]
 
     for point in likelihood_agreement_artifact["points"].values():
         vector = jnp.asarray(point["canonical_vector"])

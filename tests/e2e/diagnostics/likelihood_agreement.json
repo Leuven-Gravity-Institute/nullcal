@@ -669,13 +669,12 @@
   },
   "provenance": {
     "current_base": "3e5bf7a0cd8919fe160a4503ab3d89917e54770b",
-    "diagnostic_commit": "1603d555f5e78fab7db99f361d0281363e81b721",
-    "premigration_base": "a02bd921f6c7834aa6e9d61227643cc32bcc4a98"
+    "premigration_base": "a02bd921f6c7834aa6e9d61227643cc32bcc4a98",
+    "producer_commit": "d6714698df7790a88fbbd10c2c7cb76d322821dd"
   },
   "status": "pass",
   "versions": {
     "bilby": "2.8.2",
-    "current_nullcal": "0.1.7.dev18+g64e98b0bd.d20260919",
     "jax": "0.11.1",
     "nullcal": "0.1.7.dev17+ga02bd921f.d20260919",
     "numpy": "2.3.5"
