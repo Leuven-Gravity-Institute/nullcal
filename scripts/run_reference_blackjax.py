@@ -12,7 +12,6 @@ from pathlib import Path
 
 import jax.numpy as jnp
 import numpy as np
-from scipy.stats import ks_2samp
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -21,10 +20,16 @@ from nullcal.sampler import sample_nuts  # noqa: E402
 from tests.e2e import pipeline  # noqa: E402
 from tests.e2e.test_blackjax_posterior import (  # noqa: E402
     MAX_DIVERGENCES,
+    MAX_EIGENMODE_WIDTH_RATIO,
     MAX_KS_STATISTIC,
+    MAX_LOGDENSITY_ABS_DIFF,
+    MAX_MARGINAL_WIDTH_RATIO,
     MAX_RHAT,
+    MIN_EIGENMODE_WIDTH_RATIO,
     MIN_ESS_BULK,
     MIN_ESS_TAIL,
+    MIN_MARGINAL_WIDTH_RATIO,
+    MIN_PERMUTATION_SEPARATION,
 )
 
 DEFAULT_OUTPUT_DIR = ROOT / "tests" / "e2e" / "reference"
@@ -34,6 +39,15 @@ NUM_WARMUP = 1_000
 NUM_SAMPLES = 1_500
 TARGET_ACCEPTANCE_RATE = 0.9
 INITIAL_POSITION_JITTER = 0.005
+
+
+def _parameter_names() -> list[str]:
+    return [
+        f"recalib_{detector}_{quantity}_{knot}"
+        for detector in pipeline.config.DETECTOR_NAMES
+        for quantity in ("amplitude", "phase")
+        for knot in range(pipeline.config.N_POINTS)
+    ]
 
 
 def _git(command: list[str]) -> str:
@@ -91,18 +105,10 @@ def main() -> None:
     )
     wall_seconds = time.perf_counter() - started
 
-    bilby_path = DEFAULT_OUTPUT_DIR / "posterior_samples.npz"
-    bilby_manifest_path = DEFAULT_OUTPUT_DIR / "posterior_manifest.json"
-    with np.load(bilby_path) as stored:
-        bilby_posterior = stored["posterior"]
-        parameters = stored["parameters"].tolist()
-    bilby_manifest = json.loads(bilby_manifest_path.read_text())
+    parameters = _parameter_names()
     posterior = _ordered_posterior({key: np.asarray(value) for key, value in result.samples.items()}, parameters)
     posterior_by_chain = posterior.reshape(NUM_CHAINS, NUM_SAMPLES, -1)
     is_divergent = np.asarray(result.info["is_divergent"]).reshape(NUM_CHAINS, NUM_SAMPLES)
-    ks_statistics = np.array(
-        [ks_2samp(posterior[:, index], bilby_posterior[:, index]).statistic for index in range(posterior.shape[1])]
-    )
 
     arguments.output_dir.mkdir(parents=True, exist_ok=True)
     output_path = arguments.output_dir / "blackjax_posterior_samples.npz"
@@ -129,21 +135,34 @@ def main() -> None:
             "initial_position_jitter": INITIAL_POSITION_JITTER,
         },
         "acceptance": {
-            "max_ks_statistic": MAX_KS_STATISTIC,
-            "max_rhat": MAX_RHAT,
-            "min_ess_bulk": MIN_ESS_BULK,
-            "min_ess_tail": MIN_ESS_TAIL,
-            "max_divergences": MAX_DIVERGENCES,
+            "historical_density": {
+                "max_abs_difference": MAX_LOGDENSITY_ABS_DIFF,
+                "min_permutation_separation": MIN_PERMUTATION_SEPARATION,
+            },
+            "chain_diagnostics": {
+                "max_rhat": MAX_RHAT,
+                "min_ess_bulk": MIN_ESS_BULK,
+                "min_ess_tail": MIN_ESS_TAIL,
+                "max_divergences": MAX_DIVERGENCES,
+            },
+            "curvature": {
+                "marginal_width_ratio": [MIN_MARGINAL_WIDTH_RATIO, MAX_MARGINAL_WIDTH_RATIO],
+                "eigenmode_width_ratio": [MIN_EIGENMODE_WIDTH_RATIO, MAX_EIGENMODE_WIDTH_RATIO],
+                "require_positive_definite_hessian": True,
+            },
         },
         "results": {
             **result.metadata,
-            "observed_max_ks_statistic": float(np.max(ks_statistics)),
-            "observed_median_ks_statistic": float(np.median(ks_statistics)),
             "wall_seconds": wall_seconds,
         },
         "anchors": {
-            "bilby_posterior_sha256": bilby_manifest["posterior_sha256"],
-            "fixed_log_likelihood": bilby_manifest["results"]["frozen_reference_log_likelihood"],
+            "fixed_log_likelihood": -203.88870383371767,
+            "likelihood_agreement": "tests/e2e/diagnostics/likelihood_agreement.json",
+        },
+        "legacy_diagnostic": {
+            "ks_threshold": MAX_KS_STATISTIC,
+            "is_acceptance_reference": False,
+            "reason": "the historical dynesty protocol undercovers an exact correlated-Gaussian target",
         },
     }
     manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")

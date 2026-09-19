@@ -1,14 +1,14 @@
-"""Integrity checks on the immutable bilby posterior used for sampler comparison.
+"""Integrity checks on the immutable historical bilby posterior.
 
-The fixed-parameter artifacts remain the primary numerical anchor. This posterior is the secondary
-distributional acceptance input: BlackJAX must match its marginals, while the fixed artifacts guard
-against both samplers agreeing on a wrong likelihood. The historical manifest records unresolved
-interpretive caveats about conditional widths; those do not permit regenerating or modifying the
-5,937 by 60 sample array after bilby leaves the runtime.
+The fixed-parameter artifacts remain the primary numerical anchor. An exact correlated-Gaussian
+diagnosis showed that this posterior's generating dynesty protocol systematically undercovers, so
+the posterior is retained for provenance and informativeness checks but is no longer an acceptance
+reference for BlackJAX. That diagnosis does not permit regenerating or modifying the 5,937 by 60
+sample array after bilby leaves the runtime.
 
 These tests deliberately do not rerun the sampler. They check the shipped artifact's digest,
-shape, provenance, and informativeness; ``test_blackjax_posterior.py`` performs the cross-sampler
-comparison.
+shape, provenance, and informativeness; ``test_blackjax_posterior.py`` applies the historical-density,
+chain-diagnostic and local-curvature acceptance gates.
 
 **Why an informativeness test exists.** The first production run of this posterior converged on
 ``dlogz``, wrote a complete manifest, and returned the *prior*: median ``sigma_post/sigma_prior``
