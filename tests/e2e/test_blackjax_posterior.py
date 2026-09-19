@@ -80,9 +80,9 @@ def test_blackjax_artifact_integrity_and_provenance(blackjax_artifact):
     assert manifest["legacy_diagnostic"]["ks_threshold"] == MAX_KS_STATISTIC
     assert manifest["legacy_diagnostic"]["is_acceptance_reference"] is False
     assert manifest["legacy_diagnostic"]["bilby_posterior_sha256"] == historical_manifest["posterior_sha256"]
-    assert manifest["anchors"]["fixed_log_likelihood"] == historical_manifest["results"][
-        "frozen_reference_log_likelihood"
-    ]
+    assert (
+        manifest["anchors"]["fixed_log_likelihood"] == historical_manifest["results"]["frozen_reference_log_likelihood"]
+    )
     assert manifest["acceptance"]["historical_density"] == {
         "max_abs_difference": MAX_LOGDENSITY_ABS_DIFF,
         "min_permutation_separation": MIN_PERMUTATION_SEPARATION,
