@@ -94,7 +94,7 @@ source = ["src", "*/src"]
 
 [tool.pytest.ini_options]
 addopts = "--cov=nullcal --cov-report=xml --cov-report=term --cov-append -m 'not integration and not e2e'"
-pythonpath = ["src"]
+pythonpath = ["src", "scripts"]
 testpaths = "tests"
 junit_family = "xunit2"
 markers = [
