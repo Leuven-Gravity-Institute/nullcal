@@ -19,7 +19,10 @@ import numpy as np
 import pytest
 
 from nullcal.time_frequency_transform import get_shape_of_wavelet_transform, transform_wavelet_freq_time
-from nullcal.time_frequency_transform.inverse_wavelet_time_funcs import inverse_wavelet_time_helper_fast
+from nullcal.time_frequency_transform.inverse_wavelet_time_funcs import (
+    _compact_packets,
+    inverse_wavelet_time_helper_fast,
+)
 from nullcal.time_frequency_transform.transform_time_funcs import phi_vec, transform_wavelet_time_helper
 from nullcal.time_frequency_transform.wavelet_transforms import inverse_wavelet_time, transform_wavelet_time
 
@@ -57,6 +60,18 @@ def phi(shape):
 @pytest.fixture
 def noise():
     return np.random.default_rng(20260914).normal(size=N_SAMPLES)
+
+
+@pytest.mark.unit
+def test_compact_packets_preserve_odd_row_sign_for_even_modes():
+    """Odd-row even modes enter the low and mirrored packets with opposite signs."""
+    wave = np.zeros((2, 4))
+    wave[0, 2] = 5.0
+    wave[1, 2] = 2.0
+
+    packets = np.asarray(_compact_packets(wave, n_f=4, n_t=2))
+
+    np.testing.assert_array_equal(packets[0, [2, 6]], [3.0, 7.0])
 
 
 @pytest.mark.unit
