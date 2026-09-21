@@ -18,9 +18,9 @@ a future dynamic import would pass unnoticed.
 satisfied solely by an extra would be reported as undeclared — a false positive, so it fails loudly
 and in the safe direction, but it needs handling before any extra becomes importable from ``src/``.
 
-**``rocket-fft`` is invisible by nature**: it is never imported at all. It entered the dependency
-set as numba's FFT entry-point plugin and remains declared during the staged backend migration.
-No static import check can decide when that transitional dependency is safe to remove.
+**Plugin-only distributions are invisible by nature**: a package discovered through an entry
+point may never be imported directly. No static import check can decide whether such a dependency
+is required, so removing one requires a separate entry-point and history audit.
 
 The import check is deliberately one-directional. A separate packaging regression below pins the
 reviewed removal of dependencies that have no package imports, entry points, or retained scripts.
@@ -54,9 +54,11 @@ REMOVED_UNUSED_DISTRIBUTIONS = {
     "bilby-pipe",
     "configargparse",
     "healpy",
+    "numba",
     "nptyping",
     "pycbc",
     "pyspark",
+    "rocket-fft",
     "tables",
 }
 

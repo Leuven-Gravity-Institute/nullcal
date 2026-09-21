@@ -28,7 +28,7 @@ REFERENCE_DIR = Path(__file__).parent / "reference"
 ARTIFACT_PATH = REFERENCE_DIR / "artifacts.npz"
 MANIFEST_PATH = REFERENCE_DIR / "manifest.json"
 
-TRACKED_PACKAGES = ("nullcal", "bilby", "numpy", "scipy", "numba", "lalsuite", "rocket-fft")
+TRACKED_PACKAGES = ("nullcal", "bilby", "numpy", "scipy", "lalsuite")
 
 
 def _digest(array: np.ndarray) -> str:

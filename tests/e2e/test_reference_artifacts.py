@@ -1,6 +1,6 @@
 """End-to-end characterisation tests against frozen reference artifacts.
 
-These pin the numerical behaviour of the pre-port numpy/numba pipeline so that the JAX rewrite has
+These pin the numerical behaviour of the pre-port CPU pipeline so that the JAX rewrite has
 something external to be checked against. Agreement between two live implementations would bound
 neither; agreement with an artifact produced before the port started, at a stated tolerance, is
 what makes a regression visible.
@@ -309,7 +309,7 @@ def test_manifest_records_the_provenance_fields_it_promises(manifest):
     for field in ("git_revision", "platform", "python", "packages"):
         assert manifest.get(field), f"manifest is missing the {field!r} provenance field"
     # Take the list from the generator rather than restating it: a hand-written subset here let
-    # `nullcal` and `rocket-fft` be dropped from the manifest with the suite still green, which is
+    # required packages be dropped from the manifest with the suite still green, which is
     # the same two-encodings-of-one-list problem the configuration check exists to prevent.
     missing = [package for package in TRACKED_PACKAGES if package not in manifest["packages"]]
     assert not missing, f"manifest packages omits {missing}, which generate_reference records"
