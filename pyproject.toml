@@ -63,7 +63,7 @@ dev = [
 
 docs = ["zensical>=0.0.62", "mkdocstrings-python>=2.0.8"]
 build = ["hatch>=1.18.1"]
-release = ["git-cliff>=2.13.1"]
+release = ["git-cliff>=2.14.2"]
 
 [tool.dependency-support-policy]
 # Rolling support floors (SPEC 0): runtime lower bounds are raised on a schedule
