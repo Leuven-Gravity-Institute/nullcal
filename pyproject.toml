@@ -84,7 +84,8 @@ parallel = true
 source = ["src"]
 
 [tool.coverage.report]
-fail_under = 55
+# Policy target: keep at least three-fifths of the package covered while retaining regression headroom.
+fail_under = 60
 omit = ["*/tests/*", "*/site-packages/*"]
 
 [tool.coverage.paths]
