@@ -7,6 +7,12 @@ uniform log-frequency grid and also permits nonuniform knot placement.
 Importing this module enables JAX's process-wide ``jax_enable_x64`` setting.
 Calibration inference requires float64 precision, so this side effect is an
 intentional part of the module's public behavior.
+
+For a posterior point estimate, evaluate the complex calibration factor for
+each sample at each frequency, then take the componentwise median of its real
+and imaginary parts. Interpolating median knot values gives a different curve.
+The factor multiplies the antenna response; to correct observed strain, divide
+the strain by the estimated factor.
 """
 
 from __future__ import annotations
@@ -21,6 +27,7 @@ jax.config.update("jax_enable_x64", True)
 import jax.numpy as jnp  # noqa: E402
 
 MINIMUM_CUBIC_SPLINE_KNOTS = 4
+POSTERIOR_ARRAY_NDIM = 3
 
 
 def _float64(values):
@@ -109,6 +116,32 @@ def calibration_factor(frequencies, knot_frequencies, amplitude, phase):
     return (1.0 + delta_amplitude) * (2.0 + imaginary_phase) / (2.0 - imaginary_phase)
 
 
+def posterior_median_calibration_factor(frequencies, knot_frequencies, amplitudes, phases):
+    """Return the per-frequency posterior median of the complex factor.
+
+    ``amplitudes`` and ``phases`` have shape ``(sample, detector, knot)``;
+    knots may have shape ``(knot,)`` or ``(detector, knot)``. The complex median
+    is defined componentwise in real and imaginary coordinates. This evaluates
+    every posterior sample before taking the median, rather than evaluating a
+    curve from median knot values.
+    """
+    amplitudes = _float64(amplitudes)
+    phases = _float64(phases)
+    knots = _float64(knot_frequencies)
+    if amplitudes.ndim != POSTERIOR_ARRAY_NDIM or phases.shape != amplitudes.shape or amplitudes.shape[0] == 0:
+        raise ValueError("amplitudes and phases must have matching nonempty (sample, detector, knot) shapes")
+    if knots.ndim == 1:
+        knots = jnp.broadcast_to(knots, amplitudes.shape[1:])
+    if knots.shape != amplitudes.shape[1:]:
+        raise ValueError("knot_frequencies must match the detector-by-knot shape")
+
+    factors = jax.vmap(
+        jax.vmap(calibration_factor, in_axes=(None, 0, 0, 0)),
+        in_axes=(None, None, 0, 0),
+    )(frequencies, knots, amplitudes, phases)
+    return jnp.median(jnp.real(factors), axis=0) + 1j * jnp.median(jnp.imag(factors), axis=0)
+
+
 def calibration_log_prior(
     amplitude,
     phase,
@@ -185,5 +218,6 @@ __all__ = [
     "calibration_factor",
     "calibration_log_prior",
     "calibration_parameters_to_unconstrained",
+    "posterior_median_calibration_factor",
     "unconstrained_to_calibration_parameters",
 ]

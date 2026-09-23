@@ -77,6 +77,29 @@ log_posterior = likelihood.logdensity_fn(params)
 Use `nullcal.sampler.sample_nuts` when the standard window-adapted NUTS run and
 R-hat, ESS, and divergence diagnostics are desired together.
 
+## 5. Summarize and Apply a Calibration Posterior
+
+```python
+from nullcal.calibration import posterior_median_calibration_factor
+
+# result is the output of nullcal.sampler.sample_nuts(...).
+frequencies = data.frequency_array[np.all(data.mask, axis=0)]
+factor = posterior_median_calibration_factor(
+    frequencies,
+    likelihood.knot_frequencies,
+    result.samples["amplitude"],
+    result.samples["phase"],
+)
+corrected_strain = np.asarray(data.strain).copy()
+corrected_strain[:, np.all(data.mask, axis=0)] /= np.asarray(factor)
+```
+
+The likelihood multiplies the whitened antenna response by the calibration
+factor. Correcting observed strain uses its inverse, as above. The point
+estimate evaluates the complex factor for every posterior sample at every
+frequency, then takes separate medians of its real and imaginary parts.
+Evaluating a spline from median knot values is a different estimator.
+
 ## Next Steps
 
 - See [Installation](installation.md) for environment setup
