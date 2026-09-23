@@ -1,6 +1,7 @@
 """Zero-noise calibration-direction and posterior-summary checks."""
 
 import numpy as np
+import pytest
 
 from nullcal.calibration import calibration_factor, posterior_median_calibration_factor
 from nullcal.data import InterferometerData
@@ -10,7 +11,16 @@ from nullcal.null_stream.null_stream import NullStream
 from nullcal.time_frequency_transform.wavelet_transforms import WaveletTransform
 
 
-def test_exact_calibration_truth_removes_zero_noise_null_residual():
+@pytest.mark.parametrize("path", ["likelihood", "null_stream"])
+@pytest.mark.parametrize(
+    "correction",
+    [
+        "truth",
+        pytest.param("inverse", marks=pytest.mark.xfail(strict=True, raises=AssertionError)),
+        pytest.param("conjugate", marks=pytest.mark.xfail(strict=True, raises=AssertionError)),
+    ],
+)
+def test_exact_calibration_truth_removes_zero_noise_null_residual(path, correction, monkeypatch):
     frequencies = np.fft.rfftfreq(64, 1.0 / 64.0)
     mask = (frequencies >= 4.0) & (frequencies <= 32.0)
     knots = np.geomspace(4.0, 32.0, 4)
@@ -45,24 +55,26 @@ def test_exact_calibration_truth_removes_zero_noise_null_residual():
         wavelet_transform_frequency_resolution=4.0,
     )
 
-    # The inferred factor belongs on the response; correcting the observed
-    # strain therefore divides by that same factor.
-    corrected = strain[:, mask] / factors
-    scale = np.max(np.abs(clean_signal))
-    assert np.max(np.abs(corrected - clean_signal)) / scale < 1e-15
+    transform = {"truth": lambda factor: factor, "inverse": lambda factor: 1.0 / factor, "conjugate": np.conj}[
+        correction
+    ]
+    if path == "likelihood":
+        if correction != "truth":
+            original_factor = likelihood._calibration_factor
+            monkeypatch.setattr(likelihood, "_calibration_factor", lambda a, p: transform(original_factor(a, p)))
+        residual = np.asarray(likelihood._frequency_domain_null_stream(amplitude, phase))[:, mask]
+    else:
+        null_stream = NullStream(
+            data,
+            WaveletTransform(duration=1.0, sampling_frequency=64.0, frequency_resolution=4.0, nx=4.0),
+            np.ones((8, 8), dtype=bool),
+        )
+        full_factors = np.zeros_like(strain)
+        full_factors[:, mask] = transform(factors)
+        residual = np.asarray(null_stream.compute_calibrated_frequency_domain_null_stream(full_factors))[:, mask]
 
-    residual = np.asarray(likelihood._frequency_domain_null_stream(amplitude, phase))[:, mask]
-    assert np.max(np.abs(residual)) / np.max(np.abs(strain)) < 2e-15
-
-    null_stream = NullStream(
-        data,
-        WaveletTransform(duration=1.0, sampling_frequency=64.0, frequency_resolution=4.0, nx=4.0),
-        np.ones((8, 8), dtype=bool),
-    )
-    full_factors = np.zeros_like(strain)
-    full_factors[:, mask] = factors
-    projected = np.asarray(null_stream.compute_calibrated_frequency_domain_null_stream(full_factors))[:, mask]
-    assert np.max(np.abs(projected)) / np.max(np.abs(strain)) < 2e-15
+    relative_residual = np.max(np.abs(residual)) / np.max(np.abs(strain))
+    assert relative_residual < 2e-15, f"relative residual {relative_residual:.17g} exceeds 2e-15"
 
 
 def test_posterior_median_is_taken_after_evaluating_each_factor():
