@@ -37,6 +37,7 @@ nav = [
   { "Developer Guide" = [
     { "Contributing" = "contributing.md" },
     { "Architecture" = "dev/architecture.md" },
+    { "GPU cost ledger" = "dev/gpu-cost-ledger.md" },
   ] },
   { "Security" = "security.md" },
 ]

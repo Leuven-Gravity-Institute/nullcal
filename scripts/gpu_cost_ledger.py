@@ -153,12 +153,14 @@ def measure(arguments: argparse.Namespace) -> None:
         posterior = gpu_cost.measure_posterior(
             likelihood,
             initial_position,
+            realisations,
             seed=arguments.seed,
             num_chains=arguments.chains,
             num_warmup=arguments.warmup,
             num_samples=arguments.samples,
+            realisation_count=arguments.cpu_realisations,
         )
-        posterior["measurement"] = "single-realisation"
+        posterior["measurement"] = "single-realisation-mean"
 
     record = {
         "configuration": arguments.configuration,
@@ -209,11 +211,15 @@ def _load_arms(output_directory: Path) -> dict[str, dict[str, dict]]:
 def _per_posterior_decomposition(record: dict) -> dict[str, float]:
     posterior = record["posterior"]
     gradient_seconds = record["stages"]["likelihood_gradient"]["median_seconds"]
-    posterior_count = posterior["num_realisations"] if posterior["measurement"] == "vmap-over-realisations" else 1
+    posterior_count = int(posterior.get("num_realisations", 1))
     # Sampling-phase integration steps are measured; one warmup step per warmup
     # iteration per chain is a lower bound because the adaptation schedule is
-    # not exposed.
-    gradient_evaluations = posterior["integration_steps"] / posterior_count + posterior["num_warmup"] * posterior["chains"]
+    # not exposed. The gradient cost is a single (unbatched) evaluation, so the
+    # accelerator likelihood share is an upper bound and the sampler overhead a
+    # lower bound.
+    gradient_evaluations = (
+        posterior["integration_steps"] / posterior_count + posterior["num_warmup"] * posterior["chains"]
+    )
     return gpu_cost.decompose_per_posterior(posterior["seconds_per_posterior"], gradient_seconds, gradient_evaluations)
 
 
@@ -246,7 +252,9 @@ def merge(arguments: argparse.Namespace) -> None:
             "complete": True,
             "model": gpu_arm["model"],
             "accelerator": gpu_arm["devices"],
+            "cpu_devices": cpu_arm["devices"],
             "code": gpu_arm["code"],
+            "cpu_code": cpu_arm["code"],
             "slurm": {"gpu": gpu_arm.get("slurm", {}), "cpu": cpu_arm.get("slurm", {})},
             "sampler_settings": gpu_arm["sampler_settings"],
             "stages": {
@@ -281,10 +289,15 @@ def merge(arguments: argparse.Namespace) -> None:
         ledger["anchors"]["reference_configuration"] = "frozen e2e inputs, 8 s / 2048 Hz / 20-1024 Hz / 10 knots"
     if production.get("complete"):
         ledger["unanchored"].append(
-            "production configuration uses synthetic same-shape strain (zero whitened strain, ET-D PSD, "
-            "all-ones time-frequency filter); the cost depends on the array shapes, not the realisation values"
+            "the timed realisations are synthetic same-shape unit-variance complex arrays, not the M3 "
+            "noise-and-calibration realisations; a surrogate does not reproduce the sampler's trajectory "
+            "length, so the per-posterior cost is a shape-anchored estimate rather than an M3 prediction"
         )
     ledger["unanchored"].append("warmup gradient count is a lower bound: one gradient per warmup iteration")
+    ledger["unanchored"].append(
+        "the per-posterior split uses the single-evaluation likelihood-gradient cost, not the batched one, so the "
+        "accelerator likelihood share is an upper bound and its sampler overhead a lower bound"
+    )
     ledger["unanchored"].append(
         "the campaign size is not fixed by M2 beyond 'a population'; the pricing table is per-posterior cost times "
         "an illustrative grid"
@@ -303,63 +316,102 @@ def _reference_log_likelihood() -> float:
     return float(likelihood.log_likelihood_fn(pipeline.parameter_arrays()))
 
 
-def _write_markdown(path: Path, ledger: dict) -> None:
-    lines = ["# GPU cost ledger — vmap over realisations", ""]
-    lines.append(
+def _markdown_provenance(ledger: dict) -> list[str]:
+    intro = (
         "Per-posterior cost is the campaign budget. The accelerator arm runs one NUTS chain per "
-        "realisation inside a single `vmap`; the CPU arm is the same-day single-chain wall clock on "
-        "the same node."
+        "realisation inside a single `vmap`; the CPU arm is the same-day baseline sampling the same "
+        "realisation ensemble, so the two arms target the same posterior family."
     )
-    lines.append("")
+    method = (
+        "`scripts/gpu_cost_ledger.py measure` writes one `<configuration>-<platform>.json` per arm; "
+        "`merge` combines them and computes the speedups and the per-posterior split. The accelerator "
+        'arm asserts `any(device.platform == "gpu" for device in jax.devices())` and exits non-zero '
+        "otherwise, so a CPU-only node cannot emit GPU-labelled numbers. Every timing call regenerates "
+        "its input array, so a device-cached value cannot be mistaken for a fresh transfer. Run the CPU "
+        "arm with `JAX_PLATFORMS=cpu`."
+    )
+    lines = [
+        "# GPU cost ledger — vmap over realisations",
+        "",
+        intro,
+        "",
+        "## How these numbers were produced",
+        "",
+        method,
+        "",
+        "| field | value |",
+        "| --- | --- |",
+        f"| ledger created | {ledger['created_at']} |",
+    ]
     for configuration, record in ledger["configurations"].items():
-        lines.append(f"## {configuration}")
-        lines.append("")
         if not record.get("complete"):
-            lines.append(f"Incomplete: arms present = {record.get('arms')}")
-            lines.append("")
             continue
-        model = record["model"]
-        lines.append(
-            f"Model: {model['detector_count']} detectors, {model['selected_frequency_count']} selected bins "
-            f"over {model['minimum_frequency_hz']:.0f}-{model['maximum_frequency_hz']:.0f} Hz, "
-            f"{model['knot_count']} knots, transform {model['wavelet_shape']}."
+        accelerator = ", ".join(
+            f"{device['device_kind']} ({device['platform']})" for device in record.get("accelerator", [])
         )
-        lines.append("")
-        lines.append("| stage | CPU (s) | accelerator (s) | speedup |")
-        lines.append("| --- | ---: | ---: | ---: |")
-        for stage, values in record["stages"].items():
-            lines.append(
-                f"| {stage} | {values['cpu_seconds']:.6g} | {values['accelerator_seconds']:.6g} | "
-                f"{values['speedup']:.2f}x |"
-            )
-        lines.append("")
-        posterior = record["posterior"]
-        lines.append(
-            f"Posterior: accelerator {posterior['accelerator']['seconds_per_posterior']:.6g} s/posterior "
-            f"({posterior['accelerator']['measurement']}); CPU {posterior['cpu']['seconds_per_posterior']:.6g} "
-            f"s/posterior; speedup {posterior['speedup']:.2f}x."
-        )
-        lines.append("")
-        for label, key in (("accelerator", "accelerator_decomposition_seconds"), ("CPU", "cpu_decomposition_seconds")):
-            decomposition = posterior[key]
-            lines.append(
-                f"{label} split: likelihood {decomposition['likelihood_seconds']:.6g} s, "
-                f"sampler overhead {decomposition['sampler_overhead_seconds']:.6g} s."
-            )
-            lines.append("")
-    lines.append("## Campaign pricing")
+        cpu = ", ".join(str(device["device_kind"]) for device in record.get("cpu_devices", []))
+        lines.append(f"| {configuration} accelerator | {accelerator} |")
+        lines.append(f"| {configuration} CPU | {cpu} |")
+        lines.append(f"| {configuration} committed revision | `{record['code']['commit']}` |")
     lines.append("")
-    lines.append("| configuration | 1 event | 100x10x10 | 1000x10x10 |")
-    lines.append("| --- | ---: | ---: | ---: |")
+    return lines
+
+
+def _markdown_configuration(configuration: str, record: dict) -> list[str]:
+    lines = [f"## {configuration}", ""]
+    if not record.get("complete"):
+        return [*lines, f"Incomplete: arms present = {record.get('arms')}", ""]
+    model = record["model"]
+    lines.append(
+        f"Model: {model['detector_count']} detectors, {model['selected_frequency_count']} selected bins "
+        f"over {model['minimum_frequency_hz']:.0f}-{model['maximum_frequency_hz']:.0f} Hz, "
+        f"{model['knot_count']} knots, transform {model['wavelet_shape']}."
+    )
+    lines += ["", "| stage | CPU (s) | accelerator (s) | speedup |", "| --- | ---: | ---: | ---: |"]
+    for stage, values in record["stages"].items():
+        lines.append(
+            f"| {stage} | {values['cpu_seconds']:.6g} | {values['accelerator_seconds']:.6g} | "
+            f"{values['speedup']:.2f}x |"
+        )
+    posterior = record["posterior"]
+    summary = (
+        f"Posterior: accelerator {posterior['accelerator']['seconds_per_posterior']:.6g} s/posterior "
+        f"({posterior['accelerator']['measurement']}); CPU {posterior['cpu']['seconds_per_posterior']:.6g} "
+        f"s/posterior; speedup {posterior['speedup']:.2f}x."
+    )
+    lines += ["", summary, ""]
+    for label, key in (("accelerator", "accelerator_decomposition_seconds"), ("CPU", "cpu_decomposition_seconds")):
+        decomposition = posterior[key]
+        split = (
+            f"{label} split: likelihood {decomposition['likelihood_seconds']:.6g} s, "
+            f"sampler overhead {decomposition['sampler_overhead_seconds']:.6g} s."
+        )
+        lines += [split, ""]
+    return lines
+
+
+def _write_markdown(path: Path, ledger: dict) -> None:
+    lines = _markdown_provenance(ledger)
+    for configuration, record in ledger["configurations"].items():
+        lines += _markdown_configuration(configuration, record)
+    lines += [
+        "## Campaign pricing",
+        "",
+        "| configuration | 1 event | 100x10x10 | 1000x10x10 |",
+        "| --- | ---: | ---: | ---: |",
+    ]
     for configuration, pricing in ledger["campaign_pricing"].items():
         lines.append(
             f"| {configuration} | {pricing['one_loud_event']['gpu_hours']:.4g} GPU-h "
             f"| {pricing['population_100x10x10']['gpu_hours']:.4g} GPU-h "
             f"| {pricing['population_1000x10x10']['gpu_hours']:.4g} GPU-h |"
         )
-    lines.append("")
-    lines.append("## Unanchored")
-    lines.append("")
+    lines += ["", "## Anchors", ""]
+    if ledger["anchors"]:
+        lines.extend(f"- `{name}` = {value}" for name, value in sorted(ledger["anchors"].items()))
+    else:
+        lines.append("- none")
+    lines += ["", "## Unanchored", ""]
     lines.extend(f"- {item}" for item in ledger["unanchored"])
     lines.append("")
     path.write_text("\n".join(lines), encoding="utf-8")
@@ -373,6 +425,7 @@ def main() -> None:
     measure_parser.add_argument("--platform", choices=(gpu_cost.GPU_PLATFORM, gpu_cost.CPU_PLATFORM), required=True)
     measure_parser.add_argument("--output-directory", type=Path, required=True)
     measure_parser.add_argument("--realisations", type=int, default=32)
+    measure_parser.add_argument("--cpu-realisations", type=int, default=1)
     measure_parser.add_argument("--chains", type=int, default=2)
     measure_parser.add_argument("--warmup", type=int, default=300)
     measure_parser.add_argument("--samples", type=int, default=300)

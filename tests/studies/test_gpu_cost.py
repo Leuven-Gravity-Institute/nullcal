@@ -111,6 +111,49 @@ def test_time_call_regenerates_inputs_for_every_iteration():
     assert seen == [0, 1, 2, 3, 4]
 
 
+def test_measure_posterior_rejects_a_zero_realisation_count():
+    knots = np.geomspace(8.0, 2048.0, 4)
+    likelihood = gpu_cost.build_synthetic_likelihood(
+        duration=1.0,
+        sampling_frequency=256,
+        minimum_frequency=20.0,
+        maximum_frequency=100.0,
+        knot_frequencies=knots,
+    )
+    position = {"amplitude": jnp.zeros((3, 4)), "phase": jnp.zeros((3, 4))}
+    realisations = np.zeros((2, 3, likelihood._frequency_count), dtype=np.complex128)
+
+    with pytest.raises(ValueError, match="realisation_count"):
+        gpu_cost.measure_posterior(likelihood, position, realisations, seed=0, realisation_count=0)
+
+
+def test_measure_posterior_averages_over_the_supplied_realisations():
+    knots = np.geomspace(8.0, 2048.0, 4)
+    likelihood = gpu_cost.build_synthetic_likelihood(
+        duration=1.0,
+        sampling_frequency=256,
+        minimum_frequency=20.0,
+        maximum_frequency=100.0,
+        knot_frequencies=knots,
+    )
+    position = {"amplitude": jnp.zeros((3, 4)), "phase": jnp.zeros((3, 4))}
+    realisations = gpu_cost.synthetic_realisations((3, likelihood._frequency_count), 2, seed=3)
+
+    measured = gpu_cost.measure_posterior(
+        likelihood,
+        position,
+        realisations,
+        seed=0,
+        num_chains=2,
+        num_warmup=5,
+        num_samples=20,
+        realisation_count=2,
+    )
+
+    assert measured["num_realisations"] == 2
+    assert measured["seconds_per_posterior"] > 0.0
+
+
 def test_build_synthetic_likelihood_supports_the_per_realisation_path():
     knots = np.geomspace(8.0, 2048.0, 4)
     likelihood = gpu_cost.build_synthetic_likelihood(

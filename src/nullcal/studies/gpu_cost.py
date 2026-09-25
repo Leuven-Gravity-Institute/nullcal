@@ -343,6 +343,7 @@ def measure_batched_posterior(
 def measure_posterior(
     likelihood: RecalibrationLikelihood,
     initial_position: Mapping,
+    realisations: np.ndarray,
     *,
     seed: int,
     num_chains: int = 1,
@@ -350,38 +351,59 @@ def measure_posterior(
     num_samples: int = 1_000,
     target_acceptance_rate: float = 0.8,
     initial_position_jitter: float = 0.01,
+    realisation_count: int = 1,
 ) -> dict[str, float | int]:
-    """Time the single-realisation NUTS path (the same-day CPU baseline)."""
+    """Time the single-realisation NUTS path (the same-day CPU baseline).
 
-    def run():
-        return sample_nuts(
-            likelihood.logdensity_fn,
-            initial_position,
-            seed=seed,
-            num_chains=num_chains,
-            num_warmup=num_warmup,
-            num_samples=num_samples,
-            target_acceptance_rate=target_acceptance_rate,
-            initial_position_jitter=initial_position_jitter,
-        )
+    The baseline samples the *same* realisation ensemble the accelerator arm
+    batches, so the two arms target the same posterior family and their
+    per-posterior costs are comparable; sampling the frozen or zero strain here
+    instead would mix a target difference into the speedup. ``realisation_count``
+    posteriors are run sequentially and averaged.
+    """
+    strain_batch = jnp.asarray(realisations)
+    count = min(int(realisation_count), int(strain_batch.shape[0]))
+    if count < 1:
+        raise ValueError("realisation_count must be at least one")
+    compile_wall_seconds = 0.0
+    wall_seconds = 0.0
+    integration_steps = 0
+    divergences = 0
+    for index in range(count):
+        strain = strain_batch[index]
 
-    started = time.perf_counter()
-    jax.block_until_ready(run().samples)
-    compile_wall_seconds = time.perf_counter() - started
-    started = time.perf_counter()
-    result = run()
-    jax.block_until_ready(result.samples)
-    wall_seconds = time.perf_counter() - started
+        def run(strain=strain, index=index):
+            return sample_nuts(
+                lambda position, strain=strain: likelihood.logdensity_for_strain(position, strain),
+                initial_position,
+                seed=seed + index,
+                num_chains=num_chains,
+                num_warmup=num_warmup,
+                num_samples=num_samples,
+                target_acceptance_rate=target_acceptance_rate,
+                initial_position_jitter=initial_position_jitter,
+            )
+
+        started = time.perf_counter()
+        jax.block_until_ready(run().samples)
+        compile_wall_seconds += time.perf_counter() - started
+        started = time.perf_counter()
+        result = run()
+        jax.block_until_ready(result.samples)
+        wall_seconds += time.perf_counter() - started
+        integration_steps += int(result.metadata["integration_steps"])
+        divergences += int(result.metadata["divergences"])
     return {
         "wall_seconds": wall_seconds,
         "compile_wall_seconds": compile_wall_seconds,
-        "seconds_per_posterior": wall_seconds,
+        "seconds_per_posterior": wall_seconds / count,
+        "num_realisations": count,
         "num_chains": num_chains,
         "chains": num_chains,
         "num_warmup": num_warmup,
         "num_samples_per_chain": num_samples,
-        "integration_steps": int(result.metadata["integration_steps"]),
-        "divergences": int(result.metadata["divergences"]),
+        "integration_steps": integration_steps,
+        "divergences": divergences,
     }
 
 
