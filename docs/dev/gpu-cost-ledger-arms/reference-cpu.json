@@ -1,0 +1,98 @@
+{
+  "code": {
+    "commit": "608d3d46c83906ab3de79b300039ad16c000a607",
+    "dirty": false,
+    "repository": "https://github.com/Leuven-Gravity-Institute/nullcal",
+    "script": "scripts/gpu_cost_ledger.py"
+  },
+  "configuration": "reference",
+  "created_at": "2026-09-25T16:51:29.563243+00:00",
+  "devices": [
+    {
+      "device_kind": "cpu",
+      "id": 0,
+      "platform": "cpu"
+    }
+  ],
+  "hostname": "fys-s-ivs-clc12",
+  "model": {
+    "detector_count": 3,
+    "duration_seconds": 8.0,
+    "frequency_count": 8193,
+    "knot_count": 10,
+    "knot_frequencies_hz": [
+      20.0,
+      30.970547307245088,
+      47.95874002551529,
+      74.26542133780448,
+      115.0020372417481,
+      178.08380174125602,
+      275.7676403240812,
+      427.03373752321517,
+      661.2734284876208,
+      1024.0
+    ],
+    "maximum_frequency_hz": 1024.0,
+    "minimum_frequency_hz": 20.0,
+    "sampling_frequency_hz": 2048.0,
+    "selected_frequency_count": 8033,
+    "selected_time_frequency_pixels": 382,
+    "strain_realisations_are_synthetic": true,
+    "wavelet_shape": [
+      256,
+      64
+    ]
+  },
+  "platform": "cpu",
+  "posterior": {
+    "chains": 2,
+    "compile_wall_seconds": 169.02432273700833,
+    "divergences": 0,
+    "integration_steps": 1472,
+    "measurement": "single-realisation-mean",
+    "num_chains": 2,
+    "num_realisations": 1,
+    "num_samples_per_chain": 100,
+    "num_warmup": 100,
+    "seconds_per_posterior": 157.0882154928986,
+    "wall_seconds": 157.0882154928986
+  },
+  "sampler_settings": {
+    "num_chains_per_realisation": 2,
+    "num_samples": 100,
+    "num_warmup": 100,
+    "seed": 20260925,
+    "timing_repeats": 5
+  },
+  "slurm": {
+    "job_id": "128129",
+    "job_name": "r6-cpu-cost-final",
+    "node_list": "fys-s-ivs-clc12",
+    "partition": "ivs-short"
+  },
+  "stages": {
+    "likelihood_gradient": {
+      "count": 5,
+      "mean_seconds": 0.0392619526013732,
+      "median_seconds": 0.040290287928655744,
+      "minimum_seconds": 0.03593367408029735
+    },
+    "projector": {
+      "count": 5,
+      "mean_seconds": 0.008439324563369155,
+      "median_seconds": 0.009067220846191049,
+      "minimum_seconds": 0.0063926230650395155
+    },
+    "transform": {
+      "count": 5,
+      "mean_seconds": 0.000753986369818449,
+      "median_seconds": 0.0006731229368597269,
+      "minimum_seconds": 0.0006165760569274426
+    }
+  },
+  "versions": {
+    "blackjax": "1.6.2",
+    "jax": "0.11.2",
+    "numpy": "2.5.3"
+  }
+}

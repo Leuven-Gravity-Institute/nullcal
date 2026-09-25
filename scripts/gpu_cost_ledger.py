@@ -18,6 +18,7 @@ of them are anchored.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import socket
@@ -46,6 +47,12 @@ M3_KNOT_HALF_WIDTH_HZ = 50.0
 # A surrogate target that drives NUTS to near maximum tree depth makes the
 # per-posterior cost unrepresentative, so flag it rather than pricing from it.
 PATHOLOGICAL_STEPS_PER_SAMPLE = 30.0
+# A cross-arm posterior speedup is only a hardware ratio when both arms worked
+# through a comparable NUTS trajectory; beyond this factor of steps per sample
+# the ratio is dominated by the surrogate target, not the device.
+SPEEDUP_EQUIVALENCE_TOLERANCE = 5.0
+LEDGER_BASENAME = "gpu-cost-ledger"
+ARMS_DIRECTORY = "gpu-cost-ledger-arms"
 
 
 def _git(arguments: list[str]) -> str:
@@ -200,15 +207,103 @@ def measure(arguments: argparse.Namespace) -> None:
     print(f"wrote {output_path}")
 
 
-def _load_arms(output_directory: Path) -> dict[str, dict[str, dict]]:
+def _load_arms(input_directory: Path) -> dict[str, dict[str, dict]]:
     arms: dict[str, dict[str, dict]] = {}
     for configuration in CONFIGURATIONS:
         arms[configuration] = {}
         for platform in (gpu_cost.GPU_PLATFORM, gpu_cost.CPU_PLATFORM):
-            path = output_directory / f"{configuration}-{platform}.json"
+            path = input_directory / f"{configuration}-{platform}.json"
             if path.exists():
                 arms[configuration][platform] = json.loads(path.read_text())
     return arms
+
+
+def steps_per_sample(posterior: dict) -> float:
+    """Return the mean NUTS integration steps per sampling step per chain."""
+    samples = posterior["num_realisations"] * posterior["chains"] * posterior["num_samples_per_chain"]
+    if samples <= 0:
+        raise ValueError("sampler settings must describe at least one chain sample")
+    return posterior["integration_steps"] / samples
+
+
+def _ledger_created_at(arms: dict[str, dict[str, dict]]) -> str:
+    """Return a deterministic ledger timestamp read from the arm records.
+
+    Using the newest arm timestamp instead of the merge clock keeps a rebuild
+    byte-identical from the committed inputs.
+    """
+    stamps = [arm["created_at"] for configuration in arms.values() for arm in configuration.values()]
+    return max(stamps) if stamps else "unavailable"
+
+
+def _posterior_comparison(accelerator_arm: dict, cpu_arm: dict) -> dict[str, object]:
+    """Report whether the cross-arm posterior speedup is a hardware ratio."""
+    accelerator = steps_per_sample(accelerator_arm["posterior"])
+    cpu = steps_per_sample(cpu_arm["posterior"])
+    ratio = max(accelerator, cpu) / min(accelerator, cpu)
+    equivalent = ratio <= SPEEDUP_EQUIVALENCE_TOLERANCE
+    note = (
+        "same realisation ensemble and a comparable NUTS trajectory length"
+        if equivalent
+        else (
+            f"not a hardware ratio: the accelerator averaged {accelerator:.2f} and the CPU {cpu:.2f} integration "
+            "steps per sample, so the ratio is dominated by the surrogate target's trajectory length"
+        )
+    )
+    return {
+        "steps_per_sample": {"accelerator": accelerator, "cpu": cpu},
+        "speedup_equivalent": equivalent,
+        "note": note,
+    }
+
+
+def _scaled_m3_estimate(ledger: dict) -> dict[str, object] | None:
+    """Scale the verified reference posterior to the M2 production model.
+
+    The factor is the production/reference ratio of single-evaluation
+    likelihood-gradient wall times, which is independent of the NUTS
+    integration-step count; the campaign is priced from the scaled value, not
+    from the pathological production posterior.
+    """
+    reference = ledger["configurations"].get(REFERENCE, {})
+    production = ledger["configurations"].get(PRODUCTION, {})
+    if not (reference.get("complete") and production.get("complete")):
+        return None
+    reference_seconds = reference["posterior"]["accelerator"]["seconds_per_posterior"]
+    reference_gradient = reference["stages"]["likelihood_gradient"]["accelerator_seconds"]
+    production_gradient = production["stages"]["likelihood_gradient"]["accelerator_seconds"]
+    ratio = production_gradient / reference_gradient
+    seconds = reference_seconds * ratio
+    return {
+        "seconds_per_posterior": seconds,
+        "derivation": (
+            "reference accelerator seconds_per_posterior x (production accelerator likelihood_gradient seconds / "
+            "reference accelerator likelihood_gradient seconds)"
+        ),
+        "inputs": {
+            "reference_accelerator_seconds_per_posterior": reference_seconds,
+            "reference_accelerator_likelihood_gradient_seconds": reference_gradient,
+            "production_accelerator_likelihood_gradient_seconds": production_gradient,
+            "source": f"docs/dev/{ARMS_DIRECTORY}/{{reference,production}}-gpu.json",
+        },
+        "production_over_reference_likelihood_gradient_ratio": ratio,
+        "campaign_gpu_hours": {
+            "one_loud_event": gpu_cost.campaign_gpu_hours(seconds, 1, 1, 1),
+            "population_100x10x10": gpu_cost.campaign_gpu_hours(seconds, 100, 10, 10),
+            "population_1000x10x10": gpu_cost.campaign_gpu_hours(seconds, 1000, 10, 10),
+        },
+        "assumptions": [
+            (
+                "the production/reference ratio is a single-evaluation wall-time ratio, independent of the NUTS "
+                "integration-step count"
+            ),
+            "it assumes an M3 posterior whose NUTS trajectory length is reference-like; that is not measured here",
+            (
+                "the production gradient is measured with the all-ones filter (32768 pixels versus 382 on the "
+                "reference), so the scaled value is an upper bound for a clustered M3 analysis"
+            ),
+        ],
+    }
 
 
 def _per_posterior_decomposition(record: dict) -> dict[str, float]:
@@ -227,11 +322,13 @@ def _per_posterior_decomposition(record: dict) -> dict[str, float]:
 
 
 def merge(arguments: argparse.Namespace) -> None:
-    arms = _load_arms(arguments.output_directory)
+    input_directory = arguments.input_directory or arguments.output_directory
+    arms = _load_arms(input_directory)
     ledger: dict[str, object] = {
-        "created_at": datetime.now(UTC).isoformat(),
+        "created_at": _ledger_created_at(arms),
         "configurations": {},
         "campaign_pricing": {},
+        "scaled_m3_estimate": None,
         "anchors": {},
         "unanchored": [],
     }
@@ -251,6 +348,7 @@ def merge(arguments: argparse.Namespace) -> None:
         posterior_speedup = gpu_cost.speedup(
             cpu_arm["posterior"]["seconds_per_posterior"], gpu_arm["posterior"]["seconds_per_posterior"]
         )
+        comparison = _posterior_comparison(gpu_arm, cpu_arm)
         ledger["configurations"][configuration] = {
             "complete": True,
             "model": gpu_arm["model"],
@@ -272,13 +370,23 @@ def merge(arguments: argparse.Namespace) -> None:
                 "cpu": cpu_arm["posterior"],
                 "accelerator": gpu_arm["posterior"],
                 "speedup": posterior_speedup,
+                "speedup_equivalent": comparison["speedup_equivalent"],
+                "speedup_note": comparison["note"],
+                "steps_per_sample": comparison["steps_per_sample"],
                 "cpu_decomposition_seconds": _per_posterior_decomposition(cpu_arm),
                 "accelerator_decomposition_seconds": _per_posterior_decomposition(gpu_arm),
             },
         }
+        pathological = steps_per_sample(gpu_arm["posterior"]) > PATHOLOGICAL_STEPS_PER_SAMPLE
         seconds_per_posterior = gpu_arm["posterior"]["seconds_per_posterior"]
         ledger["campaign_pricing"][configuration] = {
             "seconds_per_posterior": seconds_per_posterior,
+            "used_for_campaign_pricing": not pathological,
+            "marker": (
+                "pathological surrogate upper bound (near maximum NUTS tree depth); NOT an M3 price"
+                if pathological
+                else "used for campaign pricing"
+            ),
             "one_loud_event": gpu_cost.campaign_gpu_hours(seconds_per_posterior, 1, 1, 1),
             "population_100x10x10": gpu_cost.campaign_gpu_hours(seconds_per_posterior, 100, 10, 10),
             "population_1000x10x10": gpu_cost.campaign_gpu_hours(seconds_per_posterior, 1000, 10, 10),
@@ -303,14 +411,11 @@ def merge(arguments: argparse.Namespace) -> None:
     for configuration, record in ledger["configurations"].items():
         if not record.get("complete"):
             continue
-        posterior = record["posterior"]["accelerator"]
-        samples = posterior["num_realisations"] * posterior["chains"] * posterior["num_samples_per_chain"]
-        steps_per_sample = posterior["integration_steps"] / samples
-        if steps_per_sample > PATHOLOGICAL_STEPS_PER_SAMPLE:
+        if steps_per_sample(record["posterior"]["accelerator"]) > PATHOLOGICAL_STEPS_PER_SAMPLE:
             ledger["unanchored"].append(
-                f"the {configuration} accelerator posterior averaged {steps_per_sample:.0f} NUTS integration steps per "
-                "sample (near maximum tree depth) on the synthetic target, so its per-posterior cost is a pathological "
-                "surrogate upper bound; the single-evaluation stage speedups are the better model-size scaling"
+                f"the {configuration} accelerator posterior ran near maximum NUTS tree depth on the synthetic "
+                "target, so its per-posterior cost is a pathological surrogate upper bound and is not used for "
+                "campaign pricing; the scaled M3 estimate uses the target-independent single-evaluation ratio"
             )
     ledger["unanchored"].append(
         "the CPU baseline is one realisation draw from the same ensemble, while the accelerator arm averages over its "
@@ -325,11 +430,14 @@ def merge(arguments: argparse.Namespace) -> None:
         "the campaign size is not fixed by M2 beyond 'a population'; the pricing table is per-posterior cost times "
         "an illustrative grid"
     )
+    ledger["scaled_m3_estimate"] = _scaled_m3_estimate(ledger)
 
-    (arguments.output_directory / "ledger.json").write_text(json.dumps(ledger, indent=2, sort_keys=True) + "\n")
-    _write_markdown(arguments.output_directory / "ledger.md", ledger)
-    print(f"wrote {arguments.output_directory / 'ledger.json'}")
-    print(f"wrote {arguments.output_directory / 'ledger.md'}")
+    json_path = arguments.output_directory / f"{arguments.basename}.json"
+    markdown_path = arguments.output_directory / f"{arguments.basename}.md"
+    json_path.write_text(json.dumps(ledger, indent=2, sort_keys=True) + "\n")
+    _write_markdown(markdown_path, ledger)
+    print(f"wrote {json_path}")
+    print(f"wrote {markdown_path}")
 
 
 def _reference_log_likelihood() -> float:
@@ -400,7 +508,7 @@ def _markdown_configuration(configuration: str, record: dict) -> list[str]:
     summary = (
         f"Posterior: accelerator {posterior['accelerator']['seconds_per_posterior']:.6g} s/posterior "
         f"({posterior['accelerator']['measurement']}); CPU {posterior['cpu']['seconds_per_posterior']:.6g} "
-        f"s/posterior; speedup {posterior['speedup']:.2f}x."
+        f"s/posterior; speedup {posterior['speedup']:.2f}x ({posterior['speedup_note']})."
     )
     lines += ["", summary, ""]
     for label, key in (("accelerator", "accelerator_decomposition_seconds"), ("CPU", "cpu_decomposition_seconds")):
@@ -413,23 +521,109 @@ def _markdown_configuration(configuration: str, record: dict) -> list[str]:
     return lines
 
 
+def _markdown_rebuild() -> list[str]:
+    commands = [
+        "```bash",
+        "uv run python scripts/gpu_cost_ledger.py merge \\",
+        f"  --input-directory docs/dev/{ARMS_DIRECTORY} \\",
+        f"  --output-directory docs/dev --basename {LEDGER_BASENAME}",
+        f"npx --yes prettier@3.9.9 --write docs/dev/{LEDGER_BASENAME}.json docs/dev/{LEDGER_BASENAME}.md",
+        "uv run python scripts/gpu_cost_ledger.py manifest \\",
+        f"  --arms-directory docs/dev/{ARMS_DIRECTORY} \\",
+        f"  --artifact docs/dev/{LEDGER_BASENAME}.json docs/dev/{LEDGER_BASENAME}.md \\",
+        f"  --output docs/dev/{LEDGER_BASENAME}-manifest.json",
+        f"npx --yes prettier@3.9.9 --write docs/dev/{LEDGER_BASENAME}-manifest.json",
+        "```",
+    ]
+    intro = (
+        f"The ledger is a deterministic function of the four arm records in `docs/dev/{ARMS_DIRECTORY}/` "
+        "that are preserved in the checkout. `merge` derives `created_at` from the newest arm record, so no "
+        "merge-clock value enters. Run:"
+    )
+    outro = (
+        "A clean re-run leaves `git status --porcelain docs/dev` empty; the Prettier step applies the "
+        "repository's `.prettierrc.yaml` to the generated prose."
+    )
+    return ["## Rebuild", "", intro, "", *commands, "", outro, ""]
+
+
+def _markdown_scaled_estimate(ledger: dict) -> list[str]:
+    estimate = ledger.get("scaled_m3_estimate")
+    if not estimate:
+        return []
+    inputs = estimate["inputs"]
+    hours = estimate["campaign_gpu_hours"]
+    reference_seconds = inputs["reference_accelerator_seconds_per_posterior"]
+    ratio_line = (
+        f"= {reference_seconds:.10g} s"
+        f" x ({inputs['production_accelerator_likelihood_gradient_seconds']:.10g} s"
+        f" / {inputs['reference_accelerator_likelihood_gradient_seconds']:.10g} s)"
+    )
+    ratio_value = (
+        f"= {reference_seconds:.10g} s x {estimate['production_over_reference_likelihood_gradient_ratio']:.10f}"
+    )
+    seconds_line = f"= {estimate['seconds_per_posterior']:.10g} s/posterior"
+    scaled_row = (
+        f"| scaled M3 | {hours['one_loud_event']['gpu_hours']:.4g} GPU-h "
+        f"| {hours['population_100x10x10']['gpu_hours']:.4g} GPU-h "
+        f"| {hours['population_1000x10x10']['gpu_hours']:.4g} GPU-h |"
+    )
+    prose = (
+        "This is the M3 price. The production posterior above is a pathological surrogate and is **not** "
+        "used for pricing. The estimate scales the verified reference per-posterior cost by the "
+        "target-independent ratio of a single likelihood-gradient evaluation:"
+    )
+    lines = [
+        "## M3 target-independent scaled estimate",
+        "",
+        prose,
+        "",
+        "```text",
+        estimate["derivation"],
+        ratio_line,
+        ratio_value,
+        seconds_line,
+        "```",
+        "",
+        "| configuration | 1 event | 100x10x10 | 1000x10x10 |",
+        "| --- | ---: | ---: | ---: |",
+        scaled_row,
+        "",
+        "Assumptions:",
+        "",
+    ]
+    lines.extend(f"- {item}" for item in estimate["assumptions"])
+    lines += ["", f"Inputs: `{inputs['source']}`.", ""]
+    return lines
+
+
 def _write_markdown(path: Path, ledger: dict) -> None:
     lines = _markdown_provenance(ledger)
     for configuration, record in ledger["configurations"].items():
         lines += _markdown_configuration(configuration, record)
+    pricing_prose = (
+        "Per-posterior cost at the measured sampler settings. A row marked *not used* is a pathological "
+        "surrogate and must not be read as campaign pricing; the M3 price is the target-independent "
+        "scaled estimate below."
+    )
     lines += [
         "## Campaign pricing",
         "",
-        "| configuration | 1 event | 100x10x10 | 1000x10x10 |",
-        "| --- | ---: | ---: | ---: |",
+        pricing_prose,
+        "",
+        "| configuration | 1 event | 100x10x10 | 1000x10x10 | used for pricing |",
+        "| --- | ---: | ---: | ---: | --- |",
     ]
     for configuration, pricing in ledger["campaign_pricing"].items():
-        lines.append(
+        row = (
             f"| {configuration} | {pricing['one_loud_event']['gpu_hours']:.4g} GPU-h "
             f"| {pricing['population_100x10x10']['gpu_hours']:.4g} GPU-h "
-            f"| {pricing['population_1000x10x10']['gpu_hours']:.4g} GPU-h |"
+            f"| {pricing['population_1000x10x10']['gpu_hours']:.4g} GPU-h "
+            f"| {pricing['marker']} |"
         )
-    lines += ["", "## Anchors", ""]
+        lines.append(row)
+    lines += ["", *_markdown_scaled_estimate(ledger), *_markdown_rebuild()]
+    lines += ["## Anchors", ""]
     if ledger["anchors"]:
         lines.extend(f"- `{name}` = {value}" for name, value in sorted(ledger["anchors"].items()))
     else:
@@ -438,6 +632,25 @@ def _write_markdown(path: Path, ledger: dict) -> None:
     lines.extend(f"- {item}" for item in ledger["unanchored"])
     lines.append("")
     path.write_text("\n".join(lines), encoding="utf-8")
+
+
+def _digest(path: Path) -> dict[str, object]:
+    data = path.read_bytes()
+    return {"path": str(path), "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}
+
+
+def manifest(arguments: argparse.Namespace) -> None:
+    """Record digests of the ledger inputs and of the committed artifacts.
+
+    Nothing here is written back into the hashed artifacts, so a later checkout
+    can rebuild them and byte-compare against these expected digests.
+    """
+    record = {
+        "inputs": [_digest(path) for path in sorted(arguments.arms_directory.glob("*.json"))],
+        "artifacts": [_digest(path) for path in arguments.artifact],
+    }
+    arguments.output.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n")
+    print(f"wrote {arguments.output}")
 
 
 def main() -> None:
@@ -457,7 +670,14 @@ def main() -> None:
     measure_parser.set_defaults(handler=measure)
     merge_parser = subparsers.add_parser("merge")
     merge_parser.add_argument("--output-directory", type=Path, required=True)
+    merge_parser.add_argument("--input-directory", type=Path, default=None)
+    merge_parser.add_argument("--basename", default="ledger")
     merge_parser.set_defaults(handler=merge)
+    manifest_parser = subparsers.add_parser("manifest")
+    manifest_parser.add_argument("--arms-directory", type=Path, required=True)
+    manifest_parser.add_argument("--artifact", type=Path, nargs="+", required=True)
+    manifest_parser.add_argument("--output", type=Path, required=True)
+    manifest_parser.set_defaults(handler=manifest)
     arguments = parser.parse_args()
     arguments.handler(arguments)
 

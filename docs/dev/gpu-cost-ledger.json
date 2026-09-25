@@ -5,6 +5,7 @@
     },
     "campaign_pricing": {
         "production": {
+            "marker": "pathological surrogate upper bound (near maximum NUTS tree depth); NOT an M3 price",
             "note": "event/noise/calibration counts are illustrative; M2 fixed a population but not its size",
             "one_loud_event": {
                 "calibration_draws": 1,
@@ -27,9 +28,11 @@
                 "noise_realisations": 10,
                 "posterior_count": 10000
             },
-            "seconds_per_posterior": 325.17953185824445
+            "seconds_per_posterior": 325.17953185824445,
+            "used_for_campaign_pricing": false
         },
         "reference": {
+            "marker": "used for campaign pricing",
             "note": "event/noise/calibration counts are illustrative; M2 fixed a population but not its size",
             "one_loud_event": {
                 "calibration_draws": 1,
@@ -52,7 +55,8 @@
                 "noise_realisations": 10,
                 "posterior_count": 10000
             },
-            "seconds_per_posterior": 6.17371466725308
+            "seconds_per_posterior": 6.17371466725308,
+            "used_for_campaign_pricing": true
         }
     },
     "configurations": {
@@ -139,7 +143,13 @@
                     "likelihood_seconds": 238.90761766210198,
                     "sampler_overhead_seconds": 236.79960616794415
                 },
-                "speedup": 1.46290641699251
+                "speedup": 1.46290641699251,
+                "speedup_equivalent": false,
+                "speedup_note": "not a hardware ratio: the accelerator averaged 268.54 and the CPU 14.32 integration steps per sample, so the ratio is dominated by the surrogate target's trajectory length",
+                "steps_per_sample": {
+                    "accelerator": 268.54,
+                    "cpu": 14.32
+                }
             },
             "sampler_settings": {
                 "num_chains_per_realisation": 2,
@@ -262,7 +272,13 @@
                     "likelihood_seconds": 67.3653614167124,
                     "sampler_overhead_seconds": 89.7228540761862
                 },
-                "speedup": 25.444683461989847
+                "speedup": 25.444683461989847,
+                "speedup_equivalent": true,
+                "speedup_note": "same realisation ensemble and a comparable NUTS trajectory length",
+                "steps_per_sample": {
+                    "accelerator": 11.75,
+                    "cpu": 7.36
+                }
             },
             "sampler_settings": {
                 "num_chains_per_realisation": 2,
@@ -304,11 +320,50 @@
             }
         }
     },
-    "created_at": "2026-09-25T18:27:22.191460+00:00",
+    "created_at": "2026-09-25T18:17:58.124464+00:00",
+    "scaled_m3_estimate": {
+        "assumptions": [
+            "the production/reference ratio is a single-evaluation wall-time ratio, independent of the NUTS integration-step count",
+            "it assumes an M3 posterior whose NUTS trajectory length is reference-like; that is not measured here",
+            "the production gradient is measured with the all-ones filter (32768 pixels versus 382 on the reference), so the scaled value is an upper bound for a clustered M3 analysis"
+        ],
+        "campaign_gpu_hours": {
+            "one_loud_event": {
+                "calibration_draws": 1,
+                "event_count": 1,
+                "gpu_hours": 0.0025774846685798344,
+                "noise_realisations": 1,
+                "posterior_count": 1
+            },
+            "population_1000x10x10": {
+                "calibration_draws": 10,
+                "event_count": 1000,
+                "gpu_hours": 257.74846685798343,
+                "noise_realisations": 10,
+                "posterior_count": 100000
+            },
+            "population_100x10x10": {
+                "calibration_draws": 10,
+                "event_count": 100,
+                "gpu_hours": 25.774846685798344,
+                "noise_realisations": 10,
+                "posterior_count": 10000
+            }
+        },
+        "derivation": "reference accelerator seconds_per_posterior x (production accelerator likelihood_gradient seconds / reference accelerator likelihood_gradient seconds)",
+        "inputs": {
+            "production_accelerator_likelihood_gradient_seconds": 0.0024288990534842014,
+            "reference_accelerator_likelihood_gradient_seconds": 0.0016160598024725914,
+            "reference_accelerator_seconds_per_posterior": 6.17371466725308,
+            "source": "docs/dev/gpu-cost-ledger-arms/{reference,production}-gpu.json"
+        },
+        "production_over_reference_likelihood_gradient_ratio": 1.5029759726514798,
+        "seconds_per_posterior": 9.278944806887404
+    },
     "unanchored": [
         "the timed realisations are synthetic same-shape unit-variance complex arrays, not the M3 noise-and-calibration realisations; a surrogate does not reproduce the sampler's trajectory length, so the per-posterior cost is a shape-anchored estimate rather than an M3 prediction",
         "the production configuration selects every time-frequency pixel (all-ones filter), an upper bound on the cost of a clustered M3 analysis, which keeps only a sparse pixel set",
-        "the production accelerator posterior averaged 269 NUTS integration steps per sample (near maximum tree depth) on the synthetic target, so its per-posterior cost is a pathological surrogate upper bound; the single-evaluation stage speedups are the better model-size scaling",
+        "the production accelerator posterior ran near maximum NUTS tree depth on the synthetic target, so its per-posterior cost is a pathological surrogate upper bound and is not used for campaign pricing; the scaled M3 estimate uses the target-independent single-evaluation ratio",
         "the CPU baseline is one realisation draw from the same ensemble, while the accelerator arm averages over its batch; the CPU arm's own integration-step count is recorded so the trajectory lengths can be compared",
         "warmup gradient count is a lower bound: one gradient per warmup iteration",
         "the per-posterior split uses the single-evaluation likelihood-gradient cost, not the batched one, so the accelerator likelihood share is an upper bound and its sampler overhead a lower bound",

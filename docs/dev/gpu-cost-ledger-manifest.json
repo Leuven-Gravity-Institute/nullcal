@@ -1,0 +1,36 @@
+{
+    "artifacts": [
+        {
+            "bytes": 16639,
+            "path": "docs/dev/gpu-cost-ledger.json",
+            "sha256": "6fd98e1adc35b457dd8e0122263feb6eb5c5976af3f1aad3f71a1cb8da1a277b"
+        },
+        {
+            "bytes": 7691,
+            "path": "docs/dev/gpu-cost-ledger.md",
+            "sha256": "e8ebd10ddc39f0af526324f8f329fa6ebb9578d55d3320484c00bf44d7c28392"
+        }
+    ],
+    "inputs": [
+        {
+            "bytes": 2591,
+            "path": "docs/dev/gpu-cost-ledger-arms/production-cpu.json",
+            "sha256": "8d61e04c0b6d1c7ff06a8c0778ee233c95d31ae75e68527281f0163879924730"
+        },
+        {
+            "bytes": 2617,
+            "path": "docs/dev/gpu-cost-ledger-arms/production-gpu.json",
+            "sha256": "f53d0f6e977bf281509089d82c76d91d81b01b3173865bba923fd4a9fdc08800"
+        },
+        {
+            "bytes": 2458,
+            "path": "docs/dev/gpu-cost-ledger-arms/reference-cpu.json",
+            "sha256": "845dfb94946100412fc25dab7609aef24dca967899c4be5deb1ce2b93f8a60f4"
+        },
+        {
+            "bytes": 2489,
+            "path": "docs/dev/gpu-cost-ledger-arms/reference-gpu.json",
+            "sha256": "acec94e7fa8c73604060266c6efb1f30027e23e1d355d90aa628f09b77c65868"
+        }
+    ]
+}

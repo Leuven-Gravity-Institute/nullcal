@@ -1,0 +1,107 @@
+{
+  "code": {
+    "commit": "608d3d46c83906ab3de79b300039ad16c000a607",
+    "dirty": false,
+    "repository": "https://github.com/Leuven-Gravity-Institute/nullcal",
+    "script": "scripts/gpu_cost_ledger.py"
+  },
+  "configuration": "production",
+  "created_at": "2026-09-25T18:17:58.124464+00:00",
+  "devices": [
+    {
+      "device_kind": "NVIDIA A30",
+      "id": 0,
+      "platform": "gpu"
+    }
+  ],
+  "hostname": "fys-s-ivs-clc21",
+  "model": {
+    "detector_count": 3,
+    "duration_seconds": 8.0,
+    "frequency_count": 16385,
+    "knot_count": 19,
+    "knot_frequencies_hz": [
+      8.0,
+      14.81399539659665,
+      27.431807451298337,
+      50.79683366298239,
+      94.06300750563837,
+      174.18112002232021,
+      199.43,
+      211.93,
+      224.43,
+      236.93,
+      249.43,
+      261.93,
+      274.43,
+      286.93,
+      299.43,
+      322.53978877308776,
+      597.2628682629727,
+      1105.9811726257233,
+      2048.0
+    ],
+    "maximum_frequency_hz": 2000.0,
+    "minimum_frequency_hz": 20.0,
+    "sampling_frequency_hz": 4096.0,
+    "selected_frequency_count": 15841,
+    "selected_time_frequency_pixels": 32768,
+    "strain_realisations_are_synthetic": true,
+    "wavelet_shape": [
+      256,
+      128
+    ]
+  },
+  "platform": "gpu",
+  "posterior": {
+    "chains": 2,
+    "compile_wall_seconds": 1318.3997498049866,
+    "divergences": 0,
+    "integration_steps": 214832,
+    "measurement": "vmap-over-realisations",
+    "num_chains_per_realisation": 2,
+    "num_realisations": 4,
+    "num_samples_per_chain": 100,
+    "num_warmup": 100,
+    "seconds_per_posterior": 325.17953185824445,
+    "wall_seconds": 1300.7181274329778
+  },
+  "sampler_settings": {
+    "num_chains_per_realisation": 2,
+    "num_samples": 100,
+    "num_warmup": 100,
+    "seed": 20260925,
+    "timing_repeats": 5
+  },
+  "slurm": {
+    "job_id": "128179",
+    "job_name": "r6-prod-gpu",
+    "node_list": "fys-s-ivs-clc21",
+    "partition": "ivs-gpu"
+  },
+  "stages": {
+    "likelihood_gradient": {
+      "count": 5,
+      "mean_seconds": 0.002429254213348031,
+      "median_seconds": 0.0024288990534842014,
+      "minimum_seconds": 0.00242336792871356
+    },
+    "projector": {
+      "count": 5,
+      "mean_seconds": 0.0007139715366065502,
+      "median_seconds": 0.0007122699171304703,
+      "minimum_seconds": 0.0007109290454536676
+    },
+    "transform": {
+      "count": 5,
+      "mean_seconds": 0.00013077175244688988,
+      "median_seconds": 0.00012998003512620926,
+      "minimum_seconds": 0.00012860982678830624
+    }
+  },
+  "versions": {
+    "blackjax": "1.6.2",
+    "jax": "0.11.2",
+    "numpy": "2.5.3"
+  }
+}
