@@ -43,6 +43,9 @@ PRODUCTION = "production"
 CONFIGURATIONS = (REFERENCE, PRODUCTION)
 M3_PEAK_FREQUENCY_HZ = 249.43
 M3_KNOT_HALF_WIDTH_HZ = 50.0
+# A surrogate target that drives NUTS to near maximum tree depth makes the
+# per-posterior cost unrepresentative, so flag it rather than pricing from it.
+PATHOLOGICAL_STEPS_PER_SAMPLE = 30.0
 
 
 def _git(arguments: list[str]) -> str:
@@ -293,6 +296,26 @@ def merge(arguments: argparse.Namespace) -> None:
             "noise-and-calibration realisations; a surrogate does not reproduce the sampler's trajectory "
             "length, so the per-posterior cost is a shape-anchored estimate rather than an M3 prediction"
         )
+        ledger["unanchored"].append(
+            "the production configuration selects every time-frequency pixel (all-ones filter), an upper "
+            "bound on the cost of a clustered M3 analysis, which keeps only a sparse pixel set"
+        )
+    for configuration, record in ledger["configurations"].items():
+        if not record.get("complete"):
+            continue
+        posterior = record["posterior"]["accelerator"]
+        samples = posterior["num_realisations"] * posterior["chains"] * posterior["num_samples_per_chain"]
+        steps_per_sample = posterior["integration_steps"] / samples
+        if steps_per_sample > PATHOLOGICAL_STEPS_PER_SAMPLE:
+            ledger["unanchored"].append(
+                f"the {configuration} accelerator posterior averaged {steps_per_sample:.0f} NUTS integration steps per "
+                "sample (near maximum tree depth) on the synthetic target, so its per-posterior cost is a pathological "
+                "surrogate upper bound; the single-evaluation stage speedups are the better model-size scaling"
+            )
+    ledger["unanchored"].append(
+        "the CPU baseline is one realisation draw from the same ensemble, while the accelerator arm averages over its "
+        "batch; the CPU arm's own integration-step count is recorded so the trajectory lengths can be compared"
+    )
     ledger["unanchored"].append("warmup gradient count is a lower bound: one gradient per warmup iteration")
     ledger["unanchored"].append(
         "the per-posterior split uses the single-evaluation likelihood-gradient cost, not the batched one, so the "

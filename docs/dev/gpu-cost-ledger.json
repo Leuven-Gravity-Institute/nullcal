@@ -1,0 +1,317 @@
+{
+    "anchors": {
+        "reference_configuration": "frozen e2e inputs, 8 s / 2048 Hz / 20-1024 Hz / 10 knots",
+        "reference_log_likelihood": -203.88870383371773
+    },
+    "campaign_pricing": {
+        "production": {
+            "note": "event/noise/calibration counts are illustrative; M2 fixed a population but not its size",
+            "one_loud_event": {
+                "calibration_draws": 1,
+                "event_count": 1,
+                "gpu_hours": 0.09032764773840124,
+                "noise_realisations": 1,
+                "posterior_count": 1
+            },
+            "population_1000x10x10": {
+                "calibration_draws": 10,
+                "event_count": 1000,
+                "gpu_hours": 9032.764773840125,
+                "noise_realisations": 10,
+                "posterior_count": 100000
+            },
+            "population_100x10x10": {
+                "calibration_draws": 10,
+                "event_count": 100,
+                "gpu_hours": 903.2764773840123,
+                "noise_realisations": 10,
+                "posterior_count": 10000
+            },
+            "seconds_per_posterior": 325.17953185824445
+        },
+        "reference": {
+            "note": "event/noise/calibration counts are illustrative; M2 fixed a population but not its size",
+            "one_loud_event": {
+                "calibration_draws": 1,
+                "event_count": 1,
+                "gpu_hours": 0.0017149207409036334,
+                "noise_realisations": 1,
+                "posterior_count": 1
+            },
+            "population_1000x10x10": {
+                "calibration_draws": 10,
+                "event_count": 1000,
+                "gpu_hours": 171.49207409036333,
+                "noise_realisations": 10,
+                "posterior_count": 100000
+            },
+            "population_100x10x10": {
+                "calibration_draws": 10,
+                "event_count": 100,
+                "gpu_hours": 17.149207409036332,
+                "noise_realisations": 10,
+                "posterior_count": 10000
+            },
+            "seconds_per_posterior": 6.17371466725308
+        }
+    },
+    "configurations": {
+        "production": {
+            "accelerator": [
+                {
+                    "device_kind": "NVIDIA A30",
+                    "id": 0,
+                    "platform": "gpu"
+                }
+            ],
+            "code": {
+                "commit": "608d3d46c83906ab3de79b300039ad16c000a607",
+                "dirty": false,
+                "repository": "https://github.com/Leuven-Gravity-Institute/nullcal",
+                "script": "scripts/gpu_cost_ledger.py"
+            },
+            "complete": true,
+            "cpu_code": {
+                "commit": "608d3d46c83906ab3de79b300039ad16c000a607",
+                "dirty": false,
+                "repository": "https://github.com/Leuven-Gravity-Institute/nullcal",
+                "script": "scripts/gpu_cost_ledger.py"
+            },
+            "cpu_devices": [
+                {
+                    "device_kind": "cpu",
+                    "id": 0,
+                    "platform": "cpu"
+                }
+            ],
+            "model": {
+                "detector_count": 3,
+                "duration_seconds": 8.0,
+                "frequency_count": 16385,
+                "knot_count": 19,
+                "knot_frequencies_hz": [
+                    8.0, 14.81399539659665, 27.431807451298337,
+                    50.79683366298239, 94.06300750563837, 174.18112002232021,
+                    199.43, 211.93, 224.43, 236.93, 249.43, 261.93, 274.43,
+                    286.93, 299.43, 322.53978877308776, 597.2628682629727,
+                    1105.9811726257233, 2048.0
+                ],
+                "maximum_frequency_hz": 2000.0,
+                "minimum_frequency_hz": 20.0,
+                "sampling_frequency_hz": 4096.0,
+                "selected_frequency_count": 15841,
+                "selected_time_frequency_pixels": 32768,
+                "strain_realisations_are_synthetic": true,
+                "wavelet_shape": [256, 128]
+            },
+            "posterior": {
+                "accelerator": {
+                    "chains": 2,
+                    "compile_wall_seconds": 1318.3997498049866,
+                    "divergences": 0,
+                    "integration_steps": 214832,
+                    "measurement": "vmap-over-realisations",
+                    "num_chains_per_realisation": 2,
+                    "num_realisations": 4,
+                    "num_samples_per_chain": 100,
+                    "num_warmup": 100,
+                    "seconds_per_posterior": 325.17953185824445,
+                    "wall_seconds": 1300.7181274329778
+                },
+                "accelerator_decomposition_seconds": {
+                    "likelihood_seconds": 130.93709017522633,
+                    "sampler_overhead_seconds": 194.24244168301811
+                },
+                "cpu": {
+                    "chains": 2,
+                    "compile_wall_seconds": 487.95113206189126,
+                    "divergences": 0,
+                    "integration_steps": 2864,
+                    "measurement": "single-realisation-mean",
+                    "num_chains": 2,
+                    "num_realisations": 1,
+                    "num_samples_per_chain": 100,
+                    "num_warmup": 100,
+                    "seconds_per_posterior": 475.70722383004613,
+                    "wall_seconds": 475.70722383004613
+                },
+                "cpu_decomposition_seconds": {
+                    "likelihood_seconds": 238.90761766210198,
+                    "sampler_overhead_seconds": 236.79960616794415
+                },
+                "speedup": 1.46290641699251
+            },
+            "sampler_settings": {
+                "num_chains_per_realisation": 2,
+                "num_samples": 100,
+                "num_warmup": 100,
+                "seed": 20260925,
+                "timing_repeats": 5
+            },
+            "slurm": {
+                "cpu": {
+                    "job_id": "128129",
+                    "job_name": "r6-cpu-cost-final",
+                    "node_list": "fys-s-ivs-clc12",
+                    "partition": "ivs-short"
+                },
+                "gpu": {
+                    "job_id": "128179",
+                    "job_name": "r6-prod-gpu",
+                    "node_list": "fys-s-ivs-clc21",
+                    "partition": "ivs-gpu"
+                }
+            },
+            "stages": {
+                "likelihood_gradient": {
+                    "accelerator_seconds": 0.0024288990534842014,
+                    "cpu_seconds": 0.07797246007248759,
+                    "speedup": 32.10197639158278
+                },
+                "projector": {
+                    "accelerator_seconds": 0.0007122699171304703,
+                    "cpu_seconds": 0.018211364978924394,
+                    "speedup": 25.568067021969316
+                },
+                "transform": {
+                    "accelerator_seconds": 0.00012998003512620926,
+                    "cpu_seconds": 0.0016639870591461658,
+                    "speedup": 12.801866513810769
+                }
+            }
+        },
+        "reference": {
+            "accelerator": [
+                {
+                    "device_kind": "NVIDIA A30",
+                    "id": 0,
+                    "platform": "gpu"
+                }
+            ],
+            "code": {
+                "commit": "608d3d46c83906ab3de79b300039ad16c000a607",
+                "dirty": false,
+                "repository": "https://github.com/Leuven-Gravity-Institute/nullcal",
+                "script": "scripts/gpu_cost_ledger.py"
+            },
+            "complete": true,
+            "cpu_code": {
+                "commit": "608d3d46c83906ab3de79b300039ad16c000a607",
+                "dirty": false,
+                "repository": "https://github.com/Leuven-Gravity-Institute/nullcal",
+                "script": "scripts/gpu_cost_ledger.py"
+            },
+            "cpu_devices": [
+                {
+                    "device_kind": "cpu",
+                    "id": 0,
+                    "platform": "cpu"
+                }
+            ],
+            "model": {
+                "detector_count": 3,
+                "duration_seconds": 8.0,
+                "frequency_count": 8193,
+                "knot_count": 10,
+                "knot_frequencies_hz": [
+                    20.0, 30.970547307245088, 47.95874002551529,
+                    74.26542133780447, 115.0020372417481, 178.08380174125602,
+                    275.7676403240812, 427.03373752321517, 661.2734284876208,
+                    1024.0
+                ],
+                "maximum_frequency_hz": 1024.0,
+                "minimum_frequency_hz": 20.0,
+                "sampling_frequency_hz": 2048.0,
+                "selected_frequency_count": 8033,
+                "selected_time_frequency_pixels": 382,
+                "strain_realisations_are_synthetic": true,
+                "wavelet_shape": [256, 64]
+            },
+            "posterior": {
+                "accelerator": {
+                    "chains": 2,
+                    "compile_wall_seconds": 116.39467087690718,
+                    "divergences": 0,
+                    "integration_steps": 37600,
+                    "measurement": "vmap-over-realisations",
+                    "num_chains_per_realisation": 2,
+                    "num_realisations": 16,
+                    "num_samples_per_chain": 100,
+                    "num_warmup": 100,
+                    "seconds_per_posterior": 6.17371466725308,
+                    "wall_seconds": 98.77943467604928
+                },
+                "accelerator_decomposition_seconds": {
+                    "likelihood_seconds": 4.120952496305108,
+                    "sampler_overhead_seconds": 2.0527621709479718
+                },
+                "cpu": {
+                    "chains": 2,
+                    "compile_wall_seconds": 169.02432273700833,
+                    "divergences": 0,
+                    "integration_steps": 1472,
+                    "measurement": "single-realisation-mean",
+                    "num_chains": 2,
+                    "num_realisations": 1,
+                    "num_samples_per_chain": 100,
+                    "num_warmup": 100,
+                    "seconds_per_posterior": 157.0882154928986,
+                    "wall_seconds": 157.0882154928986
+                },
+                "cpu_decomposition_seconds": {
+                    "likelihood_seconds": 67.3653614167124,
+                    "sampler_overhead_seconds": 89.7228540761862
+                },
+                "speedup": 25.444683461989847
+            },
+            "sampler_settings": {
+                "num_chains_per_realisation": 2,
+                "num_samples": 100,
+                "num_warmup": 100,
+                "seed": 20260925,
+                "timing_repeats": 5
+            },
+            "slurm": {
+                "cpu": {
+                    "job_id": "128129",
+                    "job_name": "r6-cpu-cost-final",
+                    "node_list": "fys-s-ivs-clc12",
+                    "partition": "ivs-short"
+                },
+                "gpu": {
+                    "job_id": "128128",
+                    "job_name": "r6-gpu-cost-final",
+                    "node_list": "fys-s-ivs-clc21",
+                    "partition": "ivs-gpu"
+                }
+            },
+            "stages": {
+                "likelihood_gradient": {
+                    "accelerator_seconds": 0.0016160598024725914,
+                    "cpu_seconds": 0.040290287928655744,
+                    "speedup": 24.93118625128297
+                },
+                "projector": {
+                    "accelerator_seconds": 0.000525359995663166,
+                    "cpu_seconds": 0.009067220846191049,
+                    "speedup": 17.25906220694521
+                },
+                "transform": {
+                    "accelerator_seconds": 0.00012036995030939579,
+                    "cpu_seconds": 0.0006731229368597269,
+                    "speedup": 5.592117759702893
+                }
+            }
+        }
+    },
+    "created_at": "2026-09-25T18:27:22.191460+00:00",
+    "unanchored": [
+        "the timed realisations are synthetic same-shape unit-variance complex arrays, not the M3 noise-and-calibration realisations; a surrogate does not reproduce the sampler's trajectory length, so the per-posterior cost is a shape-anchored estimate rather than an M3 prediction",
+        "the production configuration selects every time-frequency pixel (all-ones filter), an upper bound on the cost of a clustered M3 analysis, which keeps only a sparse pixel set",
+        "the production accelerator posterior averaged 269 NUTS integration steps per sample (near maximum tree depth) on the synthetic target, so its per-posterior cost is a pathological surrogate upper bound; the single-evaluation stage speedups are the better model-size scaling",
+        "the CPU baseline is one realisation draw from the same ensemble, while the accelerator arm averages over its batch; the CPU arm's own integration-step count is recorded so the trajectory lengths can be compared",
+        "warmup gradient count is a lower bound: one gradient per warmup iteration",
+        "the per-posterior split uses the single-evaluation likelihood-gradient cost, not the batched one, so the accelerator likelihood share is an upper bound and its sampler overhead a lower bound",
+        "the campaign size is not fixed by M2 beyond 'a population'; the pricing table is per-posterior cost times an illustrative grid"
+    ]
+}
