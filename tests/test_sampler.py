@@ -4,7 +4,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from nullcal.sampler import sample_nuts
+from nullcal.sampler import sample_nuts, sample_nuts_batched
 
 
 def test_sample_nuts_returns_samples_and_required_diagnostics():
@@ -39,3 +39,36 @@ def test_sample_nuts_rejects_diagnostics_from_one_chain():
 
     with pytest.raises(ValueError, match="at least two chains"):
         sample_nuts(standard_normal, {"x": jnp.zeros(1)}, num_chains=1)
+
+
+def test_sample_nuts_batched_runs_one_chain_per_realisation():
+    def per_realisation(position, realisation):
+        return -0.5 * jnp.sum((position["x"] - realisation["mean"]) ** 2)
+
+    realisations = {"mean": jnp.asarray([[2.0, 2.0], [-2.0, -2.0]], dtype=jnp.float64)}
+    result = sample_nuts_batched(
+        per_realisation,
+        {"x": jnp.zeros(2)},
+        realisations,
+        seed=394,
+        num_chains_per_realisation=1,
+        num_warmup=100,
+        num_samples=100,
+        initial_position_jitter=0.1,
+    )
+
+    assert result.samples["x"].shape == (2 * 100, 2)
+    assert result.metadata["num_realisations"] == 2
+    assert result.metadata["num_chains_per_realisation"] == 1
+    assert result.metadata["integration_steps"] > 0
+    means = result.samples["x"].reshape(2, 100, 2).mean(axis=1)
+    assert means[0, 0] > 0.0
+    assert means[1, 0] < 0.0
+
+
+def test_sample_nuts_batched_rejects_an_empty_realisation_batch():
+    def per_realisation(position, realisation):
+        return -0.5 * jnp.sum(position["x"] ** 2)
+
+    with pytest.raises(ValueError, match="at least one realisation"):
+        sample_nuts_batched(per_realisation, {"x": jnp.zeros(2)}, {"mean": jnp.zeros((0, 2))})

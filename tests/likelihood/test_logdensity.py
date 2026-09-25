@@ -84,3 +84,53 @@ def test_logdensity_rejects_an_invalid_parameter_pytree(likelihood, params, mess
 def test_container_represents_one_realisation_without_a_batch_axis(likelihood):
     assert likelihood.interferometers.strain.ndim == 2
     assert likelihood.interferometers.strain.shape[0] == 3
+
+
+def _full_frequency_strain(likelihood):
+    stored = np.asarray(likelihood._whitened_frequency_domain_strain)
+    full = np.zeros((stored.shape[0], likelihood._frequency_count), dtype=np.complex128)
+    full[:, np.asarray(likelihood._frequency_indices)] = stored
+    return full
+
+
+def test_supplied_strain_reproduces_the_stored_realisation(likelihood):
+    params = {
+        "amplitude": jnp.zeros((3, 4), dtype=jnp.float64),
+        "phase": jnp.zeros((3, 4), dtype=jnp.float64),
+    }
+    supplied = _full_frequency_strain(likelihood)
+
+    default = likelihood.log_likelihood_fn(params)
+    on_supplied = likelihood.log_likelihood_for_strain(params, jnp.asarray(supplied))
+    density = likelihood.logdensity_for_strain(params, jnp.asarray(supplied))
+
+    assert float(on_supplied) == pytest.approx(float(default), rel=1e-12, abs=0.0)
+    assert float(density - on_supplied) == pytest.approx(
+        float(likelihood.logdensity_fn(params) - default), rel=1e-12, abs=1e-12
+    )
+
+
+def test_strain_path_keeps_one_value_per_realisation(likelihood):
+    params = {
+        "amplitude": jnp.zeros((3, 4), dtype=jnp.float64),
+        "phase": jnp.zeros((3, 4), dtype=jnp.float64),
+    }
+    first = _full_frequency_strain(likelihood)
+    second = 2.0 * first + 0.1
+    batch = jnp.asarray(np.stack([first, second]))
+
+    batched = likelihood.log_likelihood_for_strain(params, batch)
+
+    assert batched.shape == (2,)
+    assert float(batched[0]) == pytest.approx(float(likelihood.log_likelihood_for_strain(params, batch[0])), rel=1e-12)
+    assert float(batched[1]) == pytest.approx(float(likelihood.log_likelihood_for_strain(params, batch[1])), rel=1e-12)
+    assert float(batched[0]) != pytest.approx(float(batched[1]))
+
+
+def test_strain_path_rejects_a_wrong_shape(likelihood):
+    params = {
+        "amplitude": jnp.zeros((3, 4), dtype=jnp.float64),
+        "phase": jnp.zeros((3, 4), dtype=jnp.float64),
+    }
+    with pytest.raises(ValueError, match="trailing shape"):
+        likelihood.log_likelihood_for_strain(params, jnp.zeros((3, 5), dtype=jnp.complex128))
