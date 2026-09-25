@@ -297,25 +297,38 @@ def measure_batched_posterior(
     target_acceptance_rate: float = 0.8,
     initial_position_jitter: float = 0.01,
 ) -> dict[str, float | int]:
-    """Time one vmapped NUTS batch and return the per-posterior share."""
+    """Time one vmapped NUTS batch and return the per-posterior share.
+
+    The first call compiles the vmapped kernel and is reported separately as
+    ``compile_wall_seconds``; the campaign budget is the steady-state
+    ``wall_seconds`` of the second, identically shaped call.
+    """
     realisation_count = int(np.asarray(realisations).shape[0])
+
+    def run():
+        return sample_nuts_batched(
+            likelihood.logdensity_for_strain,
+            initial_position,
+            jnp.asarray(realisations),
+            seed=seed,
+            num_chains_per_realisation=num_chains_per_realisation,
+            num_warmup=num_warmup,
+            num_samples=num_samples,
+            target_acceptance_rate=target_acceptance_rate,
+            initial_position_jitter=initial_position_jitter,
+        )
+
     started = time.perf_counter()
-    result = sample_nuts_batched(
-        likelihood.logdensity_for_strain,
-        initial_position,
-        jnp.asarray(realisations),
-        seed=seed,
-        num_chains_per_realisation=num_chains_per_realisation,
-        num_warmup=num_warmup,
-        num_samples=num_samples,
-        target_acceptance_rate=target_acceptance_rate,
-        initial_position_jitter=initial_position_jitter,
-    )
+    jax.block_until_ready(run().samples)
+    compile_wall_seconds = time.perf_counter() - started
+    started = time.perf_counter()
+    result = run()
     jax.block_until_ready(result.samples)
     wall_seconds = time.perf_counter() - started
     metadata = dict(result.metadata)
     return {
         "wall_seconds": wall_seconds,
+        "compile_wall_seconds": compile_wall_seconds,
         "seconds_per_posterior": wall_seconds / realisation_count,
         "num_realisations": realisation_count,
         "num_chains_per_realisation": metadata["num_chains_per_realisation"],
@@ -339,21 +352,29 @@ def measure_posterior(
     initial_position_jitter: float = 0.01,
 ) -> dict[str, float | int]:
     """Time the single-realisation NUTS path (the same-day CPU baseline)."""
+
+    def run():
+        return sample_nuts(
+            likelihood.logdensity_fn,
+            initial_position,
+            seed=seed,
+            num_chains=num_chains,
+            num_warmup=num_warmup,
+            num_samples=num_samples,
+            target_acceptance_rate=target_acceptance_rate,
+            initial_position_jitter=initial_position_jitter,
+        )
+
     started = time.perf_counter()
-    result = sample_nuts(
-        likelihood.logdensity_fn,
-        initial_position,
-        seed=seed,
-        num_chains=num_chains,
-        num_warmup=num_warmup,
-        num_samples=num_samples,
-        target_acceptance_rate=target_acceptance_rate,
-        initial_position_jitter=initial_position_jitter,
-    )
+    jax.block_until_ready(run().samples)
+    compile_wall_seconds = time.perf_counter() - started
+    started = time.perf_counter()
+    result = run()
     jax.block_until_ready(result.samples)
     wall_seconds = time.perf_counter() - started
     return {
         "wall_seconds": wall_seconds,
+        "compile_wall_seconds": compile_wall_seconds,
         "seconds_per_posterior": wall_seconds,
         "num_chains": num_chains,
         "chains": num_chains,
