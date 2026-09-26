@@ -1,14 +1,14 @@
 {
     "artifacts": [
         {
-            "bytes": 16639,
+            "bytes": 17690,
             "path": "docs/dev/gpu-cost-ledger.json",
-            "sha256": "6fd98e1adc35b457dd8e0122263feb6eb5c5976af3f1aad3f71a1cb8da1a277b"
+            "sha256": "847d203933ff0e5542413ee913fdf0a897a26618112032d3a7c1493860c07d95"
         },
         {
-            "bytes": 7691,
+            "bytes": 7727,
             "path": "docs/dev/gpu-cost-ledger.md",
-            "sha256": "e8ebd10ddc39f0af526324f8f329fa6ebb9578d55d3320484c00bf44d7c28392"
+            "sha256": "6f18c860c717a823ed3573fe2f643c21d095bee4080036a0a77b4cd454ddca6e"
         }
     ],
     "inputs": [

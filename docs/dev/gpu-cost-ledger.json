@@ -32,7 +32,7 @@
             "used_for_campaign_pricing": false
         },
         "reference": {
-            "marker": "used for campaign pricing",
+            "marker": "benchmark input (R5 reference); NOT the M3 campaign price",
             "note": "event/noise/calibration counts are illustrative; M2 fixed a population but not its size",
             "one_loud_event": {
                 "calibration_draws": 1,
@@ -56,6 +56,32 @@
                 "posterior_count": 10000
             },
             "seconds_per_posterior": 6.17371466725308,
+            "used_for_campaign_pricing": false
+        },
+        "scaled_m3": {
+            "marker": "M3 campaign price (target-independent scaled estimate; see scaled_m3_estimate)",
+            "one_loud_event": {
+                "calibration_draws": 1,
+                "event_count": 1,
+                "gpu_hours": 0.0025774846685798344,
+                "noise_realisations": 1,
+                "posterior_count": 1
+            },
+            "population_1000x10x10": {
+                "calibration_draws": 10,
+                "event_count": 1000,
+                "gpu_hours": 257.74846685798343,
+                "noise_realisations": 10,
+                "posterior_count": 100000
+            },
+            "population_100x10x10": {
+                "calibration_draws": 10,
+                "event_count": 100,
+                "gpu_hours": 25.774846685798344,
+                "noise_realisations": 10,
+                "posterior_count": 10000
+            },
+            "seconds_per_posterior": 9.278944806887404,
             "used_for_campaign_pricing": true
         }
     },

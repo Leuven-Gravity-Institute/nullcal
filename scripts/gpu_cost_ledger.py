@@ -379,13 +379,15 @@ def merge(arguments: argparse.Namespace) -> None:
         }
         pathological = steps_per_sample(gpu_arm["posterior"]) > PATHOLOGICAL_STEPS_PER_SAMPLE
         seconds_per_posterior = gpu_arm["posterior"]["seconds_per_posterior"]
+        # A raw arm measurement is a benchmark input, never the campaign price;
+        # the priced row is campaign_pricing.scaled_m3, added below.
         ledger["campaign_pricing"][configuration] = {
             "seconds_per_posterior": seconds_per_posterior,
-            "used_for_campaign_pricing": not pathological,
+            "used_for_campaign_pricing": False,
             "marker": (
                 "pathological surrogate upper bound (near maximum NUTS tree depth); NOT an M3 price"
                 if pathological
-                else "used for campaign pricing"
+                else "benchmark input (R5 reference); NOT the M3 campaign price"
             ),
             "one_loud_event": gpu_cost.campaign_gpu_hours(seconds_per_posterior, 1, 1, 1),
             "population_100x10x10": gpu_cost.campaign_gpu_hours(seconds_per_posterior, 100, 10, 10),
@@ -431,6 +433,14 @@ def merge(arguments: argparse.Namespace) -> None:
         "an illustrative grid"
     )
     ledger["scaled_m3_estimate"] = _scaled_m3_estimate(ledger)
+    if ledger["scaled_m3_estimate"] is not None:
+        estimate = ledger["scaled_m3_estimate"]
+        ledger["campaign_pricing"]["scaled_m3"] = {
+            "seconds_per_posterior": estimate["seconds_per_posterior"],
+            "used_for_campaign_pricing": True,
+            "marker": "M3 campaign price (target-independent scaled estimate; see scaled_m3_estimate)",
+            **estimate["campaign_gpu_hours"],
+        }
 
     json_path = arguments.output_directory / f"{arguments.basename}.json"
     markdown_path = arguments.output_directory / f"{arguments.basename}.md"
@@ -552,7 +562,6 @@ def _markdown_scaled_estimate(ledger: dict) -> list[str]:
     if not estimate:
         return []
     inputs = estimate["inputs"]
-    hours = estimate["campaign_gpu_hours"]
     reference_seconds = inputs["reference_accelerator_seconds_per_posterior"]
     ratio_line = (
         f"= {reference_seconds:.10g} s"
@@ -563,15 +572,10 @@ def _markdown_scaled_estimate(ledger: dict) -> list[str]:
         f"= {reference_seconds:.10g} s x {estimate['production_over_reference_likelihood_gradient_ratio']:.10f}"
     )
     seconds_line = f"= {estimate['seconds_per_posterior']:.10g} s/posterior"
-    scaled_row = (
-        f"| scaled M3 | {hours['one_loud_event']['gpu_hours']:.4g} GPU-h "
-        f"| {hours['population_100x10x10']['gpu_hours']:.4g} GPU-h "
-        f"| {hours['population_1000x10x10']['gpu_hours']:.4g} GPU-h |"
-    )
     prose = (
-        "This is the M3 price. The production posterior above is a pathological surrogate and is **not** "
-        "used for pricing. The estimate scales the verified reference per-posterior cost by the "
-        "target-independent ratio of a single likelihood-gradient evaluation:"
+        "The **scaled M3 row** in the Campaign pricing table is the one priced estimate. The raw arms are "
+        "benchmark inputs, not the campaign price. The estimate scales the verified reference per-posterior "
+        "cost by the target-independent ratio of a single likelihood-gradient evaluation:"
     )
     lines = [
         "## M3 target-independent scaled estimate",
@@ -584,10 +588,6 @@ def _markdown_scaled_estimate(ledger: dict) -> list[str]:
         ratio_value,
         seconds_line,
         "```",
-        "",
-        "| configuration | 1 event | 100x10x10 | 1000x10x10 |",
-        "| --- | ---: | ---: | ---: |",
-        scaled_row,
         "",
         "Assumptions:",
         "",
@@ -602,9 +602,9 @@ def _write_markdown(path: Path, ledger: dict) -> None:
     for configuration, record in ledger["configurations"].items():
         lines += _markdown_configuration(configuration, record)
     pricing_prose = (
-        "Per-posterior cost at the measured sampler settings. A row marked *not used* is a pathological "
-        "surrogate and must not be read as campaign pricing; the M3 price is the target-independent "
-        "scaled estimate below."
+        "The `scaled_m3` row is the M3 campaign price. The `reference` and `production` rows are the raw "
+        "measured arms and are benchmark inputs, not the campaign price: the reference is the unscaled "
+        "per-posterior cost, and the production arm is a pathological surrogate."
     )
     lines += [
         "## Campaign pricing",

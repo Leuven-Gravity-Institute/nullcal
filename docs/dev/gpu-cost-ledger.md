@@ -66,21 +66,23 @@ CPU split: likelihood 238.908 s, sampler overhead 236.8 s.
 
 ## Campaign pricing
 
-Per-posterior cost at the measured sampler settings. A row marked _not used_ is
-a pathological surrogate and must not be read as campaign pricing; the M3 price
-is the target-independent scaled estimate below.
+The `scaled_m3` row is the M3 campaign price. The `reference` and `production`
+rows are the raw measured arms and are benchmark inputs, not the campaign price:
+the reference is the unscaled per-posterior cost, and the production arm is a
+pathological surrogate.
 
 | configuration |        1 event |   100x10x10 |  1000x10x10 | used for pricing                                                                   |
 | ------------- | -------------: | ----------: | ----------: | ---------------------------------------------------------------------------------- |
-| reference     | 0.001715 GPU-h | 17.15 GPU-h | 171.5 GPU-h | used for campaign pricing                                                          |
+| reference     | 0.001715 GPU-h | 17.15 GPU-h | 171.5 GPU-h | benchmark input (R5 reference); NOT the M3 campaign price                          |
 | production    |  0.09033 GPU-h | 903.3 GPU-h |  9033 GPU-h | pathological surrogate upper bound (near maximum NUTS tree depth); NOT an M3 price |
+| scaled_m3     | 0.002577 GPU-h | 25.77 GPU-h | 257.7 GPU-h | M3 campaign price (target-independent scaled estimate; see scaled_m3_estimate)     |
 
 ## M3 target-independent scaled estimate
 
-This is the M3 price. The production posterior above is a pathological surrogate
-and is **not** used for pricing. The estimate scales the verified reference
-per-posterior cost by the target-independent ratio of a single
-likelihood-gradient evaluation:
+The **scaled M3 row** in the Campaign pricing table is the one priced estimate.
+The raw arms are benchmark inputs, not the campaign price. The estimate scales
+the verified reference per-posterior cost by the target-independent ratio of a
+single likelihood-gradient evaluation:
 
 ```text
 reference accelerator seconds_per_posterior x (production accelerator likelihood_gradient seconds / reference accelerator likelihood_gradient seconds)
@@ -88,10 +90,6 @@ reference accelerator seconds_per_posterior x (production accelerator likelihood
 = 6.173714667 s x 1.5029759727
 = 9.278944807 s/posterior
 ```
-
-| configuration |        1 event |   100x10x10 |  1000x10x10 |
-| ------------- | -------------: | ----------: | ----------: |
-| scaled M3     | 0.002577 GPU-h | 25.77 GPU-h | 257.7 GPU-h |
 
 Assumptions:
 
