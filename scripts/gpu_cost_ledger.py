@@ -8,8 +8,15 @@ present and exits non-zero otherwise, so a CPU-only node can never emit
 numbers labelled GPU. The CPU arm is the same-day wall-clock baseline and must
 run with ``JAX_PLATFORMS=cpu`` on the same node.
 
+Every emitted artifact records a hardware class (device platform, accelerator
+model, CPU architecture and core count) and the scheduler job id; it never
+records node hostnames or scheduler partitions, and the writers raise if one
+appears.
+
 ``merge`` reads the arms, computes the decomposed speedups and the campaign
-pricing, and writes ``ledger.json`` plus ``ledger.md``.
+pricing, and writes ``ledger.json`` plus ``ledger.md``. ``redact-arms`` migrates
+arm records written before the hardware-class schema, and ``manifest`` records
+the input and artifact digests.
 
 See ``docs/dev/gpu-cost-ledger.md`` for how the numbers are produced and which
 of them are anchored.
@@ -21,7 +28,7 @@ import argparse
 import hashlib
 import json
 import os
-import socket
+import re
 import subprocess
 import sys
 from datetime import UTC, datetime
@@ -53,6 +60,80 @@ PATHOLOGICAL_STEPS_PER_SAMPLE = 30.0
 SPEEDUP_EQUIVALENCE_TOLERANCE = 5.0
 LEDGER_BASENAME = "gpu-cost-ledger"
 ARMS_DIRECTORY = "gpu-cost-ledger-arms"
+
+# Public-repo hygiene: the ledger records a hardware class, never the scheduler
+# fabric. These keys and the value pattern below must not appear in any emitted
+# artifact, so a regression is a hard failure rather than a silent leak.
+SCHEDULER_IDENTIFIER_KEYS = frozenset(
+    {"hostname", "node_list", "nodelist", "partition", "slurm", "cluster", "cluster_name"}
+)
+SCHEDULER_IDENTIFIER_PATTERN = re.compile(
+    r"fys-s-ivs-clc\d+|ivs-(?:short|gpu|long|old|interactive)\b",
+    re.IGNORECASE,
+)
+
+
+def find_scheduler_identifiers(payload, prefix: str = "") -> list[str]:
+    """Return the paths/values that leak scheduler identifiers in ``payload``."""
+    offenders: list[str] = []
+    if isinstance(payload, dict):
+        for key, value in payload.items():
+            location = f"{prefix}.{key}" if prefix else str(key)
+            if isinstance(key, str) and key.lower() in SCHEDULER_IDENTIFIER_KEYS:
+                offenders.append(location)
+            offenders.extend(find_scheduler_identifiers(value, location))
+    elif isinstance(payload, (list, tuple)):
+        for index, value in enumerate(payload):
+            offenders.extend(find_scheduler_identifiers(value, f"{prefix}[{index}]"))
+    elif isinstance(payload, str) and SCHEDULER_IDENTIFIER_PATTERN.search(payload):
+        offenders.append(f"{prefix}={payload!r}")
+    return offenders
+
+
+def require_no_scheduler_identifiers(payload, context: str) -> None:
+    """Raise if ``payload`` carries a scheduler hostname or partition."""
+    offenders = find_scheduler_identifiers(payload)
+    if offenders:
+        raise ValueError(f"{context} contains scheduler identifiers: {offenders[:5]}")
+
+
+def write_json_record(path: Path, payload, *, context: str) -> None:
+    """Guarded JSON writer used by every producer artifact."""
+    require_no_scheduler_identifiers(payload, context)
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def make_hardware(
+    *,
+    platform: str,
+    accelerator: str | None = None,
+    cpu_model: str | None = None,
+    cpu_architecture: str | None = None,
+    cpu_count: int | None = None,
+) -> dict[str, object]:
+    """Return a hardware-class record that replaces scheduler identifiers."""
+    hardware: dict[str, object] = {"platform": str(platform)}
+    if accelerator:
+        hardware["accelerator"] = str(accelerator)
+    if cpu_model:
+        hardware["cpu_model"] = str(cpu_model)
+    if cpu_architecture:
+        hardware["cpu_architecture"] = str(cpu_architecture)
+    if cpu_count is not None:
+        hardware["cpu_count"] = int(cpu_count)
+    return hardware
+
+
+def _cpu_model() -> str | None:
+    """Return the local CPU model string, when the platform exposes one."""
+    try:
+        cpuinfo = Path("/proc/cpuinfo").read_text(encoding="utf-8")
+    except OSError:
+        return None
+    for line in cpuinfo.splitlines():
+        if line.lower().startswith("model name"):
+            return line.split(":", 1)[1].strip()
+    return None
 
 
 def _git(arguments: list[str]) -> str:
@@ -121,14 +202,22 @@ def _device_record() -> list[dict[str, object]]:
     ]
 
 
-def _slurm_record() -> dict[str, str]:
-    keys = {
-        "job_id": "SLURM_JOB_ID",
-        "job_name": "SLURM_JOB_NAME",
-        "partition": "SLURM_JOB_PARTITION",
-        "node_list": "SLURM_JOB_NODELIST",
-    }
-    return {name: os.environ[key] for name, key in keys.items() if key in os.environ}
+def _hardware_record() -> dict[str, object]:
+    """Return the local hardware class, never the scheduler's node identity."""
+    gpus = gpu_cost.devices_with_platform(gpu_cost.GPU_PLATFORM)
+    return make_hardware(
+        platform=gpu_cost.GPU_PLATFORM if gpus else gpu_cost.CPU_PLATFORM,
+        accelerator=str(gpus[0].device_kind) if gpus else None,
+        cpu_model=_cpu_model(),
+        cpu_architecture=os.uname().machine,
+        cpu_count=os.cpu_count(),
+    )
+
+
+def _job_record() -> dict[str, str]:
+    """Return the scheduler job id only; job ids are harmless provenance."""
+    job_id = os.environ.get("SLURM_JOB_ID")
+    return {"job_id": job_id} if job_id else {}
 
 
 def measure(arguments: argparse.Namespace) -> None:
@@ -176,8 +265,8 @@ def measure(arguments: argparse.Namespace) -> None:
         "configuration": arguments.configuration,
         "platform": arguments.platform,
         "created_at": datetime.now(UTC).isoformat(),
-        "hostname": socket.gethostname(),
-        "slurm": _slurm_record(),
+        "hardware": _hardware_record(),
+        "job": _job_record(),
         "devices": _device_record(),
         "code": {
             "repository": "https://github.com/Leuven-Gravity-Institute/nullcal",
@@ -203,7 +292,7 @@ def measure(arguments: argparse.Namespace) -> None:
     }
     arguments.output_directory.mkdir(parents=True, exist_ok=True)
     output_path = arguments.output_directory / f"{arguments.configuration}-{arguments.platform}.json"
-    output_path.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    write_json_record(output_path, record, context=f"arm {arguments.configuration}/{arguments.platform}")
     print(f"wrote {output_path}")
 
 
@@ -324,6 +413,9 @@ def _per_posterior_decomposition(record: dict) -> dict[str, float]:
 def merge(arguments: argparse.Namespace) -> None:
     input_directory = arguments.input_directory or arguments.output_directory
     arms = _load_arms(input_directory)
+    for configuration, platforms in arms.items():
+        for platform, arm_record in platforms.items():
+            require_no_scheduler_identifiers(arm_record, f"arm {configuration}/{platform}")
     ledger: dict[str, object] = {
         "created_at": _ledger_created_at(arms),
         "configurations": {},
@@ -356,7 +448,7 @@ def merge(arguments: argparse.Namespace) -> None:
             "cpu_devices": cpu_arm["devices"],
             "code": gpu_arm["code"],
             "cpu_code": cpu_arm["code"],
-            "slurm": {"gpu": gpu_arm.get("slurm", {}), "cpu": cpu_arm.get("slurm", {})},
+            "hardware": {"gpu": gpu_arm.get("hardware", {}), "cpu": cpu_arm.get("hardware", {})},
             "sampler_settings": gpu_arm["sampler_settings"],
             "stages": {
                 stage: {
@@ -444,7 +536,7 @@ def merge(arguments: argparse.Namespace) -> None:
 
     json_path = arguments.output_directory / f"{arguments.basename}.json"
     markdown_path = arguments.output_directory / f"{arguments.basename}.md"
-    json_path.write_text(json.dumps(ledger, indent=2, sort_keys=True) + "\n")
+    write_json_record(json_path, ledger, context=f"ledger {json_path.name}")
     _write_markdown(markdown_path, ledger)
     print(f"wrote {json_path}")
     print(f"wrote {markdown_path}")
@@ -469,7 +561,9 @@ def _markdown_provenance(ledger: dict) -> list[str]:
         'arm asserts `any(device.platform == "gpu" for device in jax.devices())` and exits non-zero '
         "otherwise, so a CPU-only node cannot emit GPU-labelled numbers. Every timing call regenerates "
         "its input array, so a device-cached value cannot be mistaken for a fresh transfer. Run the CPU "
-        "arm with `JAX_PLATFORMS=cpu`."
+        "arm with `JAX_PLATFORMS=cpu`. Each arm records a hardware class (device platform, accelerator "
+        "model, CPU architecture and core count) and the scheduler job id; node hostnames and scheduler "
+        "partitions are never emitted, and the writers fail if one appears."
     )
     lines = [
         "# GPU cost ledger — vmap over realisations",
@@ -487,12 +581,14 @@ def _markdown_provenance(ledger: dict) -> list[str]:
     for configuration, record in ledger["configurations"].items():
         if not record.get("complete"):
             continue
-        accelerator = ", ".join(
-            f"{device['device_kind']} ({device['platform']})" for device in record.get("accelerator", [])
-        )
-        cpu = ", ".join(str(device["device_kind"]) for device in record.get("cpu_devices", []))
-        lines.append(f"| {configuration} accelerator | {accelerator} |")
-        lines.append(f"| {configuration} CPU | {cpu} |")
+        hardware = record.get("hardware", {})
+        accelerator = hardware.get("gpu", {}) or {}
+        cpu = hardware.get("cpu", {}) or {}
+        accelerator_name = accelerator.get("accelerator", "none")
+        cpu_name = cpu.get("cpu_model") or cpu.get("cpu_architecture") or "cpu"
+        cores = f", {cpu['cpu_count']} cores" if cpu.get("cpu_count") else ""
+        lines.append(f"| {configuration} accelerator | {accelerator_name} ({accelerator.get('platform', '?')}) |")
+        lines.append(f"| {configuration} CPU | {cpu_name}{cores} |")
         lines.append(f"| {configuration} committed revision | `{record['code']['commit']}` |")
     lines.append("")
     return lines
@@ -631,12 +727,60 @@ def _write_markdown(path: Path, ledger: dict) -> None:
     lines += ["", "## Unanchored", ""]
     lines.extend(f"- {item}" for item in ledger["unanchored"])
     lines.append("")
-    path.write_text("\n".join(lines), encoding="utf-8")
+    text = "\n".join(lines)
+    require_no_scheduler_identifiers(text, f"ledger {path.name}")
+    path.write_text(text, encoding="utf-8")
 
 
 def _digest(path: Path) -> dict[str, object]:
     data = path.read_bytes()
     return {"path": str(path), "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}
+
+
+def redact_arm_record(
+    record: dict,
+    *,
+    cpu_architecture: str,
+    cpu_count_gpu: int,
+    cpu_count_cpu: int,
+) -> dict:
+    """Return an arm record whose scheduler identifiers become a hardware class.
+
+    This is the producer-side migration for arm records written before the
+    hardware-class schema; measured fields are copied unchanged. It is
+    idempotent: a record that already carries ``hardware`` keeps it.
+    """
+    platform = str(record.get("platform", gpu_cost.CPU_PLATFORM))
+    hardware = record.get("hardware")
+    if not hardware:
+        devices = record.get("devices", [])
+        gpus = [device for device in devices if device.get("platform") == gpu_cost.GPU_PLATFORM]
+        hardware = make_hardware(
+            platform=platform,
+            accelerator=str(gpus[0]["device_kind"]) if gpus else None,
+            cpu_architecture=cpu_architecture,
+            cpu_count=cpu_count_gpu if platform == gpu_cost.GPU_PLATFORM else cpu_count_cpu,
+        )
+    redacted = {key: value for key, value in record.items() if key not in {"hostname", "slurm", "hardware", "job"}}
+    redacted["hardware"] = hardware
+    job_id = (record.get("job") or {}).get("job_id") or (record.get("slurm") or {}).get("job_id")
+    if job_id is not None:
+        redacted["job"] = {"job_id": str(job_id)}
+    return redacted
+
+
+def redact_arms(arguments: argparse.Namespace) -> None:
+    """Rewrite legacy arm records into the hardware-class schema."""
+    for path in sorted(arguments.arms_directory.glob("*.json")):
+        record = json.loads(path.read_text(encoding="utf-8"))
+        redacted = redact_arm_record(
+            record,
+            cpu_architecture=arguments.cpu_architecture,
+            cpu_count_gpu=arguments.cpu_count_gpu,
+            cpu_count_cpu=arguments.cpu_count_cpu,
+        )
+        write_json_record(path, redacted, context=f"arm {path.name}")
+        print(f"redacted {path}")
 
 
 def manifest(arguments: argparse.Namespace) -> None:
@@ -649,7 +793,7 @@ def manifest(arguments: argparse.Namespace) -> None:
         "inputs": [_digest(path) for path in sorted(arguments.arms_directory.glob("*.json"))],
         "artifacts": [_digest(path) for path in arguments.artifact],
     }
-    arguments.output.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n")
+    write_json_record(arguments.output, record, context=f"manifest {arguments.output.name}")
     print(f"wrote {arguments.output}")
 
 
@@ -678,6 +822,12 @@ def main() -> None:
     manifest_parser.add_argument("--artifact", type=Path, nargs="+", required=True)
     manifest_parser.add_argument("--output", type=Path, required=True)
     manifest_parser.set_defaults(handler=manifest)
+    redact_parser = subparsers.add_parser("redact-arms")
+    redact_parser.add_argument("--arms-directory", type=Path, required=True)
+    redact_parser.add_argument("--cpu-architecture", default="x86_64")
+    redact_parser.add_argument("--cpu-count-gpu", type=int, required=True)
+    redact_parser.add_argument("--cpu-count-cpu", type=int, required=True)
+    redact_parser.set_defaults(handler=redact_arms)
     arguments = parser.parse_args()
     arguments.handler(arguments)
 

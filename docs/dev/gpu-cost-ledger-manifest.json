@@ -1,36 +1,36 @@
 {
     "artifacts": [
         {
-            "bytes": 17690,
+            "bytes": 17548,
             "path": "docs/dev/gpu-cost-ledger.json",
-            "sha256": "847d203933ff0e5542413ee913fdf0a897a26618112032d3a7c1493860c07d95"
+            "sha256": "1da7800adc9990f3386f1e2c4dffd0fa5262d71a3bf17bf3c5a83a7b12128136"
         },
         {
-            "bytes": 7727,
+            "bytes": 7953,
             "path": "docs/dev/gpu-cost-ledger.md",
-            "sha256": "6f18c860c717a823ed3573fe2f643c21d095bee4080036a0a77b4cd454ddca6e"
+            "sha256": "f88812434fdd98e351a639084bca1802dcb79264ab864e90af21144eb928bc11"
         }
     ],
     "inputs": [
         {
-            "bytes": 2591,
+            "bytes": 2552,
             "path": "docs/dev/gpu-cost-ledger-arms/production-cpu.json",
-            "sha256": "8d61e04c0b6d1c7ff06a8c0778ee233c95d31ae75e68527281f0163879924730"
+            "sha256": "0cfc0363f58230f07f19cd27840399275063cb0adc0b495dc3323449d30d7b89"
         },
         {
-            "bytes": 2617,
+            "bytes": 2619,
             "path": "docs/dev/gpu-cost-ledger-arms/production-gpu.json",
-            "sha256": "f53d0f6e977bf281509089d82c76d91d81b01b3173865bba923fd4a9fdc08800"
+            "sha256": "b35925e1e41fb7d101101172908255db2be37f26adecca18894d7cd0210f8e02"
         },
         {
-            "bytes": 2458,
+            "bytes": 2419,
             "path": "docs/dev/gpu-cost-ledger-arms/reference-cpu.json",
-            "sha256": "845dfb94946100412fc25dab7609aef24dca967899c4be5deb1ce2b93f8a60f4"
+            "sha256": "4c69f722722078ab95675b79c2d26a07607e64234661c702a225bdcae044ddeb"
         },
         {
-            "bytes": 2489,
+            "bytes": 2485,
             "path": "docs/dev/gpu-cost-ledger-arms/reference-gpu.json",
-            "sha256": "acec94e7fa8c73604060266c6efb1f30027e23e1d355d90aa628f09b77c65868"
+            "sha256": "8dac1ebeafffd38502ebf5207b4d30c5de51bc40e105c21f41f72f49ac014bdf"
         }
     ]
 }

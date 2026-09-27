@@ -14,7 +14,15 @@
       "platform": "gpu"
     }
   ],
-  "hostname": "fys-s-ivs-clc21",
+  "hardware": {
+    "accelerator": "NVIDIA A30",
+    "cpu_architecture": "x86_64",
+    "cpu_count": 128,
+    "platform": "gpu"
+  },
+  "job": {
+    "job_id": "128128"
+  },
   "model": {
     "detector_count": 3,
     "duration_seconds": 8.0,
@@ -63,12 +71,6 @@
     "num_warmup": 100,
     "seed": 20260925,
     "timing_repeats": 5
-  },
-  "slurm": {
-    "job_id": "128128",
-    "job_name": "r6-gpu-cost-final",
-    "node_list": "fys-s-ivs-clc21",
-    "partition": "ivs-gpu"
   },
   "stages": {
     "likelihood_gradient": {

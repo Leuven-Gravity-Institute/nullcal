@@ -14,7 +14,14 @@
       "platform": "cpu"
     }
   ],
-  "hostname": "fys-s-ivs-clc12",
+  "hardware": {
+    "cpu_architecture": "x86_64",
+    "cpu_count": 192,
+    "platform": "cpu"
+  },
+  "job": {
+    "job_id": "128129"
+  },
   "model": {
     "detector_count": 3,
     "duration_seconds": 8.0,
@@ -72,12 +79,6 @@
     "num_warmup": 100,
     "seed": 20260925,
     "timing_repeats": 5
-  },
-  "slurm": {
-    "job_id": "128129",
-    "job_name": "r6-cpu-cost-final",
-    "node_list": "fys-s-ivs-clc12",
-    "partition": "ivs-short"
   },
   "stages": {
     "likelihood_gradient": {

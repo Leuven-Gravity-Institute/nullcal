@@ -13,16 +13,19 @@ the speedups and the per-posterior split. The accelerator arm asserts
 `any(device.platform == "gpu" for device in jax.devices())` and exits non-zero
 otherwise, so a CPU-only node cannot emit GPU-labelled numbers. Every timing
 call regenerates its input array, so a device-cached value cannot be mistaken
-for a fresh transfer. Run the CPU arm with `JAX_PLATFORMS=cpu`.
+for a fresh transfer. Run the CPU arm with `JAX_PLATFORMS=cpu`. Each arm records
+a hardware class (device platform, accelerator model, CPU architecture and core
+count) and the scheduler job id; node hostnames and scheduler partitions are
+never emitted, and the writers fail if one appears.
 
 | field                         | value                                      |
 | ----------------------------- | ------------------------------------------ |
 | ledger created                | 2026-09-25T18:17:58.124464+00:00           |
 | reference accelerator         | NVIDIA A30 (gpu)                           |
-| reference CPU                 | cpu                                        |
+| reference CPU                 | x86_64, 192 cores                          |
 | reference committed revision  | `608d3d46c83906ab3de79b300039ad16c000a607` |
 | production accelerator        | NVIDIA A30 (gpu)                           |
-| production CPU                | cpu                                        |
+| production CPU                | x86_64, 192 cores                          |
 | production committed revision | `608d3d46c83906ab3de79b300039ad16c000a607` |
 
 ## reference

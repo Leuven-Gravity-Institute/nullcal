@@ -114,6 +114,19 @@
                     "platform": "cpu"
                 }
             ],
+            "hardware": {
+                "cpu": {
+                    "cpu_architecture": "x86_64",
+                    "cpu_count": 192,
+                    "platform": "cpu"
+                },
+                "gpu": {
+                    "accelerator": "NVIDIA A30",
+                    "cpu_architecture": "x86_64",
+                    "cpu_count": 128,
+                    "platform": "gpu"
+                }
+            },
             "model": {
                 "detector_count": 3,
                 "duration_seconds": 8.0,
@@ -184,20 +197,6 @@
                 "seed": 20260925,
                 "timing_repeats": 5
             },
-            "slurm": {
-                "cpu": {
-                    "job_id": "128129",
-                    "job_name": "r6-cpu-cost-final",
-                    "node_list": "fys-s-ivs-clc12",
-                    "partition": "ivs-short"
-                },
-                "gpu": {
-                    "job_id": "128179",
-                    "job_name": "r6-prod-gpu",
-                    "node_list": "fys-s-ivs-clc21",
-                    "partition": "ivs-gpu"
-                }
-            },
             "stages": {
                 "likelihood_gradient": {
                     "accelerator_seconds": 0.0024288990534842014,
@@ -244,6 +243,19 @@
                     "platform": "cpu"
                 }
             ],
+            "hardware": {
+                "cpu": {
+                    "cpu_architecture": "x86_64",
+                    "cpu_count": 192,
+                    "platform": "cpu"
+                },
+                "gpu": {
+                    "accelerator": "NVIDIA A30",
+                    "cpu_architecture": "x86_64",
+                    "cpu_count": 128,
+                    "platform": "gpu"
+                }
+            },
             "model": {
                 "detector_count": 3,
                 "duration_seconds": 8.0,
@@ -312,20 +324,6 @@
                 "num_warmup": 100,
                 "seed": 20260925,
                 "timing_repeats": 5
-            },
-            "slurm": {
-                "cpu": {
-                    "job_id": "128129",
-                    "job_name": "r6-cpu-cost-final",
-                    "node_list": "fys-s-ivs-clc12",
-                    "partition": "ivs-short"
-                },
-                "gpu": {
-                    "job_id": "128128",
-                    "job_name": "r6-gpu-cost-final",
-                    "node_list": "fys-s-ivs-clc21",
-                    "partition": "ivs-gpu"
-                }
             },
             "stages": {
                 "likelihood_gradient": {
