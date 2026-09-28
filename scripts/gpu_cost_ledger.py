@@ -632,12 +632,17 @@ def _markdown_configuration(configuration: str, record: dict) -> list[str]:
 
 
 def _markdown_rebuild() -> list[str]:
+    format_files = (
+        f"npx --yes prettier@3.9.9 --write "
+        f"docs/dev/{LEDGER_BASENAME}.json docs/dev/{LEDGER_BASENAME}.md "
+        f"docs/dev/{ARMS_DIRECTORY}/*.json"
+    )
     commands = [
         "```bash",
         "uv run python scripts/gpu_cost_ledger.py merge \\",
         f"  --input-directory docs/dev/{ARMS_DIRECTORY} \\",
         f"  --output-directory docs/dev --basename {LEDGER_BASENAME}",
-        f"npx --yes prettier@3.9.9 --write docs/dev/{LEDGER_BASENAME}.json docs/dev/{LEDGER_BASENAME}.md",
+        format_files,
         "uv run python scripts/gpu_cost_ledger.py manifest \\",
         f"  --arms-directory docs/dev/{ARMS_DIRECTORY} \\",
         f"  --artifact docs/dev/{LEDGER_BASENAME}.json docs/dev/{LEDGER_BASENAME}.md \\",
@@ -648,12 +653,11 @@ def _markdown_rebuild() -> list[str]:
     intro = (
         f"The ledger is a deterministic function of the four arm records in `docs/dev/{ARMS_DIRECTORY}/` "
         "that are preserved in the checkout. `merge` derives `created_at` from the newest arm record, so no "
-        "merge-clock value enters. Run:"
+        "merge-clock value enters. Prettier (the repository's `.prettierrc.yaml`) is applied to the arm "
+        "records and the generated ledger before the manifest hashes them, so a later format pass cannot "
+        "invalidate the recorded digests. Run:"
     )
-    outro = (
-        "A clean re-run leaves `git status --porcelain docs/dev` empty; the Prettier step applies the "
-        "repository's `.prettierrc.yaml` to the generated prose."
-    )
+    outro = "A clean re-run leaves `git status --porcelain docs/dev` empty."
     return ["## Rebuild", "", intro, "", *commands, "", outro, ""]
 
 

@@ -111,13 +111,15 @@ Inputs: `docs/dev/gpu-cost-ledger-arms/{reference,production}-gpu.json`.
 The ledger is a deterministic function of the four arm records in
 `docs/dev/gpu-cost-ledger-arms/` that are preserved in the checkout. `merge`
 derives `created_at` from the newest arm record, so no merge-clock value enters.
-Run:
+Prettier (the repository's `.prettierrc.yaml`) is applied to the arm records and
+the generated ledger before the manifest hashes them, so a later format pass
+cannot invalidate the recorded digests. Run:
 
 ```bash
 uv run python scripts/gpu_cost_ledger.py merge \
   --input-directory docs/dev/gpu-cost-ledger-arms \
   --output-directory docs/dev --basename gpu-cost-ledger
-npx --yes prettier@3.9.9 --write docs/dev/gpu-cost-ledger.json docs/dev/gpu-cost-ledger.md
+npx --yes prettier@3.9.9 --write docs/dev/gpu-cost-ledger.json docs/dev/gpu-cost-ledger.md docs/dev/gpu-cost-ledger-arms/*.json
 uv run python scripts/gpu_cost_ledger.py manifest \
   --arms-directory docs/dev/gpu-cost-ledger-arms \
   --artifact docs/dev/gpu-cost-ledger.json docs/dev/gpu-cost-ledger.md \
@@ -125,8 +127,7 @@ uv run python scripts/gpu_cost_ledger.py manifest \
 npx --yes prettier@3.9.9 --write docs/dev/gpu-cost-ledger-manifest.json
 ```
 
-A clean re-run leaves `git status --porcelain docs/dev` empty; the Prettier step
-applies the repository's `.prettierrc.yaml` to the generated prose.
+A clean re-run leaves `git status --porcelain docs/dev` empty.
 
 ## Anchors
 
