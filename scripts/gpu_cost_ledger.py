@@ -62,13 +62,17 @@ LEDGER_BASENAME = "gpu-cost-ledger"
 ARMS_DIRECTORY = "gpu-cost-ledger-arms"
 
 # Public-repo hygiene: the ledger records a hardware class, never the scheduler
-# fabric. These keys and the value pattern below must not appear in any emitted
-# artifact, so a regression is a hard failure rather than a silent leak.
+# fabric. The key denylist catches an identifier under a named field; the
+# pattern catches a scheduler-looking machine name under an innocent key. It is
+# generic by shape, not tied to any one cluster: either a hyphenated/dotted
+# name ending in digits (``node-a01``, ``compute-7``) or a role-plus-digits form
+# (``node01``, ``gpu12``).
 SCHEDULER_IDENTIFIER_KEYS = frozenset(
     {"hostname", "node_list", "nodelist", "partition", "slurm", "cluster", "cluster_name"}
 )
-SCHEDULER_IDENTIFIER_PATTERN = re.compile(
-    r"fys-s-ivs-clc\d+|ivs-(?:short|gpu|long|old|interactive)\b",
+SCHEDULER_HOSTNAME_PATTERN = re.compile(
+    r"\b[A-Za-z][A-Za-z0-9]*(?:[-.][A-Za-z0-9]+)*[-.][A-Za-z0-9]*\d\b"
+    r"|\b(?:node|gpu|cpu|login|compute|worker|batch|storage|head|master)\d+\b",
     re.IGNORECASE,
 )
 
@@ -85,7 +89,7 @@ def find_scheduler_identifiers(payload, prefix: str = "") -> list[str]:
     elif isinstance(payload, (list, tuple)):
         for index, value in enumerate(payload):
             offenders.extend(find_scheduler_identifiers(value, f"{prefix}[{index}]"))
-    elif isinstance(payload, str) and SCHEDULER_IDENTIFIER_PATTERN.search(payload):
+    elif isinstance(payload, str) and SCHEDULER_HOSTNAME_PATTERN.search(payload):
         offenders.append(f"{prefix}={payload!r}")
     return offenders
 

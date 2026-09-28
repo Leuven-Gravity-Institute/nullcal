@@ -4,7 +4,8 @@ The ledger is published in a public repository, so it records a hardware class
 (device platform, accelerator model, CPU architecture and core count) and the
 scheduler job id, never a node hostname or a scheduler partition. These tests
 exercise the production writer, loader and migration paths, and scan the
-committed artifacts, so a regression fails here rather than shipping.
+committed artifacts, so a regression fails here rather than shipping. Fixtures
+use invented names; no real cluster identifier appears in this file.
 """
 
 from __future__ import annotations
@@ -22,23 +23,36 @@ ARMS = DOCS / "gpu-cost-ledger-arms"
 
 
 def test_find_scheduler_identifiers_flags_keys_and_values():
-    payload = {"hostname": "fys-s-ivs-clc12", "note": "ran on ivs-gpu", "partition": "ivs-short"}
+    payload = {"hostname": "node-a01", "note": "ran on node-a01", "partition": "gpu-part"}
 
     offenders = gpu_cost_ledger.find_scheduler_identifiers(payload)
 
-    assert offenders
     assert any("hostname" in item for item in offenders)
-    assert any("ivs-gpu" in item for item in offenders)
+    assert any("partition" in item for item in offenders)
+    assert any("node-a01" in item for item in offenders)
     assert gpu_cost_ledger.find_scheduler_identifiers({"hardware": {"platform": "gpu"}}) == []
+
+
+@pytest.mark.parametrize("value", ["node-a01", "compute-7", "node01", "gpu12", "batch-node3"])
+def test_generic_hostname_pattern_flags_a_machine_name_under_an_innocent_key(value):
+    # The key is not in the denylist, so only the generic pattern can reject it.
+    offenders = gpu_cost_ledger.find_scheduler_identifiers({"note": f"scheduled on {value}"})
+
+    assert offenders, f"generic pattern missed {value!r}"
+
+
+@pytest.mark.parametrize("value", ["gpu", "cpu", "x86_64", "NVIDIA A30", "2026-09-25T18:17:58.124464+00:00"])
+def test_generic_hostname_pattern_does_not_flag_hardware_or_timestamps(value):
+    assert gpu_cost_ledger.find_scheduler_identifiers({"note": value}) == []
 
 
 @pytest.mark.parametrize(
     "payload",
     [
-        {"hostname": "fys-s-ivs-clc21"},
-        {"node_list": "fys-s-ivs-clc21"},
-        {"partition": "ivs-short"},
-        {"note": "scheduled on ivs-gpu"},
+        {"hostname": "node-a01"},
+        {"node_list": "node-a01"},
+        {"partition": "gpu-part"},
+        {"note": "scheduled on node-a01"},
     ],
 )
 def test_write_json_record_rejects_scheduler_identifiers(tmp_path, payload):
@@ -57,7 +71,7 @@ def test_write_json_record_accepts_a_hardware_class(tmp_path):
 def test_merge_rejects_a_dirty_arm(tmp_path):
     arms = tmp_path / "arms"
     arms.mkdir()
-    (arms / "reference-gpu.json").write_text(json.dumps({"hostname": "fys-s-ivs-clc21"}), encoding="utf-8")
+    (arms / "reference-gpu.json").write_text(json.dumps({"hostname": "node-a01"}), encoding="utf-8")
     arguments = SimpleNamespace(input_directory=arms, output_directory=tmp_path / "out", basename="gpu-cost-ledger")
 
     with pytest.raises(ValueError, match="scheduler identifiers"):
@@ -68,8 +82,8 @@ def test_redact_arm_record_replaces_identifiers_with_hardware():
     record = {
         "platform": "gpu",
         "devices": [{"platform": "gpu", "device_kind": "NVIDIA A30", "id": 0}],
-        "hostname": "fys-s-ivs-clc21",
-        "slurm": {"job_id": "128128", "partition": "ivs-gpu", "node_list": "fys-s-ivs-clc21"},
+        "hostname": "node-a01",
+        "slurm": {"job_id": "128128", "partition": "gpu-part", "node_list": "node-a01"},
         "posterior": {"seconds_per_posterior": 6.17371466725308},
     }
 
