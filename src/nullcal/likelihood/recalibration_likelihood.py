@@ -169,22 +169,50 @@ class RecalibrationLikelihood:
             phase,
         )
 
-    def _frequency_domain_null_stream(self, amplitude: jax.Array, phase: jax.Array) -> jax.Array:
+    def _validated_strain(self, whitened_strain) -> jax.Array:
+        strain = jnp.asarray(whitened_strain)
+        expected_shape = (self.parameter_shape[0], self._frequency_count)
+        if tuple(strain.shape[-2:]) != expected_shape:
+            raise ValueError(
+                f"whitened_frequency_domain_strain must have trailing shape {expected_shape}; "
+                f"received {tuple(strain.shape)}"
+            )
+        return strain
+
+    def _calibrated_projector(self, amplitude: jax.Array, phase: jax.Array) -> jax.Array:
+        """Build the per-frequency null projector for the calibrated response."""
         factors = self._calibration_factor(amplitude, phase)
         response = self._whitened_antenna_response * jnp.swapaxes(factors, 0, 1)[:, :, None]
         response_dagger = jnp.swapaxes(jnp.conj(response), 1, 2)
         gram = response_dagger @ response
         projected_response = response @ jnp.linalg.solve(gram, response_dagger)
-        projector = jnp.eye(response.shape[1], dtype=response.dtype)[None, :, :] - projected_response
-        masked_null_stream = jnp.einsum("fij,jf->if", projector, self._whitened_frequency_domain_strain)
+        return jnp.eye(response.shape[1], dtype=response.dtype)[None, :, :] - projected_response
+
+    def _project(self, projector: jax.Array, selected_strain: jax.Array) -> jax.Array:
+        """Apply the null projector to a masked frequency-domain strain."""
+        return jnp.einsum("fij,...jf->...if", projector, selected_strain)
+
+    def _frequency_domain_null_stream(
+        self, amplitude: jax.Array, phase: jax.Array, whitened_strain: jax.Array | None = None
+    ) -> jax.Array:
+        if whitened_strain is None:
+            selected_strain = self._whitened_frequency_domain_strain
+            realisation_shape = selected_strain.shape[:-1]
+        else:
+            strain = self._validated_strain(whitened_strain)
+            selected_strain = strain[..., self._frequency_indices]
+            realisation_shape = strain.shape[:-1]
+        projector = self._calibrated_projector(amplitude, phase)
+        masked_null_stream = self._project(projector, selected_strain)
+        full_shape = (*realisation_shape, self._frequency_count)
         return (
-            jnp.zeros((self.parameter_shape[0], self._frequency_count), dtype=masked_null_stream.dtype)
-            .at[:, self._frequency_indices]
+            jnp.zeros(full_shape, dtype=masked_null_stream.dtype)
+            .at[..., self._frequency_indices]
             .set(masked_null_stream)
         )
 
-    def _time_frequency_null_stream(self, amplitude: jax.Array, phase: jax.Array) -> jax.Array:
-        frequency_domain = self._frequency_domain_null_stream(amplitude, phase)
+    def _transform_to_time_frequency(self, frequency_domain: jax.Array) -> jax.Array:
+        """Map a ``(..., detector, frequency)`` array through the WDM transform."""
 
         def transform(detector_data):
             return (
@@ -197,14 +225,52 @@ class RecalibrationLikelihood:
                 * self._wavelet_scale
             )
 
-        time_frequency = jax.vmap(transform)(frequency_domain)
-        return jnp.where(self.time_frequency_filter[None, :, :], time_frequency, 0.0)
+        leading_shape = frequency_domain.shape[:-1]
+        flattened = frequency_domain.reshape((-1, frequency_domain.shape[-1]))
+        transformed = jax.vmap(transform)(flattened)
+        return transformed.reshape(leading_shape + transformed.shape[-2:])
+
+    def _time_frequency_null_stream(
+        self, amplitude: jax.Array, phase: jax.Array, whitened_strain: jax.Array | None = None
+    ) -> jax.Array:
+        frequency_domain = self._frequency_domain_null_stream(amplitude, phase, whitened_strain)
+        return jnp.where(self.time_frequency_filter, self._transform_to_time_frequency(frequency_domain), 0.0)
+
+    def _log_likelihood_from_stream(self, null_stream: jax.Array) -> jax.Array:
+        # The detector axis always sits immediately before the time and
+        # frequency axes, so summing the trailing three leaves exactly one
+        # value per leading realisation (and a scalar for a single realisation).
+        return -0.5 * jnp.sum(jnp.abs(null_stream) ** 2, axis=(-1, -2, -3))
 
     def log_likelihood_fn(self, params: Mapping[str, jax.Array]) -> jax.Array:
         """Return the pure JAX null-stream log likelihood for ``params``."""
         amplitude, phase = self._validated_parameters(params)
-        null_stream = self._time_frequency_null_stream(amplitude, phase)
-        return -0.5 * jnp.sum(jnp.abs(null_stream) ** 2)
+        return self._log_likelihood_from_stream(self._time_frequency_null_stream(amplitude, phase))
+
+    def log_likelihood_for_strain(self, params: Mapping[str, jax.Array], whitened_frequency_domain_strain) -> jax.Array:
+        """Evaluate the likelihood on a supplied whitened strain realisation.
+
+        ``whitened_frequency_domain_strain`` has trailing shape
+        ``(detector, frequency)`` and may carry any number of leading
+        realisation axes. The return value drops those leading axes and keeps
+        one log likelihood per realisation, so a ``vmap`` over the leading axis
+        yields one posterior target per realisation.
+        """
+        amplitude, phase = self._validated_parameters(params)
+        null_stream = self._time_frequency_null_stream(amplitude, phase, whitened_frequency_domain_strain)
+        return self._log_likelihood_from_stream(null_stream)
+
+    def logdensity_for_strain(self, params: Mapping[str, jax.Array], whitened_frequency_domain_strain) -> jax.Array:
+        """Return log prior plus the per-realisation log likelihood on supplied strain."""
+        amplitude, phase = self._validated_parameters(params)
+        return self.log_likelihood_for_strain(params, whitened_frequency_domain_strain) + calibration_log_prior(
+            amplitude,
+            phase,
+            self.amplitude_prior_mean,
+            self.amplitude_prior_sigma,
+            self.phase_prior_mean,
+            self.phase_prior_sigma,
+        )
 
     def logdensity_fn(self, params: Mapping[str, jax.Array]) -> jax.Array:
         """Return normalized Gaussian log prior plus null-stream log likelihood."""
