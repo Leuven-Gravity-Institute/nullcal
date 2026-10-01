@@ -1,0 +1,34 @@
+{
+    "protocol": "d1-control-v1",
+    "registration_sha256": "1291a8a49cf8f430580c1de2a2c81481ce86a6f8db59a23ec71a2c85ecc39f20",
+    "status": "blocked",
+    "scope": "availability and provenance only; not a scientific validation or inference run",
+    "artifact_sha256": {},
+    "failures": [
+        {
+            "artifact": "waveform.h5",
+            "reason": "missing or empty required artifact"
+        },
+        {
+            "artifact": "waveform-manifest.json",
+            "reason": "missing or empty required artifact"
+        },
+        {
+            "artifact": "ringdown-anchor.json",
+            "reason": "missing or empty required artifact"
+        },
+        {
+            "artifact": "gr-imr-validation.json",
+            "reason": "missing or empty required artifact"
+        },
+        {
+            "artifact": "injection-prescription.json",
+            "reason": "missing or empty required artifact"
+        },
+        {
+            "artifact": "resolution-precheck.json",
+            "reason": "missing or empty required artifact"
+        }
+    ],
+    "scientific_results": null
+}
