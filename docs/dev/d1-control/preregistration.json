@@ -1,47 +1,47 @@
 {
-  "schema_version": 1,
-  "protocol": "d1-control-v1",
-  "injection": {
-    "waveform": "SXS:BBH:0305",
-    "calibration_amplitude": 0.0,
-    "calibration_phase_radians": 0.0,
-    "delta_omega_220": 0.05,
-    "delta_tau_220": 0.0,
-    "reference_frequency_hz": 249.43,
-    "ringdown_network_snr": 120.0
-  },
-  "population": {
-    "events_per_population": 16,
-    "noise_replicates": 8,
-    "geometry_seed": 40100,
-    "noise_seed_start": 40101,
-    "shared_calibration": true
-  },
-  "interval": {
-    "probability": 0.9,
-    "kind": "equal_tailed",
-    "quantiles": [0.05, 0.5, 0.95]
-  },
-  "absorption": {
-    "minimum_fraction": 0.5,
-    "minimum_knot_shift_in_prior_sigma": 1.0,
-    "minimum_population_fraction": 0.75,
-    "designated_detector": "ET1",
-    "designated_knot": "nearest_to_reference_frequency",
-    "designated_components": ["amplitude", "phase"]
-  },
-  "sampling": {
-    "maximum_rhat": 1.01,
-    "minimum_bulk_ess": 400,
-    "minimum_tail_ess": 400,
-    "maximum_divergences": 0
-  },
-  "required_artifacts": [
-    "waveform.h5",
-    "waveform-manifest.json",
-    "ringdown-anchor.json",
-    "gr-imr-validation.json",
-    "injection-prescription.json",
-    "resolution-precheck.json"
-  ]
+    "schema_version": 1,
+    "protocol": "d1-control-v1",
+    "injection": {
+        "waveform": "SXS:BBH:0305",
+        "calibration_amplitude": 0.0,
+        "calibration_phase_radians": 0.0,
+        "delta_omega_220": 0.05,
+        "delta_tau_220": 0.0,
+        "reference_frequency_hz": 249.43,
+        "ringdown_network_snr": 120.0
+    },
+    "population": {
+        "events_per_population": 16,
+        "noise_replicates": 8,
+        "geometry_seed": 40100,
+        "noise_seed_start": 40101,
+        "shared_calibration": true
+    },
+    "interval": {
+        "probability": 0.9,
+        "kind": "equal_tailed",
+        "quantiles": [0.05, 0.5, 0.95]
+    },
+    "absorption": {
+        "minimum_fraction": 0.5,
+        "minimum_knot_shift_in_prior_sigma": 1.0,
+        "minimum_population_fraction": 0.75,
+        "designated_detector": "ET1",
+        "designated_knot": "nearest_to_reference_frequency",
+        "designated_components": ["amplitude", "phase"]
+    },
+    "sampling": {
+        "maximum_rhat": 1.01,
+        "minimum_bulk_ess": 400,
+        "minimum_tail_ess": 400,
+        "maximum_divergences": 0
+    },
+    "required_artifacts": [
+        "waveform.h5",
+        "waveform-manifest.json",
+        "ringdown-anchor.json",
+        "gr-imr-validation.json",
+        "injection-prescription.json",
+        "resolution-precheck.json"
+    ]
 }
