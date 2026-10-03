@@ -50,6 +50,38 @@ The exact published bytes are preserved in `inputs/cosmic_explorer_strain.txt`;
 The 20 km file is excluded from this benchmark. No scientific comparison has
 yet run.
 
+## Fiducial catalog inspection
+
+The catalog probe ran from clean producing commit
+`28c1ff4b11bd032f7cf5fcca81b49f78bacf72d8` through a scheduler-controlled CPU
+job (129463, completed with exit 0):
+
+```sh
+python -u d1_waveform_probe.py --output waveform-catalog-probe.json \
+  --producing-commit 28c1ff4b11bd032f7cf5fcca81b49f78bacf72d8
+```
+
+The script SHA-256 is
+`385a6500e62393784f78b5d044248fdc4fd1912527a9a8450b95632919a72278`.
+`inputs/waveform-catalog-probe.json` preserves the catalog entry, including
+published download URLs and checksums. Its SHA-256 is
+`d6097306a0e9b462e4b3974830ea2d0528c1fde3c13e75d7b7a748a5d893fe0f`.
+The observed catalog tag is `v3.0.0`; the unversioned simulation resolves to
+`SXS:BBH:0305v3.0/Lev6`. Older versions, including `v2.0`, remain listed.
+This was metadata inspection: no strain extraction or inference ran.
+
+[SXS documentation](https://sxs.readthedocs.io/en/main/tutorials/02-Simulation/)
+states that versions identify modifications to the data files. Its
+[waveform tutorial](https://sxs.readthedocs.io/en/stable/tutorials/04-Waveforms/)
+notes that the third catalog includes waveform memory. The
+[anchor paper](https://arxiv.org/html/2506.15979v2) names the simulation but
+does not pin its release. The release used to produce its figures could not be
+established from that paper. Before extraction, the benchmark release must be
+selected explicitly; the current loader default is not evidence of the authors'
+choice. No version has been selected for the benchmark yet.
+
 The SXS waveform, spectroscopy anchor comparison, GR IMR validation, injection
-prescription and resolution pre-check remain unproduced. Environment
-verification must not be counted as completion of any of those artifacts.
+prescription and resolution pre-check remain unproduced. The prerequisite
+checker still returns exit 2, `status=blocked`, all six required files missing,
+and `scientific_results=null`. Environment and catalog verification must not
+be counted as completion of any of those artifacts.
