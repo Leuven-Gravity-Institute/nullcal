@@ -1,0 +1,17 @@
+{
+    "scope": "published source-curve provenance; no inference or scientific measurement",
+    "source": "https://dcc.cosmicexplorer.org/CE-T2000017-v5/public",
+    "source_archive_sha256": "ae7941e9072994aca948724f3049785dda132d66590b9f686a108c5e55fcbd6b",
+    "archive_member": "ce_sensitivity/cosmic_explorer_strain.txt",
+    "detector": "baseline 40 km",
+    "quantity": "strain amplitude spectral density",
+    "units": [
+        "Hz",
+        "1/sqrt(Hz)"
+    ],
+    "psd_convention": "square the published strain ASD",
+    "selected_date": "2026-10-02",
+    "artifacts": {
+        "cosmic_explorer_strain.txt": "ebc9145dc9079b9f8839730ba8ce6642dc25542b1fe63c22db90982abf61c29c"
+    }
+}

@@ -41,8 +41,14 @@ These hashes were computed directly from the downloaded published archive. They
 are source-file identifiers, not science measurements. Both files contain strain
 amplitude spectral density, so their squares supply a PSD. Selecting a curve
 affects the covariance and weighting, even if strain is later scaled to the same
-SNR. The exact file selection for the benchmark remains unresolved; no curve was
-selected and no scientific comparison was run.
+SNR. The selected benchmark curve is the baseline 40 km
+`cosmic_explorer_strain.txt` from CE-T2000017-v5, selected on 2026-10-02.
+Its SHA-256 is
+`ebc9145dc9079b9f8839730ba8ce6642dc25542b1fe63c22db90982abf61c29c`.
+The exact published bytes are preserved in `inputs/cosmic_explorer_strain.txt`;
+`inputs/ce-curve-manifest.json` records the source archive and extraction hashes.
+The 20 km file is excluded from this benchmark. No scientific comparison has
+yet run.
 
 The SXS waveform, spectroscopy anchor comparison, GR IMR validation, injection
 prescription and resolution pre-check remain unproduced. Environment
