@@ -45,3 +45,9 @@ runner, shared-population nullcal runner, inspiral-only runner, and calibrated
 `ringdown` inference with uncertainty propagation. All those fits and the
 population measurement remain to be executed. Their absence must not be reported
 as a negative absorption result.
+
+The fiducial waveform is pinned to catalog `v3.0.0` and
+**`SXS:BBH:0305v3.0/Lev6`**. The anchor paper's data release, resolution and
+package version remain unknown. See `environment-production.md` for the Table 1
+metadata anchor recipe and `inputs/waveform-release-pin.json` for source hashes.
+The remnant metadata check does not supply the spectroscopy anchor comparison.

@@ -1,0 +1,24 @@
+{
+    "scope": "selected data release and metadata provenance only; no waveform or inference",
+    "selected_date": "2026-10-04",
+    "waveform": "SXS:BBH:0305",
+    "catalog_tag": "v3.0.0",
+    "simulation": "SXS:BBH:0305v3.0/Lev6",
+    "data_release": "v3.0",
+    "resolution": "Lev6",
+    "data_doi": "https://doi.org/10.26138/SXS:BBH:0305v3.0",
+    "catalog_probe": "waveform-catalog-probe.json",
+    "catalog_probe_sha256": "d6097306a0e9b462e4b3974830ea2d0528c1fde3c13e75d7b7a748a5d893fe0f",
+    "metadata_source": "https://data.caltech.edu/api/records/zggft-s0306/files/Lev6%3Ametadata.json/content",
+    "metadata_published_checksum": "md5:0217071352f64284b14400ae4338f5c7",
+    "metadata_checksum_verified": true,
+    "artifacts": {
+        "sxs-bbh-0305-v3-lev6-metadata.json": "811a78cc4a3136555ed4f7fede471732532219528c12582fa1194d4b02ab3d1b"
+    },
+    "anchor_paper": "https://arxiv.org/html/2506.15979v2",
+    "authors_data_release": "unknown",
+    "authors_resolution": "unknown",
+    "authors_sxs_package_version": "unknown",
+    "sxs_package_version_in_prior_probe": "2026.0.7",
+    "package_version_note": "Software version is separate from the catalog tag and simulation data release."
+}
