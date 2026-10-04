@@ -1,0 +1,58 @@
+{
+    "scope": "Table 1 remnant metadata anchor only; no spectroscopy or inference",
+    "producing_commit": "c09461da87adc291225eebbadfb94abdd037e127",
+    "dirty": false,
+    "command": "python - < anchor recipe in environment-production.md",
+    "scheduler_job_id": "129544",
+    "versions": {
+        "python": "3.12.3"
+    },
+    "catalog_tag": "v3.0.0",
+    "simulation": "SXS:BBH:0305v3.0/Lev6",
+    "authors_data_release": "unknown",
+    "anchor": {
+        "url": "https://arxiv.org/html/2506.15979v2",
+        "table": 1,
+        "binary_mass_solar_masses": 70.6,
+        "remnant_mass_solar_masses": 67.21,
+        "remnant_spin": 0.69
+    },
+    "metadata": {
+        "remnant_mass": 0.9520329397043087,
+        "remnant_dimensionless_spin": [
+            5.253958683511938e-8, -2.4567336559285058e-8, 0.6920851868170271
+        ],
+        "reference_mass1": 0.5498023657759457,
+        "reference_mass2": 0.4502139397435628
+    },
+    "calculation": {
+        "mass_formula": "remnant_mass * 70.6",
+        "spin_formula": "Euclidean norm of remnant_dimensionless_spin",
+        "remnant_mass_solar_masses": 67.21352554312419,
+        "remnant_spin": 0.6920851868170296,
+        "mass_difference_solar_masses": 0.0035255431241978386,
+        "spin_difference": 0.0020851868170296273,
+        "reference_total_mass": 1.0000163055195084,
+        "reference_normalized_mass_solar_masses": 67.21242960954199,
+        "reference_normalized_mass_pass": true
+    },
+    "rounding_tolerance": {
+        "mass_solar_masses": 0.005,
+        "spin": 0.005,
+        "relative": 0.0,
+        "comparison": "absolute difference <= tolerance"
+    },
+    "mass_pass": true,
+    "spin_pass": true,
+    "v2_fallback_required": false,
+    "artifacts": {
+        "sxs-bbh-0305-v3-lev6-metadata.json": "811a78cc4a3136555ed4f7fede471732532219528c12582fa1194d4b02ab3d1b",
+        "waveform-release-pin.json": "b5a421d87a23cafbae29816b6f3540e1c1269ecd966f661fa2f76ec502f71a58",
+        "waveform-catalog-probe.json": "d6097306a0e9b462e4b3974830ea2d0528c1fde3c13e75d7b7a748a5d893fe0f"
+    },
+    "limitations": [
+        "Authors' data release, resolution and package version are unknown.",
+        "The table does not specify the mass-normalization epoch; both conventions are checked.",
+        "Rounded metadata agreement does not identify the authors' release or reproduce their posteriors."
+    ]
+}

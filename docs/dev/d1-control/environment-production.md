@@ -201,3 +201,39 @@ Path("remnant-metadata-anchor.json").write_text(json.dumps(record, indent=4) + "
 print(json.dumps(record, indent=4))
 raise SystemExit(0 if mass_pass and spin_pass else 2)
 ```
+
+## Table 1 anchor result
+
+The recipe above ran from clean producing revision
+`c09461da87adc291225eebbadfb94abdd037e127` in a scheduler-controlled CPU job
+(129544, completed with exit `0:0`, Python 3.12.3). The Python code block was
+extracted without modification to `d1-remnant-recipe.py`; the actual invocation
+was `python - < d1-remnant-recipe.py`, with `D1_PRODUCING_COMMIT` set to the
+revision above. The input hashes in `inputs/remnant-metadata-anchor.json`
+identify the exact pin, catalog and metadata used.
+
+| Quantity                    | Metadata calculation | Table 1 | Absolute difference | Rounding tolerance | Result |
+| --------------------------- | -------------------- | ------- | ------------------- | ------------------ | ------ |
+| Remnant mass (solar masses) | 67.21352554312419    | 67.21   | 0.00352554312420    | 0.005              | Pass   |
+| Dimensionless remnant spin  | 0.6920851868170296   | 0.69    | 0.00208518681703    | 0.005              | Pass   |
+
+The mass decomposes as `0.9520329397043087 × 70.6`: the first factor is the
+published Lev6 remnant mass in simulation units; the second is the total binary
+mass in solar masses specified by the paper. The spin is the Euclidean norm of
+`[5.253958683511938e-08, -2.4567336559285058e-08, 0.6920851868170271]`, rather
+than the z component alone. Both quantities round to the independent published
+Table 1 values. Relative tolerance was zero.
+
+The paper does not specify the epoch used to normalize the total binary mass. As
+a sensitivity check, dividing by the metadata's reference component-mass sum,
+`0.5498023657759457 + 0.4502139397435628 = 1.0000163055195084`, gives
+`67.21242960954199` solar masses, also within the same rounding tolerance. The
+exact normalization convention used by the authors could not be anchored from
+their table; the rounding verdict is unchanged by these two conventions.
+
+**The pinned v3.0 release matches both printed values.** No beyond-rounding
+disagreement occurred, so the conditional v2.0 fallback was not run; no claim is
+made about whether v2.0 also matches. Rounded agreement does not identify the
+authors' release, establish waveform equivalence or reproduce their spectroscopy
+posteriors. The authors' release, resolution and package version remain unknown.
+The full D1 comparison and its scientific acceptance criteria remain unmeasured.

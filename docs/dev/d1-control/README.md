@@ -50,4 +50,7 @@ The fiducial waveform is pinned to catalog `v3.0.0` and
 **`SXS:BBH:0305v3.0/Lev6`**. The anchor paper's data release, resolution and
 package version remain unknown. See `environment-production.md` for the Table 1
 metadata anchor recipe and `inputs/waveform-release-pin.json` for source hashes.
-The remnant metadata check does not supply the spectroscopy anchor comparison.
+`inputs/remnant-metadata-anchor.json` records the successful Table 1 check:
+67.21352554312419 solar masses and spin 0.6920851868170296 reproduce 67.21 and
+0.69 within absolute rounding tolerances of 0.005 each. The remnant metadata
+check does not supply the spectroscopy anchor comparison.
