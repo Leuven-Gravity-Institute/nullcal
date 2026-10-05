@@ -5,10 +5,7 @@
     "archive_member": "ce_sensitivity/cosmic_explorer_strain.txt",
     "detector": "baseline 40 km",
     "quantity": "strain amplitude spectral density",
-    "units": [
-        "Hz",
-        "1/sqrt(Hz)"
-    ],
+    "units": ["Hz", "1/sqrt(Hz)"],
     "psd_convention": "square the published strain ASD",
     "selected_date": "2026-10-02",
     "artifacts": {
