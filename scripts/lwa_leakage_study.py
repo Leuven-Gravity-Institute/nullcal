@@ -146,7 +146,7 @@ def write_readme(path: Path, results: list[dict[str, float | int]], commit: str,
             else "; no failure occurs on the tested grid"
         )
         recommendation = (
-            f"Use **20-{validity_maximum:.0f} Hz** as the conservative M3 LWA validity band on this grid{bracket}. "
+            f"Use **20-{validity_maximum:.0f} Hz** as the conservative LWA validity band on this grid{bracket}. "
             "This is a pre-check recommendation, not a measured continuous-frequency boundary."
         )
     maximum_failure_count = max(int(row["map_failure_count"]) for row in results)
@@ -168,7 +168,7 @@ The complete numerical table is `bias_vs_frequency.csv`; it also reports p99 and
 signal-minus-null statistic shift, the noise-only false-alarm fraction, ET-D PSD, and MAP convergence.
 No frequency has more than {maximum_failure_count} failed MAP fits.
 
-## Validity-band recommendation for M3
+## Validity-band recommendation
 
 {recommendation}
 
@@ -216,9 +216,10 @@ signal-present versus signal-absent pair is retained for the leakage significanc
 - The sky-factor distribution, leakage SNRs, MAP biases, and recommended band are new computational
   results produced by this run. No external numerical replication was found; they remain **unanchored
   to an independent numerical reference**. Agreement between code paths is not presented as accuracy.
-- This pre-check is not the M4 D2 result: it uses monochromatic bins, fixed SNR, independent equal ET-D
-  noise, a MAP rather than a posterior, and calibration parameters free at each frequency. M4 must use
-  a broadband source, the 19-knot calibration curve, posterior coverage, more noise realizations, and
+- This pre-check is not the full leakage-to-calibration-bias measurement: it uses monochromatic
+  bins, fixed SNR, independent equal ET-D noise, a MAP rather than a posterior, and calibration
+  parameters free at each frequency. That measurement must use a broadband source, the 19-knot
+  calibration curve, posterior coverage, more noise realizations, and
   frequency-dependent null mitigation. The ET-D curve affects physical strain/noise scaling, while the
   fixed-SNR whitened statistics deliberately isolate the geometric frequency dependence.
 

@@ -282,8 +282,9 @@ def test_manifest_configuration_matches_the_live_config(manifest):
 def test_manifest_provenance_is_not_from_a_dirty_tree(manifest):
     """A recorded revision that cannot reproduce the artifacts is worse than none.
 
-    R17's artifacts were first generated from a working tree carrying an uncommitted fix, so the
-    manifest named ``main``, whose code raises ``IndexError`` and cannot produce two of the keys
+    The artifacts frozen with the ``noise_log_likelihood`` fix were first generated from a working
+    tree carrying that fix uncommitted, so the manifest named ``main``, whose code raises
+    ``IndexError`` and cannot produce two of the keys
     the manifest describes. Nothing detected it — the digests were self-consistent and every test
     passed. This asserts the generator was run on a clean tree, which is what makes
     ``git_revision`` a reproduction instruction rather than a decoration.
