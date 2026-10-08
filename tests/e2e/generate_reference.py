@@ -30,6 +30,20 @@ MANIFEST_PATH = REFERENCE_DIR / "manifest.json"
 
 TRACKED_PACKAGES = ("nullcal", "bilby", "numpy", "scipy", "lalsuite")
 
+#: Written verbatim into the manifest's ``fixed_defects``. Kept here as the single source so the
+#: stored manifest can be checked against it; edit the text here and regenerate, never the JSON alone.
+FIXED_DEFECTS = {
+    "noise_log_likelihood": (
+        "Fixed. Before the fix, RecalibrationLikelihood.noise_log_likelihood() raised "
+        "IndexError, because compute_uncalibrated_time_frequency_domain_null_stream applied "
+        "the 2-D time-frequency filter to the 2-D frequency-domain array it had already "
+        "consumed and returned the time-frequency array unfiltered. The fix filters the "
+        "array it returns, matching the calibrated path. noise_log_likelihood and "
+        "uncalibrated_time_frequency_domain_null_stream are frozen artifacts from this "
+        "revision onward; earlier manifests record them as absent under known_defects."
+    )
+}
+
 
 def _digest(array: np.ndarray) -> str:
     """Content digest of an array, independent of how numpy chooses to lay it out."""
@@ -114,17 +128,7 @@ def main() -> int:
             }
             for key, value in artifacts.items()
         },
-        "fixed_defects": {
-            "noise_log_likelihood": (
-                "Fixed. Before the fix, RecalibrationLikelihood.noise_log_likelihood() raised "
-                "IndexError, because compute_uncalibrated_time_frequency_domain_null_stream applied "
-                "the 2-D time-frequency filter to the 2-D frequency-domain array it had already "
-                "consumed and returned the time-frequency array unfiltered. The fix filters the "
-                "array it returns, matching the calibrated path. noise_log_likelihood and "
-                "uncalibrated_time_frequency_domain_null_stream are frozen artifacts from this "
-                "revision onward; earlier manifests record them as absent under known_defects."
-            )
-        },
+        "fixed_defects": FIXED_DEFECTS,
     }
     MANIFEST_PATH.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
 

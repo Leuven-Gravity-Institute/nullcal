@@ -16,13 +16,14 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from . import generate_reference_inputs, pipeline
+from . import generate_reference, generate_reference_inputs, pipeline
 
 REFERENCE_DIR = Path(__file__).parent / "reference"
 ARTIFACT_PATH = REFERENCE_DIR / "artifacts.npz"
 MANIFEST_PATH = REFERENCE_DIR / "manifest.json"
 INPUT_ARTIFACT_PATH = REFERENCE_DIR / "inputs.npz"
 INPUT_MANIFEST_PATH = REFERENCE_DIR / "inputs_manifest.json"
+POSTERIOR_MANIFEST_PATH = REFERENCE_DIR / "posterior_manifest.json"
 
 pytestmark = [pytest.mark.e2e, pytest.mark.slow]
 
@@ -277,6 +278,44 @@ def test_manifest_configuration_matches_the_live_config(manifest):
     )
     for key, value in expected.items():
         assert recorded[key] == value, f"manifest configuration[{key!r}] = {recorded[key]!r}, config.py says {value!r}"
+
+
+def test_manifest_fixed_defects_match_the_generator(manifest):
+    """The stored defect notes must be exactly what the generator writes.
+
+    The same prose lives in two places: ``generate_reference.FIXED_DEFECTS`` and the committed
+    ``manifest.json``. Nothing else reads it, so an edit to one copy alone would leave the manifest
+    describing a fix the generator no longer states, with every other test still green. Compare the
+    UTF-8 bytes per key, not just the parsed dicts, so the failure names the entry that drifted.
+    """
+    stored = manifest.get("fixed_defects")
+    assert isinstance(stored, dict), "manifest has no fixed_defects mapping"
+    expected = generate_reference.FIXED_DEFECTS
+    assert set(stored) == set(expected), (
+        f"manifest fixed_defects keys {sorted(stored)} differ from the generator's {sorted(expected)}"
+    )
+    for key, text in expected.items():
+        assert stored[key].encode("utf-8") == text.encode("utf-8"), (
+            f"fixed_defects[{key!r}] in manifest.json differs from generate_reference.FIXED_DEFECTS; "
+            "edit the generator and regenerate rather than editing either copy alone"
+        )
+
+
+def test_posterior_manifest_defect_note_points_at_a_recorded_fix(manifest):
+    """The posterior manifest explains its NaN noise evidence by pointing at ``fixed_defects``.
+
+    That note has no generator in this repository, so it cannot be compared against one. What can
+    be checked is that the pointer resolves: the defect it names must have an entry in the
+    artifact manifest, or the explanation sends the reader to a record that does not exist.
+    """
+    if not POSTERIOR_MANIFEST_PATH.exists():
+        pytest.fail(f"reference posterior manifest absent: {POSTERIOR_MANIFEST_PATH}")
+    note = json.loads(POSTERIOR_MANIFEST_PATH.read_text())["unavailable_at_this_revision"]["log_noise_evidence"]
+    assert "noise_log_likelihood()" in note, "log_noise_evidence note no longer names the defective method"
+    assert "fixed_defects in manifest.json" in note, "log_noise_evidence note no longer points at fixed_defects"
+    assert "noise_log_likelihood" in manifest.get("fixed_defects", {}), (
+        "posterior manifest points at fixed_defects for noise_log_likelihood, but manifest.json has no such entry"
+    )
 
 
 def test_manifest_provenance_is_not_from_a_dirty_tree(manifest):
