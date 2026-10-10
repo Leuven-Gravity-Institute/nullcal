@@ -150,6 +150,6 @@
     },
     "smoke": false,
     "unavailable_at_this_revision": {
-        "log_noise_evidence": "NaN by construction: noise_log_likelihood() raises IndexError on this revision (the R1 defect, fixed in R17), and bilby calls it unconditionally after sampling. log_bayes_factor is NaN for the same reason. Neither is part of the anchor."
+        "log_noise_evidence": "NaN by construction: noise_log_likelihood() raises IndexError on this revision (a defect fixed in a later revision; see fixed_defects in manifest.json), and bilby calls it unconditionally after sampling. log_bayes_factor is NaN for the same reason. Neither is part of the anchor."
     }
 }
