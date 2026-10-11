@@ -1,4 +1,4 @@
-"""Run the fixed BlackJAX acceptance posterior against immutable R1 inputs."""
+"""Run the fixed BlackJAX acceptance posterior against the immutable end-to-end reference inputs."""
 
 from __future__ import annotations
 
