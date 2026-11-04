@@ -124,3 +124,9 @@ def test_bca_is_distinct_from_the_percentile_bound():
     )
     assert result.upper_bound == reference.confidence_interval.high
     assert result.upper_bound != percentile
+
+
+def test_rejects_masked_values_instead_of_using_hidden_entries():
+    values = np.ma.masked_equal(np.arange(12.0).reshape(4, 3), 3.0)
+    with pytest.raises(ValueError, match="values"):
+        source_block_quantile_upper(values, resamples=128)

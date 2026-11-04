@@ -60,6 +60,8 @@ def source_block_quantile_upper(
         raise ValueError("resamples must be an integer of at least two")
     if isinstance(seed, bool) or not isinstance(seed, Integral) or seed < 0:
         raise ValueError("seed must be a nonnegative integer")
+    if np.ma.is_masked(values):
+        raise ValueError("values must not contain masked entries")
     try:
         raw = np.asarray(values)
         if np.iscomplexobj(raw):
