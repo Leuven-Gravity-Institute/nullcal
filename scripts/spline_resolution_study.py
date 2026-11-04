@@ -289,7 +289,7 @@ detector relative to 21 knots.
 
 ## Provenance and limitations
 
-- Claim `submitted_basis_misses_requirement` -> result `submitted-10` -> run
+- Claim `submitted_basis_not_demonstrated_over_20_2000_hz` -> result `submitted-10` -> run
   `2026-09-15-spline-resolution-study` in `run.json`.
 - Claim `recommended_basis_resolves_bump_over_20_2000_hz` -> result `qnm-dense-19` -> the same
   run snapshot.
