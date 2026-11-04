@@ -21,6 +21,7 @@ class SourceBlockQuantileBound:
     upper_bound: float
     standard_error: float
     bootstrap_distribution: tuple[float, ...]
+    support_saturated: bool
 
 
 def _probability(value: float, name: str) -> float:
@@ -44,7 +45,9 @@ def source_block_quantile_upper(
     jackknife deletes one complete source. The quantile uses NumPy's ``linear``
     convention over the pooled values. At least three sources and one repeat
     are required; unequal-sized clusters or non-finite/missing values are not
-    accepted. Sources, rather than individual repeats, must be independent.
+    accepted, including masks nested in row sequences. Input dtypes must be
+    integer or floating point, excluding boolean/string/object arrays. Sources,
+    rather than individual repeats, must be independent.
 
     This delegates BCa to ``scipy.stats.bootstrap`` with ``alternative='less'``
     (https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.bootstrap.html).
@@ -52,7 +55,9 @@ def source_block_quantile_upper(
     or non-finite intervals raise ValueError, with no percentile fallback.
     The returned nominal level is not evidence of empirical coverage for a
     non-smooth quantile, nor a simultaneous confidence band across many calls.
-    Callers must assess resampling precision and sampling-model validity.
+    ``support_saturated`` flags an endpoint at the largest bootstrap estimate;
+    it does not establish coverage or universally invalidate a discrete-data
+    interval. Callers must assess resampling precision and sampling-model validity.
     """
     quantile = _probability(quantile, "quantile")
     confidence_level = _probability(confidence_level, "confidence_level")
@@ -60,15 +65,19 @@ def source_block_quantile_upper(
         raise ValueError("resamples must be an integer of at least two")
     if isinstance(seed, bool) or not isinstance(seed, Integral) or seed < 0:
         raise ValueError("seed must be a nonnegative integer")
-    if np.ma.is_masked(values):
-        raise ValueError("values must not contain masked entries")
     try:
-        raw = np.asarray(values)
-        if np.iscomplexobj(raw):
-            raise ValueError("values must be real")
-        matrix = np.asarray(raw, dtype=np.float64)
-    except (TypeError, ValueError) as exc:
-        raise ValueError("values must be a finite real source-by-repeat matrix") from exc
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", UserWarning)
+            warnings.simplefilter("error", RuntimeWarning)
+            masked = np.ma.asarray(values)
+            if np.ma.is_masked(masked):
+                raise ValueError("values must not contain masked entries")
+            raw = np.asarray(masked)
+            if raw.dtype.kind not in "iuf":
+                raise ValueError("values must have a real integer or floating-point dtype")
+            matrix = np.asarray(raw, dtype=np.float64)
+    except (TypeError, ValueError, UserWarning, RuntimeWarning) as exc:
+        raise ValueError("values must be a finite real source-by-repeat matrix without masked entries") from exc
     if (
         matrix.ndim != _SOURCE_MATRIX_NDIM
         or matrix.shape[0] < _MIN_SOURCE_COUNT
@@ -110,6 +119,7 @@ def source_block_quantile_upper(
         upper_bound=upper_bound,
         standard_error=standard_error,
         bootstrap_distribution=tuple(float(value) for value in result.bootstrap_distribution),
+        support_saturated=bool(upper_bound >= np.max(result.bootstrap_distribution)),
     )
 
 

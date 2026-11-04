@@ -124,9 +124,32 @@ def test_bca_is_distinct_from_the_percentile_bound():
     )
     assert result.upper_bound == reference.confidence_interval.high
     assert result.upper_bound != percentile
+    assert result.support_saturated is False
 
 
 def test_rejects_masked_values_instead_of_using_hidden_entries():
     values = np.ma.masked_equal(np.arange(12.0).reshape(4, 3), 3.0)
     with pytest.raises(ValueError, match="values"):
         source_block_quantile_upper(values, resamples=128)
+
+
+@pytest.mark.parametrize("container", [list, tuple])
+def test_rejects_masked_rows_inside_a_sequence(container):
+    matrix = np.ma.masked_equal(np.arange(12.0).reshape(4, 3), 3.0)
+    values = container(matrix[row] for row in range(4))
+    with pytest.raises(ValueError, match="values"):
+        source_block_quantile_upper(values, resamples=64)
+
+
+@pytest.mark.parametrize("dtype", [str, bool, object])
+def test_rejects_non_numeric_or_boolean_matrix_types(dtype):
+    values = np.arange(12.0).reshape(4, 3).astype(dtype)
+    with pytest.raises(ValueError, match="values"):
+        source_block_quantile_upper(values, resamples=64)
+
+
+def test_reports_bootstrap_support_boundary_saturation():
+    values = np.array([0.0, 0.01, 0.02, 0.03, 100.0])[:, None]
+    result = source_block_quantile_upper(values, resamples=256, seed=5)
+    assert result.upper_bound == max(result.bootstrap_distribution)
+    assert getattr(result, "support_saturated", None) is True
